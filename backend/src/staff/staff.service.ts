@@ -49,8 +49,79 @@ export class StaffService {
           joiningDate: new Date(data.joiningDate || Date.now()),
           salary: parseFloat(data.salary || 0),
           institutionId,
+          
+          aadhaarNumber: data.aadhaarNumber || null,
+          panNumber: data.panNumber || null,
+          qualification: data.qualification || null,
+          experience: data.experience !== undefined ? parseInt(data.experience) : null,
+          gender: data.gender || null,
+          bloodGroup: data.bloodGroup || null,
+          fatherSpouseName: data.fatherSpouseName || null,
+          permanentAddress: data.permanentAddress || null,
+          bankName: data.bankName || null,
+          bankBranch: data.bankBranch || null,
+          accNumber: data.accNumber || null,
+          ifscCode: data.ifscCode || null,
+          pfNumber: data.pfNumber || null,
+          esiNumber: data.esiNumber || null,
+          emergencyContactName: data.emergencyContactName || null,
+          emergencyContactPhone: data.emergencyContactPhone || null,
         },
       });
+    });
+  }
+
+  async getStaffById(institutionId: string, id: string) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id, institutionId },
+      include: {
+        user: { select: { email: true, role: true, isActive: true } },
+        payrolls: true,
+        leaves: true,
+      },
+    });
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+    return staff;
+  }
+
+  async updateStaff(institutionId: string, id: string, data: any) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id, institutionId },
+    });
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    return this.prisma.staff.update({
+      where: { id },
+      data: {
+        firstName: data.firstName !== undefined ? data.firstName : staff.firstName,
+        lastName: data.lastName !== undefined ? data.lastName : staff.lastName,
+        phone: data.phone !== undefined ? data.phone : staff.phone,
+        designation: data.designation !== undefined ? data.designation : staff.designation,
+        joiningDate: data.joiningDate !== undefined ? new Date(data.joiningDate) : staff.joiningDate,
+        salary: data.salary !== undefined ? parseFloat(data.salary) : staff.salary,
+        status: data.status !== undefined ? data.status : staff.status,
+        
+        aadhaarNumber: data.aadhaarNumber !== undefined ? data.aadhaarNumber : staff.aadhaarNumber,
+        panNumber: data.panNumber !== undefined ? data.panNumber : staff.panNumber,
+        qualification: data.qualification !== undefined ? data.qualification : staff.qualification,
+        experience: data.experience !== undefined ? (data.experience ? parseInt(data.experience) : null) : staff.experience,
+        gender: data.gender !== undefined ? data.gender : staff.gender,
+        bloodGroup: data.bloodGroup !== undefined ? data.bloodGroup : staff.bloodGroup,
+        fatherSpouseName: data.fatherSpouseName !== undefined ? data.fatherSpouseName : staff.fatherSpouseName,
+        permanentAddress: data.permanentAddress !== undefined ? data.permanentAddress : staff.permanentAddress,
+        bankName: data.bankName !== undefined ? data.bankName : staff.bankName,
+        bankBranch: data.bankBranch !== undefined ? data.bankBranch : staff.bankBranch,
+        accNumber: data.accNumber !== undefined ? data.accNumber : staff.accNumber,
+        ifscCode: data.ifscCode !== undefined ? data.ifscCode : staff.ifscCode,
+        pfNumber: data.pfNumber !== undefined ? data.pfNumber : staff.pfNumber,
+        esiNumber: data.esiNumber !== undefined ? data.esiNumber : staff.esiNumber,
+        emergencyContactName: data.emergencyContactName !== undefined ? data.emergencyContactName : staff.emergencyContactName,
+        emergencyContactPhone: data.emergencyContactPhone !== undefined ? data.emergencyContactPhone : staff.emergencyContactPhone,
+      },
     });
   }
 

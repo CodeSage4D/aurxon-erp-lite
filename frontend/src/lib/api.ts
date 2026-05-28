@@ -87,9 +87,90 @@ const DEFAULT_MOCK_DB = {
   ],
 
   staff: [
-    { id: 'staff-1', employeeId: 'EMP001', firstName: 'Sarah', lastName: 'Connor', phone: '+1 555-0101', designation: 'TEACHER', joiningDate: '2024-08-15', salary: 4500, status: 'ACTIVE', user: { email: 'teacher1@aurxon.com', isActive: true } },
-    { id: 'staff-2', employeeId: 'EMP002', firstName: 'John', lastName: 'Keating', phone: '+1 555-0102', designation: 'TEACHER', joiningDate: '2025-01-10', salary: 4800, status: 'ACTIVE', user: { email: 'teacher2@aurxon.com', isActive: true } },
-    { id: 'staff-3', employeeId: 'EMP003', firstName: 'Robert', lastName: 'Kiyosaki', phone: '+1 555-0103', designation: 'ACCOUNTANT', joiningDate: '2024-09-01', salary: 4000, status: 'ACTIVE', user: { email: 'accountant@aurxon.com', isActive: true } }
+    {
+      id: 'staff-1',
+      employeeId: 'EMP001',
+      firstName: 'Sarah',
+      lastName: 'Connor',
+      phone: '+1 555-0101',
+      designation: 'TEACHER',
+      joiningDate: '2024-08-15',
+      salary: 45000,
+      status: 'ACTIVE',
+      user: { email: 'teacher1@aurxon.com', isActive: true },
+      aadhaarNumber: '394082049284',
+      panNumber: 'ABCDE1234F',
+      qualification: 'M.Sc. Mathematics, B.Ed.',
+      experience: 8,
+      gender: 'FEMALE',
+      bloodGroup: 'O+',
+      fatherSpouseName: 'James Connor',
+      permanentAddress: '742 Evergreen Terrace, Springfield',
+      bankName: 'State Bank of India',
+      bankBranch: 'Main Branch',
+      accNumber: '10002930492',
+      ifscCode: 'SBIN0000001',
+      pfNumber: 'PF-2026-904',
+      esiNumber: 'ESI-302-840',
+      emergencyContactName: 'John Connor',
+      emergencyContactPhone: '+1 555-0199'
+    },
+    {
+      id: 'staff-2',
+      employeeId: 'EMP002',
+      firstName: 'John',
+      lastName: 'Keating',
+      phone: '+1 555-0102',
+      designation: 'TEACHER',
+      joiningDate: '2025-01-10',
+      salary: 48000,
+      status: 'ACTIVE',
+      user: { email: 'teacher2@aurxon.com', isActive: true },
+      aadhaarNumber: '562180429402',
+      panNumber: 'FGHIJ5678K',
+      qualification: 'M.A. English Literature',
+      experience: 12,
+      gender: 'MALE',
+      bloodGroup: 'A+',
+      fatherSpouseName: 'Arthur Keating',
+      permanentAddress: 'Welton Academy Quarters, Vermont',
+      bankName: 'HDFC Bank',
+      bankBranch: 'City Center',
+      accNumber: '50019283049',
+      ifscCode: 'HDFC0000124',
+      pfNumber: 'PF-2026-905',
+      esiNumber: 'ESI-302-841',
+      emergencyContactName: 'Todd Anderson',
+      emergencyContactPhone: '+1 555-0188'
+    },
+    {
+      id: 'staff-3',
+      employeeId: 'EMP003',
+      firstName: 'Robert',
+      lastName: 'Kiyosaki',
+      phone: '+1 555-0103',
+      designation: 'ACCOUNTANT',
+      joiningDate: '2024-09-01',
+      salary: 40000,
+      status: 'ACTIVE',
+      user: { email: 'accountant@aurxon.com', isActive: true },
+      aadhaarNumber: '894082049285',
+      panNumber: 'KLMNO9012L',
+      qualification: 'B.Com, Chartered Accountant',
+      experience: 15,
+      gender: 'MALE',
+      bloodGroup: 'B+',
+      fatherSpouseName: 'Richard Kiyosaki',
+      permanentAddress: '88 Financial Plaza, Mumbai',
+      bankName: 'ICICI Bank',
+      bankBranch: 'Finance Row',
+      accNumber: '60029304925',
+      ifscCode: 'ICIC0000045',
+      pfNumber: 'PF-2026-906',
+      esiNumber: 'ESI-302-842',
+      emergencyContactName: 'Kim Kiyosaki',
+      emergencyContactPhone: '+1 555-0177'
+    }
   ],
 
   attendance: [
@@ -147,6 +228,40 @@ const DEFAULT_MOCK_DB = {
   ],
   bookIssues: [
     { id: 'issue-1', studentId: 'stud-1', bookId: 'book-1', issueDate: '2026-05-26T10:00:00.000Z', returnDate: null, status: 'ISSUED', book: { title: 'Fundamentals of Physics', author: 'Halliday & Resnick', isbn: '978-0470801833' }, student: { firstName: 'Alice', lastName: 'Miller', scholarNumber: 'SCH-2026-001', rollNumber: 'ROLL-10A-01' } }
+  ],
+  payrolls: [
+    {
+      id: 'pay-1',
+      staffId: 'staff-1',
+      month: 'May 2026',
+      baseSalary: 45000,
+      hra: 8000,
+      da: 5000,
+      allowances: 2000,
+      deductions: 1500,
+      netPay: 58500,
+      paymentDate: '2026-05-25T10:00:00.000Z',
+      paymentMethod: 'BANK_TRANSFER',
+      receiptNumber: 'PAY-820492-901',
+      status: 'PAID',
+      staff: { id: 'staff-1', employeeId: 'EMP001', firstName: 'Sarah', lastName: 'Connor', designation: 'TEACHER' }
+    },
+    {
+      id: 'pay-2',
+      staffId: 'staff-2',
+      month: 'May 2026',
+      baseSalary: 48000,
+      hra: 8000,
+      da: 5000,
+      allowances: 3000,
+      deductions: 2000,
+      netPay: 62000,
+      paymentDate: '2026-05-25T10:30:00.000Z',
+      paymentMethod: 'BANK_TRANSFER',
+      receiptNumber: 'PAY-820492-902',
+      status: 'PAID',
+      staff: { id: 'staff-2', employeeId: 'EMP002', firstName: 'John', lastName: 'Keating', designation: 'TEACHER' }
+    }
   ]
 };
 
@@ -1435,6 +1550,174 @@ export async function returnBookApi(issueId: string) {
 
     saveMockDb(db);
     return db.bookIssues[issueIdx];
+  }
+}
+
+export async function getStaffByIdApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/staff/${id}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const staff = db.staff.find((s: any) => s.id === id);
+    if (!staff) throw new Error('Staff member not found');
+    
+    const payrolls = (db.payrolls || []).filter((p: any) => p.staffId === id);
+    const leaves = (db.leaves || []).filter((l: any) => l.staffId === id);
+    
+    return {
+      ...staff,
+      payrolls,
+      leaves
+    };
+  }
+}
+
+export async function updateStaffApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/staff/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const idx = db.staff.findIndex((s: any) => s.id === id);
+    if (idx === -1) throw new Error('Staff member not found');
+    
+    db.staff[idx] = {
+      ...db.staff[idx],
+      ...data,
+      salary: data.salary !== undefined ? parseFloat(data.salary) : db.staff[idx].salary,
+      experience: data.experience !== undefined ? parseInt(data.experience) : db.staff[idx].experience,
+    };
+    saveMockDb(db);
+    return db.staff[idx];
+  }
+}
+
+export async function getPayrollsApi(month?: string) {
+  try {
+    const query = month ? `?month=${month}` : '';
+    const res = await fetch(`${API_URL}/payroll${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.payrolls || [];
+    if (month) {
+      list = list.filter((p: any) => p.month === month);
+    }
+    return list;
+  }
+}
+
+export async function getStaffPayrollsApi(staffId: string) {
+  try {
+    const res = await fetch(`${API_URL}/payroll/staff/${staffId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return (db.payrolls || []).filter((p: any) => p.staffId === staffId);
+  }
+}
+
+export async function getPayrollByIdApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/payroll/${id}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const payroll = (db.payrolls || []).find((p: any) => p.id === id);
+    if (!payroll) throw new Error('Payroll record not found');
+    const staff = db.staff.find((s: any) => s.id === payroll.staffId);
+    return {
+      ...payroll,
+      staff
+    };
+  }
+}
+
+export async function createPayrollApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/payroll`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.payrolls) db.payrolls = [];
+    
+    const staff = db.staff.find((s: any) => s.id === data.staffId);
+    if (!staff) throw new Error('Staff member not found');
+    
+    const existing = db.payrolls.find((p: any) => p.staffId === data.staffId && p.month === data.month);
+    if (existing) throw new Error(`Salary slip for ${data.month} already generated for this employee`);
+    
+    const baseSalary = parseFloat(data.baseSalary) || staff.salary;
+    const hra = parseFloat(data.hra) || 0;
+    const da = parseFloat(data.da) || 0;
+    const allowances = parseFloat(data.allowances) || 0;
+    const deductions = parseFloat(data.deductions) || 0;
+    const netPay = baseSalary + hra + da + allowances - deductions;
+    
+    const receiptNumber = `PAY-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    
+    const newPayroll = {
+      id: `pay-${Date.now()}`,
+      staffId: data.staffId,
+      month: data.month,
+      baseSalary,
+      hra,
+      da,
+      allowances,
+      deductions,
+      netPay,
+      paymentDate: new Date().toISOString(),
+      paymentMethod: data.paymentMethod || 'BANK_TRANSFER',
+      receiptNumber,
+      status: 'PAID',
+      staff: {
+        id: staff.id,
+        employeeId: staff.employeeId,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        designation: staff.designation
+      }
+    };
+    
+    db.payrolls.push(newPayroll);
+    saveMockDb(db);
+    return newPayroll;
+  }
+}
+
+export async function updatePayrollStatusApi(id: string, status: string) {
+  try {
+    const res = await fetch(`${API_URL}/payroll/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.payrolls) db.payrolls = [];
+    const idx = db.payrolls.findIndex((p: any) => p.id === id);
+    if (idx === -1) throw new Error('Payroll record not found');
+    
+    db.payrolls[idx].status = status;
+    saveMockDb(db);
+    return db.payrolls[idx];
   }
 }
 

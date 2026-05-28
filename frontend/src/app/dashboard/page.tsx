@@ -48,9 +48,15 @@ import {
   getIssuesApi,
   getStudentIssuesApi,
   issueBookApi,
-  returnBookApi
+  returnBookApi,
+  getPayrollsApi
 } from '@/lib/api';
+import EmployeeModal from '@/components/hr/EmployeeModal';
+import HireFormModal from '@/components/hr/HireFormModal';
+import PayslipModal from '@/components/hr/PayslipModal';
+import PayslipGeneratorModal from '@/components/hr/PayslipGeneratorModal';
 import {
+
   LayoutDashboard, Users, CalendarCheck, CreditCard, GraduationCap, Briefcase, Megaphone, LogOut,
   Moon, Sun, Search, Plus, Trash2, Check, X, FileText, DollarSign, TrendingUp, Percent, Clock,
   ChevronRight, ShieldCheck, FileSpreadsheet, BookOpen, Book, Award, MessageSquare, BarChart2,
@@ -87,7 +93,7 @@ const SIDEBAR_CATEGORIES = [
   { id: 'fees', label: 'Fees & Finance', icon: CreditCard, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'] },
   { id: 'comms', label: 'Comms Hub', icon: MessageSquare, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'] },
   { id: 'library', label: 'Library Desk', icon: Book, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'] },
-  { id: 'hr', label: 'HR System', icon: Briefcase, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN'] },
+  { id: 'hr', label: 'HR System', icon: Briefcase, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'] },
   { id: 'analytics', label: 'Analytics Desk', icon: BarChart2, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'INSTITUTE_ADMIN'] },
   { id: 'settings', label: 'Settings', icon: Settings, roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'] }
 ];
@@ -192,6 +198,15 @@ export default function DashboardPage() {
   const [payrollAllowances, setPayrollAllowances] = useState({ hra: 8000, da: 5000, tax: 200 });
   const [payslipData, setPayslipData] = useState<any>(null);
 
+  // Advanced HR states
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [hireModalOpen, setHireModalOpen] = useState(false);
+  const [payrollGeneratorOpen, setPayrollGeneratorOpen] = useState(false);
+  const [selectedPayroll, setSelectedPayroll] = useState<any | null>(null);
+  const [payrolls, setPayrolls] = useState<any[]>([]);
+  const [hrTab, setHrTab] = useState<'employees' | 'payroll' | 'leaves'>('employees');
+  const [payrollSearchQuery, setPayrollSearchQuery] = useState('');
+
   // Communications & Circular States
   const [circularForm, setCircularForm] = useState({ title: '', content: '', targetRoles: [] as string[] });
   const [whatsappGroup, setWhatsappGroup] = useState('PARENTS_ALL');
@@ -264,6 +279,7 @@ export default function DashboardPage() {
     loadFinanceOverview();
     loadBooks();
     loadIssues();
+    loadPayrolls();
 
     // Key listener for Ctrl+K
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -359,6 +375,10 @@ export default function DashboardPage() {
   const loadIssues = async () => {
     const data = await getIssuesApi();
     setBookIssues(data);
+  };
+  const loadPayrolls = async () => {
+    const data = await getPayrollsApi();
+    setPayrolls(data);
   };
 
   const handleLogout = () => {
@@ -2235,163 +2255,103 @@ Type "financial health" or "attendance" to get detailed lists.`;
           {/* J. HR & EMPLOYEE SYSTEM */}
           {activeCategory === 'hr' && (
             <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
-              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
-                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">HR, Staff Leaves & Payroll Desk</h3>
+              
+              {/* Header Tab Switcher */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 pb-4 dark:border-zinc-800 gap-4">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">HR, Staff Leaves & Payroll Desk</h3>
+                  <p className="text-[10px] text-zinc-400 font-medium mt-0.5">Manage contracts, salary vouchers, and leave rosters.</p>
+                </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setStaffTab('list')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${staffTab === 'list' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Employees List</button>
-                  <button onClick={() => setStaffTab('leaves')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${staffTab === 'leaves' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Leaves Approval</button>
+                  <button 
+                    onClick={() => setHrTab('employees')} 
+                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${hrTab === 'employees' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}
+                  >
+                    Employees Directory
+                  </button>
+                  <button 
+                    onClick={() => setHrTab('payroll')} 
+                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${hrTab === 'payroll' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}
+                  >
+                    Payroll Slip Vault
+                  </button>
+                  <button 
+                    onClick={() => setHrTab('leaves')} 
+                    className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${hrTab === 'leaves' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}
+                  >
+                    Leaves Desk
+                  </button>
                 </div>
               </div>
 
-              {staffTab === 'list' && (
-                <div className="space-y-6">
-                  {/* Create staff form */}
-                  <form onSubmit={handleCreateStaff} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">First Name</label>
-                      <input required placeholder="Sarah" value={staffForm.firstName} onChange={e => setStaffForm({...staffForm, firstName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+              {/* Sub-Tab 1: Employees Directory */}
+              {hrTab === 'employees' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute top-2.5 left-3 h-4 w-4 text-zinc-400" />
+                      <input
+                        type="text"
+                        placeholder="Search employees by name, ID or designation..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-4 text-xs font-medium outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                      />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Last Name</label>
-                      <input required placeholder="Connor" value={staffForm.lastName} onChange={e => setStaffForm({...staffForm, lastName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Employee ID</label>
-                      <input required placeholder="EMP004" value={staffForm.employeeId} onChange={e => setStaffForm({...staffForm, employeeId: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Monthly Salary (₹)</label>
-                      <input type="number" required placeholder="45000" value={staffForm.salary} onChange={e => setStaffForm({...staffForm, salary: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Designation Role</label>
-                      <select value={staffForm.designation} onChange={e => setStaffForm({...staffForm, designation: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
-                        <option value="TEACHER">Teacher Desk</option>
-                        <option value="ACCOUNTANT">Accountant Desk</option>
-                        <option value="LIBRARIAN">Librarian Desk</option>
-                        <option value="STAFF">General Office Staff</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Phone</label>
-                      <input placeholder="+91 9988776655" value={staffForm.phone} onChange={e => setStaffForm({...staffForm, phone: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Email</label>
-                      <input required placeholder="teacher@aurxon.com" value={staffForm.email} onChange={e => setStaffForm({...staffForm, email: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
-                    </div>
-                    <div className="flex items-end">
-                      <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-sky-600 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                    {['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'INSTITUTE_ADMIN'].includes(currentRole) && (
+                      <button
+                        onClick={() => setHireModalOpen(true)}
+                        className="flex justify-center items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-sky-500 shrink-0"
+                      >
                         <Plus className="h-4 w-4" />
                         <span>Hire Employee</span>
                       </button>
-                    </div>
-                  </form>
-
-                  {/* Payroll generator preview */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Left side parameters */}
-                    <div className="bg-zinc-50/40 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800 space-y-4 text-xs">
-                      <h4 className="font-bold text-zinc-500 uppercase">CBSE Payroll slips Calculator</h4>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400">Select Employee</label>
-                        <select value={payrollStaffId} onChange={e => setPayrollStaffId(e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
-                          <option value="">Select Employee</option>
-                          {staff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.designation})</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400">House Rent Allowance (HRA)</label>
-                        <input type="number" value={allowances.hra} onChange={e => setAllowances({...allowances, hra: parseInt(e.target.value) || 0})} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400">Dearness Allowance (DA)</label>
-                        <input type="number" value={allowances.da} onChange={e => setAllowances({...allowances, da: parseInt(e.target.value) || 0})} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
-                      </div>
-                      <button type="button" onClick={() => generatePayslip(payrollStaffId)} className="w-full rounded-xl bg-indigo-600 py-3 font-bold text-white hover:bg-indigo-500">Calculate Pay & Allowances</button>
-                    </div>
-
-                    {/* Right side preview */}
-                    <div className="md:col-span-2 border border-zinc-100 rounded-xl p-5 dark:border-zinc-800 bg-zinc-50/20">
-                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Payslip Print Preview</h4>
-                      {payslipData ? (
-                        <div className="bg-white p-5 rounded-xl border border-zinc-200 text-xs font-mono text-zinc-800 space-y-4 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-300">
-                          <div className="text-center border-b border-zinc-200 pb-3 dark:border-zinc-800">
-                            <h5 className="font-extrabold text-sm text-sky-600 dark:text-sky-400">AURXON INTERNATIONAL ACADEMY</h5>
-                            <p className="text-[10px] text-zinc-400">Salary Slip for Period: {payslipData.period}</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-[11px]">
-                            <p><strong>Employee Name:</strong> {payslipData.name}</p>
-                            <p className="text-right"><strong>ID Number:</strong> {payslipData.employeeId}</p>
-                            <p><strong>Designation:</strong> {payslipData.designation}</p>
-                            <p className="text-right"><strong>Voucher Reference:</strong> {payslipData.receiptNo}</p>
-                          </div>
-                          <div className="border-t border-b border-zinc-200 py-2.5 dark:border-zinc-800 space-y-1.5 text-[11px]">
-                            <div className="flex justify-between">
-                              <span>Base Salary</span>
-                              <span>₹{payslipData.baseSalary}</span>
-                            </div>
-                            <div className="flex justify-between text-emerald-600">
-                              <span>(+) House Rent Allowance (HRA)</span>
-                              <span>₹{payslipData.hra}</span>
-                            </div>
-                            <div className="flex justify-between text-emerald-600">
-                              <span>(+) Dearness Allowance (DA)</span>
-                              <span>₹{payslipData.da}</span>
-                            </div>
-                            <div className="flex justify-between text-red-600">
-                              <span>(-) Professional Tax (debit)</span>
-                              <span>₹{payslipData.tax}</span>
-                            </div>
-                          </div>
-                          <div className="flex justify-between font-black text-xs text-sky-600 dark:text-sky-400 pt-2">
-                            <span>NET EARNINGS PAID</span>
-                            <span>₹{payslipData.netPay}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-48 flex justify-center items-center text-xs text-zinc-400 font-medium">Select employee and calculate to preview voucher.</div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                </div>
-              )}
 
-              {staffTab === 'leaves' && (
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Leave Applications Desk</h4>
                   <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
-                          <th className="p-3">Staff Name</th>
+                          <th className="p-3">Employee ID</th>
+                          <th className="p-3">Employee Name</th>
                           <th className="p-3">Designation</th>
-                          <th className="p-3">Reason</th>
-                          <th className="p-3">Interval</th>
+                          <th className="p-3">Joining Date</th>
+                          <th className="p-3">Monthly Salary</th>
                           <th className="p-3">Status</th>
-                          <th className="p-3">Actions</th>
+                          <th className="p-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
-                        {leaves.map((leave) => (
-                          <tr key={leave.id}>
-                            <td className="p-3 font-bold">{leave.staff?.firstName} {leave.staff?.lastName}</td>
-                            <td className="p-3 text-zinc-500">{leave.staff?.designation}</td>
-                            <td className="p-3">{leave.reason}</td>
-                            <td className="p-3">{new Date(leave.startDate).toLocaleDateString()} to {new Date(leave.endDate).toLocaleDateString()}</td>
+                        {staff.filter(s => {
+                          const q = searchQuery.toLowerCase();
+                          return s.firstName.toLowerCase().includes(q) ||
+                                 s.lastName.toLowerCase().includes(q) ||
+                                 s.employeeId.toLowerCase().includes(q) ||
+                                 s.designation.toLowerCase().includes(q);
+                        }).map((employee) => (
+                          <tr key={employee.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20">
+                            <td className="p-3">
+                              <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-600 dark:text-sky-400 font-mono uppercase">
+                                {employee.employeeId}
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold">{employee.firstName} {employee.lastName}</td>
+                            <td className="p-3 text-zinc-500 text-[11px]">{employee.designation}</td>
+                            <td className="p-3 text-zinc-400">{new Date(employee.joiningDate).toLocaleDateString()}</td>
+                            <td className="p-3 font-mono font-bold">₹{employee.salary}</td>
                             <td className="p-3">
                               <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
-                                leave.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600' :
-                                leave.status === 'REJECTED' ? 'bg-red-500/10 text-red-600' : 'bg-amber-500/10 text-amber-600'
-                              }`}>{leave.status}</span>
+                                employee.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-zinc-500/10 text-zinc-500'
+                              }`}>{employee.status}</span>
                             </td>
-                            <td className="p-3 flex gap-2">
-                              {leave.status === 'PENDING' && (
-                                <>
-                                  <button onClick={() => handleApproveLeave(leave.id, 'APPROVED')} className="rounded bg-emerald-600 px-2 py-1 text-[9px] font-bold text-white hover:bg-emerald-500">Approve</button>
-                                  <button onClick={() => handleApproveLeave(leave.id, 'REJECTED')} className="rounded bg-red-600 px-2 py-1 text-[9px] font-bold text-white hover:bg-red-500">Reject</button>
-                                </>
-                              )}
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => setSelectedEmployeeId(employee.id)}
+                                className="rounded-xl border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800 px-3.5 py-1.5 text-xs font-bold text-zinc-500"
+                              >
+                                View Profile
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -2400,6 +2360,193 @@ Type "financial health" or "attendance" to get detailed lists.`;
                   </div>
                 </div>
               )}
+
+              {/* Sub-Tab 2: Payroll Slip Vault */}
+              {hrTab === 'payroll' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute top-2.5 left-3 h-4 w-4 text-zinc-400" />
+                      <input
+                        type="text"
+                        placeholder="Search payslips by employee name or period..."
+                        value={payrollSearchQuery}
+                        onChange={e => setPayrollSearchQuery(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-4 text-xs font-medium outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                      />
+                    </div>
+                    {['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN'].includes(currentRole) && (
+                      <button
+                        onClick={() => setPayrollGeneratorOpen(true)}
+                        className="flex justify-center items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-sky-500 shrink-0"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Generate Salary Slip</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Period</th>
+                          <th className="p-3">Employee Name</th>
+                          <th className="p-3">Designation</th>
+                          <th className="p-3">Voucher Ref</th>
+                          <th className="p-3">Base Salary</th>
+                          <th className="p-3">Net Take-Home</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        {payrolls.filter(p => {
+                          // If standard staff, filter by their profileId
+                          if (['TEACHER', 'LIBRARIAN'].includes(currentRole) && user.profileId) {
+                            if (p.staffId !== user.profileId) return false;
+                          }
+                          const q = payrollSearchQuery.toLowerCase();
+                          const staffName = p.staff ? `${p.staff.firstName} ${p.staff.lastName}`.toLowerCase() : '';
+                          return staffName.includes(q) || p.month.toLowerCase().includes(q) || p.receiptNumber.toLowerCase().includes(q);
+                        }).map((payroll) => (
+                          <tr key={payroll.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20">
+                            <td className="p-3 font-bold">{payroll.month}</td>
+                            <td className="p-3 font-bold">{payroll.staff ? `${payroll.staff.firstName} ${payroll.staff.lastName}` : 'Employee'}</td>
+                            <td className="p-3 text-zinc-500 text-[11px]">{payroll.staff?.designation || 'Staff'}</td>
+                            <td className="p-3 font-mono text-zinc-400">{payroll.receiptNumber}</td>
+                            <td className="p-3 font-mono">₹{payroll.baseSalary}</td>
+                            <td className="p-3 font-mono font-bold text-sky-600 dark:text-sky-400">₹{payroll.netPay}</td>
+                            <td className="p-3">
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-600 uppercase">
+                                {payroll.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => setSelectedPayroll(payroll)}
+                                className="rounded-xl border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800 px-3.5 py-1.5 text-xs font-bold text-zinc-500"
+                              >
+                                View Slip
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-Tab 3: Leaves Desk */}
+              {hrTab === 'leaves' && (
+                <div className="space-y-6">
+                  
+                  {/* Staff view: Apply form */}
+                  {['TEACHER', 'LIBRARIAN', 'STAFF'].includes(currentRole) && (
+                    <form onSubmit={handleCreateLeave} className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Start Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={leaveForm.startDate}
+                          onChange={e => setLeaveForm({...leaveForm, startDate: e.target.value})}
+                          className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">End Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={leaveForm.endDate}
+                          onChange={e => setLeaveForm({...leaveForm, endDate: e.target.value})}
+                          className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Reason / Details</label>
+                        <input
+                          required
+                          placeholder="Medical appointment / Personal reasons..."
+                          value={leaveForm.reason}
+                          onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})}
+                          className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                        />
+                      </div>
+                      <div className="md:col-span-3 flex justify-end">
+                        <button type="submit" className="rounded-xl bg-sky-600 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                          Submit Leave Request
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* List of leaves */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Leave Applications Desk</h4>
+                    <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                            <th className="p-3">Staff Name</th>
+                            <th className="p-3">Designation</th>
+                            <th className="p-3">Reason</th>
+                            <th className="p-3">Interval</th>
+                            <th className="p-3">Status</th>
+                            {['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'INSTITUTE_ADMIN'].includes(currentRole) && <th className="p-3 text-right">Actions</th>}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                          {leaves.filter(leave => {
+                            // If standard staff, filter by profileId
+                            if (['TEACHER', 'LIBRARIAN'].includes(currentRole) && user.profileId) {
+                              return leave.staffId === user.profileId || leave.staff?.id === user.profileId;
+                            }
+                            return true;
+                          }).map((leave) => (
+                            <tr key={leave.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20">
+                              <td className="p-3 font-bold">{leave.staff ? `${leave.staff.firstName} ${leave.staff.lastName}` : 'Staff'}</td>
+                              <td className="p-3 text-zinc-500 text-[11px]">{leave.staff?.designation}</td>
+                              <td className="p-3">{leave.reason}</td>
+                              <td className="p-3 text-zinc-400">{new Date(leave.startDate).toLocaleDateString()} to {new Date(leave.endDate).toLocaleDateString()}</td>
+                              <td className="p-3">
+                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                                  leave.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600' :
+                                  leave.status === 'REJECTED' ? 'bg-red-500/10 text-red-600' : 'bg-amber-500/10 text-amber-600'
+                                }`}>{leave.status}</span>
+                              </td>
+                              {['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'INSTITUTE_ADMIN'].includes(currentRole) && (
+                                <td className="p-3 text-right flex justify-end gap-2">
+                                  {leave.status === 'PENDING' && (
+                                    <>
+                                      <button 
+                                        onClick={() => handleApproveLeave(leave.id, 'APPROVED')} 
+                                        className="rounded bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-emerald-500"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button 
+                                        onClick={() => handleApproveLeave(leave.id, 'REJECTED')} 
+                                        className="rounded bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-red-500"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
             </div>
           )}
 
@@ -2605,6 +2752,34 @@ Type "financial health" or "attendance" to get detailed lists.`;
             </form>
           </div>
         </div>
+      )}
+
+      {/* Advanced HR Overlays & Modals */}
+      {selectedEmployeeId && (
+        <EmployeeModal
+          employeeId={selectedEmployeeId}
+          onClose={() => setSelectedEmployeeId(null)}
+          onSaved={() => { loadStaff(); }}
+        />
+      )}
+      {hireModalOpen && (
+        <HireFormModal
+          onClose={() => setHireModalOpen(false)}
+          onSaved={() => { loadStaff(); }}
+        />
+      )}
+      {payrollGeneratorOpen && (
+        <PayslipGeneratorModal
+          staffList={staff}
+          onClose={() => setPayrollGeneratorOpen(false)}
+          onSaved={() => { loadPayrolls(); loadFinanceOverview(); loadDashboardStats(); }}
+        />
+      )}
+      {selectedPayroll && (
+        <PayslipModal
+          payroll={selectedPayroll}
+          onClose={() => setSelectedPayroll(null)}
+        />
       )}
 
     </div>

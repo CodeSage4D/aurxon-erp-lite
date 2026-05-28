@@ -163,10 +163,35 @@ model Staff {
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
 
+  // Advanced Indian HR/Demographics fields
+  aadhaarNumber String?
+  panNumber     String?
+  qualification String?
+  experience    Int?
+  gender        String?
+  bloodGroup    String?
+  fatherSpouseName String?
+  permanentAddress String?
+  
+  // Banking Credentials
+  bankName      String?
+  bankBranch    String?
+  accNumber     String?
+  ifscCode      String?
+  
+  // Statutory registrations
+  pfNumber      String?
+  esiNumber     String?
+  
+  // Emergency contact details
+  emergencyContactName  String?
+  emergencyContactPhone String?
+
   leaves        LeaveRequest[]
   classes       Class[]     @relation("ClassTeacher") // If teacher is class head
   subjects      Subject[]   // Subjects they teach
   lessonPlans   LessonPlan[]
+  payrolls      Payroll[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -404,4 +429,24 @@ model BookIssue {
   status     String    @default("ISSUED") // ISSUED, RETURNED, OVERDUE
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+}
+
+model Payroll {
+  id            String      @id @default(uuid())
+  staffId       String
+  staff         Staff       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  month         String      // e.g. "May 2026"
+  baseSalary    Float
+  hra           Float
+  da            Float
+  allowances    Float       @default(0) // other allowances
+  deductions    Float       @default(0) // PF, ESI, Tax deductions
+  netPay        Float
+  paymentDate   DateTime    @default(now())
+  paymentMethod String      // CASH, BANK_TRANSFER, UPI
+  receiptNumber String      @unique // e.g. PAY-2026-XXXX
+  status        String      @default("PAID") // PAID, PENDING, VOID
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }

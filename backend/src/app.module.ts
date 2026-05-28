@@ -13,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ClassModule } from './class/class.module';
 import { LessonModule } from './lesson/lesson.module';
 import { LibraryModule } from './library/library.module';
+import { PayrollModule } from './payroll/payroll.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { LibraryModule } from './library/library.module';
     ClassModule,
     LessonModule,
     LibraryModule,
+    PayrollModule,
   ],
   controllers: [AppController],
   providers: [AppService],
