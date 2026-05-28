@@ -40,6 +40,12 @@ export class StudentController {
     return this.studentService.update(req.user.institutionId, id, body);
   }
 
+  @Post('promote')
+  @Roles('INSTITUTE_ADMIN')
+  async promote(@Request() req, @Body() body: { studentIds: string[]; targetClassId: string }) {
+    return this.studentService.promote(req.user.institutionId, body);
+  }
+
   @Delete(':id')
   @Roles('INSTITUTE_ADMIN', 'STAFF')
   async remove(@Request() req, @Param('id') id: string) {

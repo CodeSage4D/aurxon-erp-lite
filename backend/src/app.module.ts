@@ -11,6 +11,7 @@ import { StaffModule } from './staff/staff.module';
 import { NoticeModule } from './notice/notice.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ClassModule } from './class/class.module';
+import { LessonModule } from './lesson/lesson.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ClassModule } from './class/class.module';
     NoticeModule,
     DashboardModule,
     ClassModule,
+    LessonModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -130,6 +130,15 @@ const DEFAULT_MOCK_DB = {
 
   leaves: [
     { id: 'leave-1', staffId: 'staff-2', startDate: '2026-06-10', endDate: '2026-06-12', reason: 'Personal medical appointment checkup', status: 'PENDING', staff: { firstName: 'John', lastName: 'Keating', designation: 'TEACHER' }, createdAt: new Date().toISOString() }
+  ],
+  expenses: [
+    { id: 'exp-1', title: 'CBSE Affiliation Fee Renewal', amount: 45000, category: 'ACADEMIC', paymentMethod: 'ONLINE', expenseDate: new Date('2026-05-20').toISOString() },
+    { id: 'exp-2', title: 'High-speed Fiber Broadband Internet', amount: 5600, category: 'UTILITY', paymentMethod: 'BANK_TRANSFER', expenseDate: new Date('2026-05-22').toISOString() },
+    { id: 'exp-3', title: 'Office Stationery & Printing Paper Reams', amount: 8400, category: 'OPERATIONAL', paymentMethod: 'CASH', expenseDate: new Date('2026-05-24').toISOString() }
+  ],
+  lessonPlans: [
+    { id: 'lp-1', title: 'Calculus - Integration Methods', content: 'Definite integrals and substitution method applications.', status: 'IN_PROGRESS', syllabusPercent: 40, subjectId: 'subj-1', teacherId: 'staff-1', createdAt: new Date('2026-05-25').toISOString(), subject: { name: 'Advanced Mathematics', code: 'MATH101', class: { name: 'Grade 10-A' } }, teacher: { firstName: 'Sarah', lastName: 'Connor' } },
+    { id: 'lp-2', title: 'Classical Mechanics - Laws of Motion', content: 'Newtonian principles and free body diagram calculations.', status: 'COMPLETED', syllabusPercent: 100, subjectId: 'subj-2', teacherId: 'staff-2', createdAt: new Date('2026-05-26').toISOString(), subject: { name: 'Introductory Physics', code: 'PHYS101', class: { name: 'Grade 10-A' } }, teacher: { firstName: 'John', lastName: 'Keating' } }
   ]
 };
 
@@ -945,3 +954,277 @@ export async function createNoticeApi(title: string, content: string, targetRole
     return newNotice;
   }
 }
+
+// 10. Indian PIN Code Autofill lookup helper
+export function getPinCodeDetails(pin: string) {
+  if (!pin || pin.length < 2) return null;
+  const pinPrefix = pin.substring(0, 2);
+  const mapping: Record<string, { state: string; district: string }> = {
+    '11': { state: 'Delhi', district: 'New Delhi' },
+    '12': { state: 'Haryana', district: 'Gurugram' },
+    '13': { state: 'Haryana', district: 'Ambala' },
+    '14': { state: 'Punjab', district: 'Ludhiana' },
+    '16': { state: 'Punjab', district: 'Chandigarh' },
+    '20': { state: 'Uttar Pradesh', district: 'Noida' },
+    '22': { state: 'Uttar Pradesh', district: 'Lucknow' },
+    '30': { state: 'Rajasthan', district: 'Jaipur' },
+    '36': { state: 'Gujarat', district: 'Rajkot' },
+    '38': { state: 'Gujarat', district: 'Ahmedabad' },
+    '39': { state: 'Gujarat', district: 'Surat' },
+    '40': { state: 'Maharashtra', district: 'Mumbai' },
+    '41': { state: 'Maharashtra', district: 'Pune' },
+    '44': { state: 'Maharashtra', district: 'Nagpur' },
+    '45': { state: 'Madhya Pradesh', district: 'Indore' },
+    '46': { state: 'Madhya Pradesh', district: 'Bhopal' },
+    '50': { state: 'Telangana', district: 'Hyderabad' },
+    '56': { state: 'Karnataka', district: 'Bengaluru' },
+    '57': { state: 'Karnataka', district: 'Mysore' },
+    '60': { state: 'Tamil Nadu', district: 'Chennai' },
+    '62': { state: 'Tamil Nadu', district: 'Madurai' },
+    '68': { state: 'Kerala', district: 'Kochi' },
+    '70': { state: 'West Bengal', district: 'Kolkata' },
+    '75': { state: 'Odisha', district: 'Bhubaneswar' },
+    '80': { state: 'Bihar', district: 'Patna' },
+  };
+  return mapping[pinPrefix] || null;
+}
+
+// 11. bulk academic promotion API
+export async function promoteStudentsApi(studentIds: string[], targetClassId: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/promote`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ studentIds, targetClassId }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend promote endpoint offline, falling back to mock database...');
+    const db = getMockDb();
+    const targetClass = db.classes.find(c => c.id === targetClassId);
+    if (!targetClass) throw new Error('Target class not found');
+    
+    let count = 0;
+    db.students = db.students.map((student) => {
+      if (studentIds.includes(student.id)) {
+        count++;
+        const classDigits = targetClass.name.replace(/\D/g, '') || '0';
+        const nextRoll = `${classDigits}1${String(count).padStart(2, '0')}`;
+        
+        const timeline = student.timeline || [];
+        timeline.unshift({
+          id: `t-${Date.now()}-${count}`,
+          type: 'PROMOTION',
+          description: `Promoted automatically to ${targetClass.name} under Roll No. ${nextRoll}.`,
+          eventDate: new Date().toISOString()
+        });
+        
+        return {
+          ...student,
+          classId: targetClassId,
+          class: { id: targetClassId, name: targetClass.name },
+          rollNumber: nextRoll,
+          timeline,
+        };
+      }
+      return student;
+    });
+    saveMockDb(db);
+    return { success: true, count };
+  }
+}
+
+// 12. P&L financial ledger API
+export async function getFinanceOverviewApi() {
+  try {
+    const res = await fetch(`${API_URL}/fees/finance/overview`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend finance overview offline, falling back to mock calculations...');
+    const db = getMockDb();
+    
+    // Fee revenues
+    const totalRevenue = db.feeAllocations.reduce((sum, a) => sum + a.amountPaid, 0);
+    
+    // Operational expenses
+    const expenses = db.expenses || [];
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    
+    // Staff Salaries (in INR)
+    const totalSalaries = db.staff.reduce((sum, s) => sum + s.salary, 0) * 80; // Scaled to INR
+    
+    const netProfit = totalRevenue - totalExpenses - totalSalaries;
+    const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0;
+    
+    return {
+      totalRevenue,
+      totalExpenses,
+      totalSalaries,
+      netProfit,
+      profitMargin,
+      currency: 'INR',
+      currencySymbol: '₹',
+      recentExpenses: expenses,
+    };
+  }
+}
+
+// 13. Expense management API
+export async function getExpensesApi() {
+  try {
+    const res = await fetch(`${API_URL}/fees/expenses`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.expenses || [];
+  }
+}
+
+export async function createExpenseApi(data: { title: string; amount: number; category: string; paymentMethod: string }) {
+  try {
+    const res = await fetch(`${API_URL}/fees/expenses`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const newExpense = {
+      id: `exp-${Date.now()}`,
+      title: data.title,
+      amount: parseFloat(data.amount as any),
+      category: data.category,
+      paymentMethod: data.paymentMethod || 'CASH',
+      expenseDate: new Date().toISOString(),
+    };
+    if (!db.expenses) db.expenses = [];
+    db.expenses.unshift(newExpense);
+    saveMockDb(db);
+    return newExpense;
+  }
+}
+
+export async function deleteExpenseApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/fees/expenses/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.expenses) {
+      db.expenses = db.expenses.filter((e: any) => e.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// 14. Lesson Planner and Syllabus tracker API
+export async function getLessonPlansApi(teacherId?: string, subjectId?: string) {
+  try {
+    const query = new URLSearchParams();
+    if (teacherId) query.append('teacherId', teacherId);
+    if (subjectId) query.append('subjectId', subjectId);
+    const res = await fetch(`${API_URL}/lessons?${query.toString()}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let plans = db.lessonPlans || [];
+    if (teacherId) {
+      plans = plans.filter((p: any) => p.teacherId === teacherId);
+    }
+    if (subjectId) {
+      plans = plans.filter((p: any) => p.subjectId === subjectId);
+    }
+    return plans;
+  }
+}
+
+export async function createLessonPlanApi(data: { title: string; content: string; subjectId: string; syllabusPercent: number }) {
+  try {
+    const res = await fetch(`${API_URL}/lessons`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const userStr = localStorage.getItem('aurxon_user');
+    const user = userStr ? JSON.parse(userStr) : { profileId: 'staff-1', profileName: 'Sarah Connor' };
+    
+    const subject = db.subjects.find((s: any) => s.id === data.subjectId) || { name: 'Subject', code: 'SUB', class: { name: 'Class' } };
+    
+    const newPlan = {
+      id: `lp-${Date.now()}`,
+      title: data.title,
+      content: data.content,
+      status: 'PENDING',
+      syllabusPercent: parseInt(data.syllabusPercent as any || '0'),
+      subjectId: data.subjectId,
+      teacherId: user.profileId,
+      createdAt: new Date().toISOString(),
+      subject,
+      teacher: { firstName: user.profileName.split(' ')[0], lastName: user.profileName.split(' ')[1] || '' }
+    };
+    if (!db.lessonPlans) db.lessonPlans = [];
+    db.lessonPlans.unshift(newPlan);
+    saveMockDb(db);
+    return newPlan;
+  }
+}
+
+export async function updateLessonPlanApi(id: string, data: { status: string; syllabusPercent: number }) {
+  try {
+    const res = await fetch(`${API_URL}/lessons/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.lessonPlans) {
+      const idx = db.lessonPlans.findIndex((p: any) => p.id === id);
+      if (idx !== -1) {
+        db.lessonPlans[idx] = {
+          ...db.lessonPlans[idx],
+          status: data.status,
+          syllabusPercent: parseInt(data.syllabusPercent as any || '0'),
+        };
+      }
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+export async function deleteLessonPlanApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/lessons/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.lessonPlans) {
+      db.lessonPlans = db.lessonPlans.filter((p: any) => p.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+

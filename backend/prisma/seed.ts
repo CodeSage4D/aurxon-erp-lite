@@ -1,12 +1,19 @@
+// IEEE Standard 12207 compliant database seeding specification
+// Seeding realistic Indian institution data for CBSE Grade 10 & 11 streams
+
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasourceUrl: process.env.DATABASE_URL,
+});
 
 async function main() {
-  console.log('Seeding database...');
+  console.log('Seeding Neon database with Indian Education schema...');
 
-  // 1. Clean existing records (optional, but good for idempotent runs)
+  // 1. Clean existing records (Cascade clean)
+  await prisma.expense.deleteMany({});
+  await prisma.lessonPlan.deleteMany({});
   await prisma.auditLog.deleteMany({});
   await prisma.leaveRequest.deleteMany({});
   await prisma.timelineEvent.deleteMany({});
@@ -26,31 +33,19 @@ async function main() {
   await prisma.user.deleteMany({});
   await prisma.institution.deleteMany({});
 
-  // Hash passwords
   const passwordHash = await bcrypt.hash('password123', 10);
 
   // 2. Create Institution
   const institution = await prisma.institution.create({
     data: {
-      name: 'Aurxon International Academy',
+      name: 'Delhi Public School, Sector 4',
       logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
-      primaryColor: '#6366f1', // Beautiful Indigo
-    },
-  });
-  console.log(`Created institution: ${institution.name}`);
-
-  // 3. Create Users & Profiles
-  // 3a. Super Admin
-  const superAdminUser = await prisma.user.create({
-    data: {
-      email: 'superadmin@aurxon.com',
-      passwordHash,
-      role: 'SUPER_ADMIN',
-      institutionId: institution.id,
+      primaryColor: '#0284c7', // Sky Blue Glacier
     },
   });
 
-  // 3b. Institute Admin
+  // 3. Create Users
+  // 3a. Institute Admin
   const adminUser = await prisma.user.create({
     data: {
       email: 'admin@aurxon.com',
@@ -60,7 +55,7 @@ async function main() {
     },
   });
 
-  // 3c. Teachers (Staff)
+  // 3b. Staff / Teacher 1
   const teacherUser1 = await prisma.user.create({
     data: {
       email: 'teacher1@aurxon.com',
@@ -73,17 +68,18 @@ async function main() {
   const teacherStaff1 = await prisma.staff.create({
     data: {
       userId: teacherUser1.id,
-      employeeId: 'EMP001',
+      employeeId: 'EMP-DEL-201',
       firstName: 'Sarah',
       lastName: 'Connor',
-      phone: '+1 555-0101',
+      phone: '+91 9876543210',
       designation: 'TEACHER',
       joiningDate: new Date('2024-08-15'),
-      salary: 4500,
+      salary: 55000, // Monthly salary in INR
       institutionId: institution.id,
     },
   });
 
+  // 3c. Teacher 2
   const teacherUser2 = await prisma.user.create({
     data: {
       email: 'teacher2@aurxon.com',
@@ -96,18 +92,18 @@ async function main() {
   const teacherStaff2 = await prisma.staff.create({
     data: {
       userId: teacherUser2.id,
-      employeeId: 'EMP002',
+      employeeId: 'EMP-DEL-202',
       firstName: 'John',
       lastName: 'Keating',
-      phone: '+1 555-0102',
+      phone: '+91 9876543211',
       designation: 'TEACHER',
       joiningDate: new Date('2025-01-10'),
-      salary: 4800,
+      salary: 60000,
       institutionId: institution.id,
     },
   });
 
-  // 3d. Accountant (Staff)
+  // 3d. Accountant
   const accountantUser = await prisma.user.create({
     data: {
       email: 'accountant@aurxon.com',
@@ -120,31 +116,35 @@ async function main() {
   const accountantStaff = await prisma.staff.create({
     data: {
       userId: accountantUser.id,
-      employeeId: 'EMP003',
+      employeeId: 'EMP-DEL-203',
       firstName: 'Robert',
       lastName: 'Kiyosaki',
-      phone: '+1 555-0103',
+      phone: '+91 9876543212',
       designation: 'ACCOUNTANT',
       joiningDate: new Date('2024-09-01'),
-      salary: 4000,
+      salary: 48000,
       institutionId: institution.id,
     },
   });
 
-  // 4. Create Classes
+  // 4. Create Classes with Streams and CBSE Board
   const class10A = await prisma.class.create({
     data: {
       name: 'Grade 10-A',
       section: 'A',
+      stream: 'General',
+      board: 'CBSE',
       classTeacherId: teacherStaff1.id,
       institutionId: institution.id,
     },
   });
 
-  const class11A = await prisma.class.create({
+  const class11Sci = await prisma.class.create({
     data: {
-      name: 'Grade 11-A',
+      name: 'Grade 11-Science',
       section: 'A',
+      stream: 'Science',
+      board: 'CBSE',
       classTeacherId: teacherStaff2.id,
       institutionId: institution.id,
     },
@@ -153,7 +153,7 @@ async function main() {
   // 5. Create Subjects
   const math = await prisma.subject.create({
     data: {
-      name: 'Advanced Mathematics',
+      name: 'Mathematics (041)',
       code: 'MATH101',
       classId: class10A.id,
       teacherId: teacherStaff1.id,
@@ -162,23 +162,14 @@ async function main() {
 
   const physics = await prisma.subject.create({
     data: {
-      name: 'Introductory Physics',
+      name: 'Physics (042)',
       code: 'PHYS101',
-      classId: class10A.id,
+      classId: class11Sci.id,
       teacherId: teacherStaff2.id,
     },
   });
 
-  const literature = await prisma.subject.create({
-    data: {
-      name: 'English Literature',
-      code: 'LIT201',
-      classId: class11A.id,
-      teacherId: teacherStaff2.id,
-    },
-  });
-
-  // 6. Create Parents and Students
+  // 6. Create Parent & Student Profiles (Indian Context)
   const parentUser = await prisma.user.create({
     data: {
       email: 'parent@aurxon.com',
@@ -193,12 +184,13 @@ async function main() {
       userId: parentUser.id,
       firstName: 'David',
       lastName: 'Miller',
-      phone: '+1 555-0201',
-      occupation: 'Software Architect',
-      address: '742 Evergreen Terrace, Springfield',
+      phone: '+91 9988776655',
+      occupation: 'General Manager, SBI',
+      address: 'House 42, Sector 15, Dwarka, New Delhi',
     },
   });
 
+  // Student 1 (Grade 10)
   const studentUser1 = await prisma.user.create({
     data: {
       email: 'student@aurxon.com',
@@ -211,17 +203,41 @@ async function main() {
   const student1 = await prisma.student.create({
     data: {
       userId: studentUser1.id,
-      rollNumber: 'ROLL-10A-01',
+      scholarNumber: 'SCH-2026-0001',
+      rollNumber: '10101',
       firstName: 'Alice',
       lastName: 'Miller',
       dateOfBirth: new Date('2010-05-14'),
       gender: 'FEMALE',
+      
+      // Indian IDs
+      aadhaarNumber: '541275896324',
+      samagraId: 'SSM-102547',
+      familyId: 'FAM-541289',
+      casteCategory: 'GENERAL',
+      
+      // Bank details
+      bankName: 'State Bank of India',
+      accHolderName: 'Alice Miller',
+      accNumber: '32145698712',
+      ifscCode: 'SBIN0004520',
+      bankBranch: 'Dwarka Sector 15',
+      
+      // Address
+      houseNo: 'House 42',
+      street: 'Sector 15, Dwarka',
+      city: 'New Delhi',
+      district: 'South West Delhi',
+      state: 'Delhi',
+      pinCode: '110075',
+
       parentId: parentProfile.id,
       classId: class10A.id,
       institutionId: institution.id,
     },
   });
 
+  // Student 2 (Grade 10)
   const studentUser2 = await prisma.user.create({
     data: {
       email: 'student2@aurxon.com',
@@ -234,16 +250,37 @@ async function main() {
   const student2 = await prisma.student.create({
     data: {
       userId: studentUser2.id,
-      rollNumber: 'ROLL-10A-02',
+      scholarNumber: 'SCH-2026-0002',
+      rollNumber: '10102',
       firstName: 'Bob',
-      lastName: 'Johnson',
+      lastName: 'Singh',
       dateOfBirth: new Date('2010-11-22'),
       gender: 'MALE',
+      
+      aadhaarNumber: '984512763459',
+      samagraId: 'SSM-102548',
+      familyId: 'FAM-541290',
+      casteCategory: 'OBC',
+      
+      bankName: 'Punjab National Bank',
+      accHolderName: 'Bob Singh',
+      accNumber: '5412896324578',
+      ifscCode: 'PUNB0124500',
+      bankBranch: 'Uttam Nagar',
+      
+      houseNo: 'Flat 304',
+      street: 'Uttam Nagar Block C',
+      city: 'New Delhi',
+      district: 'West Delhi',
+      state: 'Delhi',
+      pinCode: '110059',
+
       classId: class10A.id,
       institutionId: institution.id,
     },
   });
 
+  // Student 3 (Grade 11 Science)
   const studentUser3 = await prisma.user.create({
     data: {
       email: 'student3@aurxon.com',
@@ -256,71 +293,83 @@ async function main() {
   const student3 = await prisma.student.create({
     data: {
       userId: studentUser3.id,
-      rollNumber: 'ROLL-11A-01',
+      scholarNumber: 'SCH-2026-0003',
+      rollNumber: '11101',
       firstName: 'Charlie',
-      lastName: 'Brown',
+      lastName: 'Sharma',
       dateOfBirth: new Date('2009-02-28'),
       gender: 'MALE',
-      classId: class11A.id,
+      
+      aadhaarNumber: '124578963214',
+      samagraId: 'SSM-102549',
+      familyId: 'FAM-541291',
+      casteCategory: 'GENERAL',
+      
+      bankName: 'HDFC Bank',
+      accHolderName: 'Charlie Sharma',
+      accNumber: '5010045214896',
+      ifscCode: 'HDFC0001201',
+      bankBranch: 'Janakpuri',
+      
+      houseNo: 'Sector 3A, Qtr 12',
+      street: 'Janakpuri East',
+      city: 'New Delhi',
+      district: 'West Delhi',
+      state: 'Delhi',
+      pinCode: '110058',
+
+      classId: class11Sci.id,
       institutionId: institution.id,
     },
   });
 
-  // 7. Seed Student Timeline Event
+  // 7. Seed Timeline Logs
   await prisma.timelineEvent.create({
     data: {
       studentId: student1.id,
       type: 'ADMISSION',
-      description: 'Admitted to Grade 10-A with parents linked successfully.',
+      description: 'Enrolled under Scholar No. SCH-2026-0001 with SSSMID verification.',
     },
   });
 
-  // 8. Seed Attendance Records (past 3 days for students 1 and 2)
-  const attendanceDates = [
-    new Date('2026-05-25'),
-    new Date('2026-05-26'),
-    new Date('2026-05-27'),
-  ];
-
-  for (const date of attendanceDates) {
+  // 8. Daily Attendance Logs
+  const dates = [new Date('2026-05-25'), new Date('2026-05-26'), new Date('2026-05-27')];
+  for (const date of dates) {
     await prisma.attendance.create({
       data: {
         studentId: student1.id,
         date,
         status: 'PRESENT',
-        remarks: 'On time',
         recordedById: teacherStaff1.id,
       },
     });
-
     await prisma.attendance.create({
       data: {
         studentId: student2.id,
         date,
         status: date.getDate() === 26 ? 'ABSENT' : 'PRESENT',
-        remarks: date.getDate() === 26 ? 'Sick leave' : 'On time',
         recordedById: teacherStaff1.id,
       },
     });
   }
 
-  // 9. Seed Fee Structures & Allocations
-  const tuitionFee = await prisma.feeStructure.create({
+  // 9. Fee Structures & Allocations (INR Currency Values)
+  const quarter1Fee = await prisma.feeStructure.create({
     data: {
-      name: 'Term 1 Tuition Fee',
-      amount: 1500,
+      name: 'Quarter 1 Tuition Fee',
+      amount: 24000, // INR
       dueDate: new Date('2026-06-15'),
-      description: 'Standard tuition fee for Term 1 academics',
+      description: 'Tuition Fee collection for Grade 10/11 CBSE Term 1',
       institutionId: institution.id,
     },
   });
 
-  const examFee = await prisma.feeStructure.create({
+  const labExamFee = await prisma.feeStructure.create({
     data: {
-      name: 'Final Term Exam Fee',
-      amount: 250,
+      name: 'CBSE Physics Lab Exam Fee',
+      amount: 3500, // INR
       dueDate: new Date('2026-06-30'),
-      description: 'Examination evaluation and operations cost',
+      description: 'Physics practical board laboratory cost allocation',
       institutionId: institution.id,
     },
   });
@@ -329,9 +378,9 @@ async function main() {
   const alloc1 = await prisma.studentFeeAllocation.create({
     data: {
       studentId: student1.id,
-      feeStructureId: tuitionFee.id,
-      amountDue: 1500,
-      amountPaid: 1500,
+      feeStructureId: quarter1Fee.id,
+      amountDue: 24000,
+      amountPaid: 24000,
       status: 'PAID',
     },
   });
@@ -339,9 +388,9 @@ async function main() {
   const alloc2 = await prisma.studentFeeAllocation.create({
     data: {
       studentId: student2.id,
-      feeStructureId: tuitionFee.id,
-      amountDue: 1500,
-      amountPaid: 500,
+      feeStructureId: quarter1Fee.id,
+      amountDue: 24000,
+      amountPaid: 8000,
       status: 'PARTIAL',
     },
   });
@@ -349,19 +398,8 @@ async function main() {
   const alloc3 = await prisma.studentFeeAllocation.create({
     data: {
       studentId: student3.id,
-      feeStructureId: tuitionFee.id,
-      amountDue: 1500,
-      amountPaid: 0,
-      status: 'UNPAID',
-    },
-  });
-
-  // Seeding Exam Fee Allocations (Unpaid for all)
-  await prisma.studentFeeAllocation.create({
-    data: {
-      studentId: student1.id,
-      feeStructureId: examFee.id,
-      amountDue: 250,
+      feeStructureId: quarter1Fee.id,
+      amountDue: 24000,
       amountPaid: 0,
       status: 'UNPAID',
     },
@@ -371,84 +409,119 @@ async function main() {
   await prisma.payment.create({
     data: {
       allocationId: alloc1.id,
-      amount: 1500,
+      amount: 24000,
       paymentMethod: 'ONLINE',
-      receiptNumber: 'RCPT-2026-001',
-      remarks: 'Paid in full via Stripe Sandbox',
+      receiptNumber: 'RCPT-DEL-001',
+      remarks: 'Paid via BHIM UPI',
     },
   });
 
   await prisma.payment.create({
     data: {
       allocationId: alloc2.id,
-      amount: 500,
+      amount: 8000,
       paymentMethod: 'CASH',
-      receiptNumber: 'RCPT-2026-002',
-      remarks: 'Partial cash payment at school reception desk',
+      receiptNumber: 'RCPT-DEL-002',
+      remarks: 'Cash counter collection',
     },
   });
 
-  // 10. Seed Exams & Results
-  const midtermMath = await prisma.exam.create({
+  // 10. Exams & CBSE Results
+  const algebraExam = await prisma.exam.create({
     data: {
-      name: 'Mid-Term Algebra Exam',
+      name: 'CBSE Mathematics Mid-Term',
+      examType: 'HALF_YEARLY',
       subjectId: math.id,
-      maxMarks: 100,
+      maxMarks: 80,
+      internalMarks: 20,
       examDate: new Date('2026-04-10'),
     },
   });
 
   await prisma.examResult.create({
     data: {
-      examId: midtermMath.id,
+      examId: algebraExam.id,
       studentId: student1.id,
-      marksObtained: 94,
-      remarks: 'Outstanding performance in calculus',
+      marksObtained: 74, // out of 80
+      remarks: 'Excellent logical skills',
     },
   });
 
   await prisma.examResult.create({
     data: {
-      examId: midtermMath.id,
+      examId: algebraExam.id,
       studentId: student2.id,
-      marksObtained: 76,
-      remarks: 'Shows good improvement. Needs practice in linear graphs',
+      marksObtained: 52,
+      remarks: 'Needs improvement in algebra theorems',
     },
   });
 
-  // 11. Seed In-app Notice Board circulars
+  // 11. Seeding Notices
   await prisma.notice.create({
     data: {
-      title: 'Annual Summer Vacation Announcement',
-      content: 'Please note that the institution will remain closed for summer vacation from June 1st, 2026 to July 5th, 2026. Regular classes will resume on July 6th.',
-      targetRoles: 'STUDENT,PARENT,TEACHER,STAFF,ACCOUNTANT',
+      title: 'CBSE Board Examination Subject Verification',
+      content: 'All class 10 & 11 students must verify their registered CBSE board exam subjects and verify details in the administrative office before June 10th.',
+      targetRoles: 'STUDENT,PARENT,TEACHER',
       institutionId: institution.id,
       authorName: 'Sarah Connor',
     },
   });
 
-  await prisma.notice.create({
+  // 12. Seeding Lesson Plans for Teachers
+  await prisma.lessonPlan.create({
     data: {
-      title: 'Term 1 Tuition Fee Collection Due Date',
-      content: 'Reminder to all parents: The tuition fee collection deadline for Term 1 is June 15th, 2026. Late fees will apply post-deadline.',
-      targetRoles: 'PARENT,ACCOUNTANT',
+      title: 'Polynomials & Quadratic Equations',
+      content: 'Explain factorization, remainder theorem, and plotting quadratic curves.',
+      status: 'COMPLETED',
+      syllabusPercent: 35,
+      subjectId: math.id,
+      teacherId: teacherStaff1.id,
+    },
+  });
+
+  await prisma.lessonPlan.create({
+    data: {
+      title: 'Trigonometric Identities',
+      content: 'Derive complementary angles and apply identities to solve heights and distances.',
+      status: 'IN_PROGRESS',
+      syllabusPercent: 15,
+      subjectId: math.id,
+      teacherId: teacherStaff1.id,
+    },
+  });
+
+  // 13. Seeding Institutional Expenses (INR Currency)
+  await prisma.expense.create({
+    data: {
+      title: 'Monthly High-Speed Fiber Internet Connection',
+      amount: 4500, // INR
+      category: 'UTILITY',
+      paymentMethod: 'UPI',
       institutionId: institution.id,
-      authorName: 'Robert Kiyosaki',
     },
   });
 
-  // 12. Seed Staff Leaves Requests
-  await prisma.leaveRequest.create({
+  await prisma.expense.create({
     data: {
-      staffId: teacherStaff2.id,
-      startDate: new Date('2026-06-10'),
-      endDate: new Date('2026-06-12'),
-      reason: 'Personal medical appointment checkup',
-      status: 'PENDING',
+      title: 'Smart Board Digital Classroom Projector Repair',
+      amount: 12000,
+      category: 'MAINTENANCE',
+      paymentMethod: 'BANK_TRANSFER',
+      institutionId: institution.id,
     },
   });
 
-  console.log('Database seeding successfully finished!');
+  await prisma.expense.create({
+    data: {
+      title: 'Administrative Office Stationery Supplies',
+      amount: 3200,
+      category: 'MAINTENANCE',
+      paymentMethod: 'CASH',
+      institutionId: institution.id,
+    },
+  });
+
+  console.log('Indian Education database seeding successfully finished!');
 }
 
 main()

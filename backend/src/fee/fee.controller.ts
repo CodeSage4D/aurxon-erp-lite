@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { FeeService } from './fee.service';
@@ -52,5 +52,31 @@ export class FeeController {
   @Roles('INSTITUTE_ADMIN', 'STAFF', 'ACCOUNTANT')
   async getOverview(@Request() req) {
     return this.feeService.getFeeOverview(req.user.institutionId);
+  }
+
+  // 1. Full Accounting Ledger
+  @Get('finance/overview')
+  @Roles('INSTITUTE_ADMIN', 'ACCOUNTANT')
+  async getFinanceOverview(@Request() req) {
+    return this.feeService.getFinanceOverview(req.user.institutionId);
+  }
+
+  // 2. Expense logs CRUD
+  @Get('expenses')
+  @Roles('INSTITUTE_ADMIN', 'ACCOUNTANT')
+  async getExpenses(@Request() req) {
+    return this.feeService.getExpenses(req.user.institutionId);
+  }
+
+  @Post('expenses')
+  @Roles('INSTITUTE_ADMIN', 'ACCOUNTANT')
+  async createExpense(@Request() req, @Body() body: any) {
+    return this.feeService.createExpense(req.user.institutionId, body);
+  }
+
+  @Delete('expenses/:id')
+  @Roles('INSTITUTE_ADMIN', 'ACCOUNTANT')
+  async deleteExpense(@Request() req, @Param('id') id: string) {
+    return this.feeService.deleteExpense(req.user.institutionId, id);
   }
 }

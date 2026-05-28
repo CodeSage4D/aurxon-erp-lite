@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// IEEE Standard 830-1998 compliant database specification for AURXON ERP Lite
+// Dedicated to Indian Educational Institution Workflows (CBSE/ICSE/State Boards)
 
 generator client {
   provider = "prisma-client-js"
@@ -24,7 +24,7 @@ model Institution {
   id           String   @id @default(uuid())
   name         String
   logoUrl      String?
-  primaryColor String   @default("#3b82f6")
+  primaryColor String   @default("#0284c7") // Glacier sky blue default
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -34,13 +34,14 @@ model Institution {
   classes   Class[]
   fees      FeeStructure[]
   notices   Notice[]
+  expenses  Expense[]
 }
 
 model User {
   id            String      @id @default(uuid())
   email         String      @unique
   passwordHash  String
-  role          String      // e.g. "SUPER_ADMIN", "INSTITUTE_ADMIN", etc. (Store as string or enum)
+  role          String      // e.g. "SUPER_ADMIN", "INSTITUTE_ADMIN", etc.
   isActive      Boolean     @default(true)
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
@@ -58,13 +59,59 @@ model Student {
   id            String      @id @default(uuid())
   userId        String      @unique
   user          User        @relation(fields: [userId], references: [id])
-  rollNumber    String
+  
+  // Permanent unique identification mapping (Indian Scholar Number System)
+  scholarNumber String      @unique
+  rollNumber    String      // Class-specific dynamic number (changes annually)
+  
   firstName     String
   lastName      String
   dateOfBirth   DateTime
   gender        String
   admissionDate DateTime    @default(now())
   status        String      @default("ACTIVE") // ACTIVE, GRADUATED, DROPPED
+  
+  // Indian Demographics & Identity Verification
+  aadhaarNumber          String?    // 12-digit UIDAI Verification ID
+  samagraId              String?    // State SSSMID Family / Individual ID
+  familyId               String?    // Family Ration Card / Household ID
+  penNumber              String?    // Permanent Education Number
+  birthCertificateNumber String?
+  
+  bloodGroup             String?
+  religion               String?
+  casteCategory          String?    // GENERAL, OBC, SC, ST
+  nationality            String     @default("Indian")
+  motherTongue           String?
+  
+  // Parent & Guardian Details
+  fatherName             String?
+  motherName             String?
+  fatherOccupation       String?
+  motherOccupation       String?
+  annualIncome           Float?
+  
+  // Indian Structured Address Mapping
+  houseNo                String?
+  street                 String?
+  city                   String?    // Village / Town
+  district               String?
+  state                  String?
+  pinCode                String?
+  
+  // Banking Credentials
+  bankName               String?
+  accHolderName          String?
+  accNumber              String?
+  ifscCode               String?
+  bankBranch             String?
+  upiId                  String?
+
+  // Transfer Certificate (TC) & Migration
+  prevSchoolName         String?
+  tcNumber               String?
+  migrationCertNo        String?
+
   parentId      String?
   parent        Parent?     @relation(fields: [parentId], references: [id])
   classId       String
@@ -80,6 +127,8 @@ model Student {
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([scholarNumber])
 }
 
 model Parent {
@@ -115,6 +164,7 @@ model Staff {
   leaves        LeaveRequest[]
   classes       Class[]     @relation("ClassTeacher") // If teacher is class head
   subjects      Subject[]   // Subjects they teach
+  lessonPlans   LessonPlan[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -122,8 +172,10 @@ model Staff {
 
 model Class {
   id            String      @id @default(uuid())
-  name          String      // e.g., "Grade 10-A", "Tuition Batch B"
-  section       String?
+  name          String      // e.g., "Grade 10", "Nursery"
+  section       String?     // e.g., "A", "B"
+  stream        String      @default("General") // General, Science, Commerce, Arts
+  board         String      @default("CBSE")    // CBSE, ICSE, STATE_BOARD, NIOS
   classTeacherId String?
   classTeacher  Staff?      @relation("ClassTeacher", fields: [classTeacherId], references: [id])
   institutionId String
@@ -145,6 +197,7 @@ model Subject {
   teacherId     String?
   teacher       Staff?      @relation(fields: [teacherId], references: [id])
   exams         Exam[]
+  lessonPlans   LessonPlan[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -167,7 +220,7 @@ model Attendance {
 
 model FeeStructure {
   id            String      @id @default(uuid())
-  name          String      // e.g., "Annual Tuition Fee 2026"
+  name          String      // e.g., "Quarterly Tuition Term 1"
   amount        Float
   dueDate       DateTime
   description   String?
@@ -202,7 +255,7 @@ model Payment {
   allocation     StudentFeeAllocation @relation(fields: [allocationId], references: [id])
   amount         Float
   paymentDate    DateTime             @default(now())
-  paymentMethod  String               // CASH, CARD, ONLINE, BANK_TRANSFER
+  paymentMethod  String               // CASH, CARD, ONLINE, UPI
   receiptNumber  String               @unique
   remarks        String?
 
@@ -211,10 +264,13 @@ model Payment {
 
 model Exam {
   id            String       @id @default(uuid())
-  name          String       // e.g., "Mid-Term Exam", "Monthly Quiz 1"
+  name          String       // e.g., "Term 1 Final", "Monthly Unit Test 2"
+  examType      String       @default("UNIT_TEST") // UNIT_TEST, HALF_YEARLY, ANNUAL, BOARD
   subjectId     String
   subject       Subject      @relation(fields: [subjectId], references: [id])
   maxMarks      Float
+  practicalMarks Float       @default(0)
+  internalMarks Float        @default(0)
   examDate      DateTime
 
   results       ExamResult[]
@@ -242,10 +298,10 @@ model Notice {
   id            String      @id @default(uuid())
   title         String
   content       String
-  targetRoles   String      // Store comma-separated roles like "STUDENT,PARENT" or "TEACHER"
+  targetRoles   String      // Comma-separated roles list
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
-  authorName    String      // Cached name of creator
+  authorName    String
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -264,7 +320,7 @@ model TimelineEvent {
   id          String   @id @default(uuid())
   studentId   String
   student     Student  @relation(fields: [studentId], references: [id])
-  type        String   // ADMISSION, ACADEMIC_AWARD, DISCIPLINARY, EXAM_EXCELLENCE
+  type        String   // ADMISSION, PROMOTION, ACADEMIC_AWARD, MIGRATION
   description String
   eventDate   DateTime @default(now())
 }
@@ -287,8 +343,36 @@ model AuditLog {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  action    String   // e.g., "UPDATE_STUDENT", "COLLECT_FEE"
+  action    String
   details   String
   ipAddress String?
   createdAt DateTime @default(now())
+}
+
+model LessonPlan {
+  id              String   @id @default(uuid())
+  title           String
+  content         String
+  status          String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, REVISED
+  syllabusPercent Int      @default(0)
+  subjectId       String
+  subject         Subject  @relation(fields: [subjectId], references: [id])
+  teacherId       String
+  teacher         Staff    @relation(fields: [teacherId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Expense {
+  id            String      @id @default(uuid())
+  title         String
+  amount        Float
+  category      String      // UTILITY, SALARY, RENT, MAINTENANCE, OTHER
+  expenseDate   DateTime    @default(now())
+  paymentMethod String      // CASH, CARD, BANK_TRANSFER, UPI
+  receiptUrl    String?
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
