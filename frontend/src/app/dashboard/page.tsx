@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   getDashboardStatsApi,
@@ -31,7 +31,6 @@ import {
   approveLeaveApi,
   getNoticesApi,
   createNoticeApi,
-  // Indian ERP Extensions
   getPinCodeDetails,
   promoteStudentsApi,
   getFinanceOverviewApi,
@@ -42,52 +41,101 @@ import {
   createLessonPlanApi,
   updateLessonPlanApi,
   deleteLessonPlanApi,
+  getBooksApi,
+  createBookApi,
+  updateBookApi,
+  deleteBookApi,
+  getIssuesApi,
+  getStudentIssuesApi,
+  issueBookApi,
+  returnBookApi
 } from '@/lib/api';
 import {
-  LayoutDashboard,
-  Users,
-  CalendarCheck,
-  CreditCard,
-  GraduationCap,
-  Briefcase,
-  Megaphone,
-  LogOut,
-  Moon,
-  Sun,
-  Search,
-  Plus,
-  Trash2,
-  Check,
-  X,
-  FileText,
-  DollarSign,
-  TrendingUp,
-  Percent,
-  Clock,
-  ChevronRight,
-  ShieldCheck,
-  FileSpreadsheet,
+  LayoutDashboard, Users, CalendarCheck, CreditCard, GraduationCap, Briefcase, Megaphone, LogOut,
+  Moon, Sun, Search, Plus, Trash2, Check, X, FileText, DollarSign, TrendingUp, Percent, Clock,
+  ChevronRight, ShieldCheck, FileSpreadsheet, BookOpen, Book, Award, MessageSquare, BarChart2,
+  Settings, HelpCircle, Send, Bell, ChevronLeft, UserCheck, Printer, Download, RefreshCw,
+  Sliders, Database, Menu, Sparkles, Phone, ShieldAlert, BadgeInfo
 } from 'lucide-react';
+
+const ROLES_LIST = [
+  { value: 'SUPER_ADMIN', label: 'Super Admin' },
+  { value: 'PRINCIPAL', label: 'Principal' },
+  { value: 'VICE_PRINCIPAL', label: 'Vice Principal' },
+  { value: 'ACADEMIC_DIRECTOR', label: 'Academic Director' },
+  { value: 'REGISTRAR', label: 'Registrar' },
+  { value: 'ACCOUNTANT', label: 'Accountant' },
+  { value: 'LIBRARIAN', label: 'Librarian' },
+  { value: 'HR_MANAGER', label: 'HR Manager' },
+  { value: 'EXAM_CONTROLLER', label: 'Exam Controller' },
+  { value: 'ATTENDANCE_OFFICER', label: 'Attendance Officer' },
+  { value: 'COMMUNICATION_HEAD', label: 'Comms Head' },
+  { value: 'TEACHER', label: 'Teacher' },
+  { value: 'STUDENT', label: 'Student' },
+  { value: 'PARENT', label: 'Parent' },
+  { value: 'COACHING_DIRECTOR', label: 'Coaching Director' },
+  { value: 'INSTITUTE_ADMIN', label: 'Institute Admin' }
+];
+
+const SIDEBAR_CATEGORIES = [
+  { id: 'overview', label: 'Dashboard', icon: LayoutDashboard, roles: ['*'] },
+  { id: 'academic', label: 'Academic Desk', icon: BookOpen, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'COACHING_DIRECTOR', 'REGISTRAR', 'EXAM_CONTROLLER', 'INSTITUTE_ADMIN'] },
+  { id: 'students', label: 'Student Desk', icon: Users, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'REGISTRAR', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'] },
+  { id: 'teachers', label: 'Teacher Desk', icon: UserCheck, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'] },
+  { id: 'exams', label: 'Exams & Grades', icon: Award, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'EXAM_CONTROLLER', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'] },
+  { id: 'attendance', label: 'Attendance', icon: CalendarCheck, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'ATTENDANCE_OFFICER', 'INSTITUTE_ADMIN'] },
+  { id: 'fees', label: 'Fees & Finance', icon: CreditCard, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'] },
+  { id: 'comms', label: 'Comms Hub', icon: MessageSquare, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'] },
+  { id: 'library', label: 'Library Desk', icon: Book, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'] },
+  { id: 'hr', label: 'HR System', icon: Briefcase, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN'] },
+  { id: 'analytics', label: 'Analytics Desk', icon: BarChart2, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'INSTITUTE_ADMIN'] },
+  { id: 'settings', label: 'Settings', icon: Settings, roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'] }
+];
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [activeMenu, setActiveMenu] = useState('overview');
-  const [stats, setStats] = useState<any>(null);
+  const [currentRole, setCurrentRole] = useState('STUDENT');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('overview');
   
-  // Roster lists
+  // Dialog controls
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  
+  // Datasets
+  const [stats, setStats] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
+  const [lessonPlans, setLessonPlans] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [financeData, setFinanceData] = useState<any>(null);
+  const [books, setBooks] = useState<any[]>([]);
+  const [bookIssues, setBookIssues] = useState<any[]>([]);
   
   // Selection states
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Form states
+  // Tab states
+  const [feesTab, setFeesTab] = useState<'allocations' | 'history' | 'structures' | 'ledger'>('allocations');
+  const [examsTab, setExamsTab] = useState<'list' | 'entry'>('list');
+  const [staffTab, setStaffTab] = useState<'list' | 'leaves'>('list');
+  const [academicTab, setAcademicTab] = useState<'timetable' | 'lessons'>('timetable');
+  const [studentTab, setStudentTab] = useState<'list' | 'admission' | 'promotions'>('list');
+  
+  // Library Form & State
+  const [librarySubTab, setLibrarySubTab] = useState<'inventory' | 'checkout' | 'issues'>('inventory');
+  const [bookSearch, setBookSearch] = useState('');
+  const [bookForm, setBookForm] = useState({ title: '', author: '', isbn: '', totalCopies: '5' });
+  const [issueForm, setIssueForm] = useState({ studentId: '', bookId: '' });
+
+  // Indian Admissions Form Fields
   const [studentForm, setStudentForm] = useState({
     firstName: '',
     lastName: '',
@@ -96,8 +144,6 @@ export default function DashboardPage() {
     classId: '',
     dateOfBirth: '2010-01-01',
     gender: 'MALE',
-    
-    // Indian Demographics & IDs
     aadhaarNumber: '',
     samagraId: '',
     familyId: '',
@@ -108,81 +154,94 @@ export default function DashboardPage() {
     casteCategory: 'GENERAL',
     nationality: 'Indian',
     motherTongue: '',
-
-    // Parents details
     fatherName: '',
     motherName: '',
     fatherOccupation: '',
     motherOccupation: '',
     annualIncome: '',
-
-    // Banking credentials
-    bankName: '',
-    accHolderName: '',
-    accNumber: '',
-    ifscCode: '',
-    bankBranch: '',
-
-    // Structured Address
     houseNo: '',
     street: '',
     city: '',
     district: '',
     state: '',
     pinCode: '',
-
-    // TC Migration
+    bankName: '',
+    accHolderName: '',
+    accNumber: '',
+    ifscCode: '',
+    bankBranch: '',
     prevSchoolName: '',
     tcNumber: '',
     migrationCertNo: ''
   });
-  const [feeForm, setFeeForm] = useState({ name: '', amount: '', dueDate: '', description: '' });
-  const [examForm, setExamForm] = useState({ name: '', subjectId: '', maxMarks: '100', examDate: '' });
-  const [staffForm, setStaffForm] = useState({ firstName: '', lastName: '', email: '', employeeId: '', designation: 'TEACHER', role: 'TEACHER', salary: '', phone: '' });
-  const [noticeForm, setNoticeForm] = useState({ title: '', content: '', roles: [] as string[] });
-  const [leaveForm, setLeaveForm] = useState({ startDate: '', endDate: '', reason: '' });
 
-  // Indian Educational ERP state additions
-  const [financeData, setFinanceData] = useState<any>(null);
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [expenseForm, setExpenseForm] = useState({ title: '', amount: '', category: 'OPERATIONAL', paymentMethod: 'CASH' });
-  
-  const [lessonPlans, setLessonPlans] = useState<any[]>([]);
-  const [lessonForm, setLessonForm] = useState({ title: '', content: '', subjectId: '', syllabusPercent: 0 });
+  // Exams / Grading States
+  const [selectedExamId, setSelectedExamId] = useState('');
+  const [examForm, setExamForm] = useState({ name: '', subjectId: '', maxMarks: '100', examDate: '', examType: 'UNIT_TEST' });
+  const [examStudents, setExamStudents] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
 
-  const [promotionSelectedStudents, setPromotionSelectedStudents] = useState<string[]>([]);
-  const [promotionTargetClassId, setPromotionTargetClassId] = useState('');
-
-  // Sub-tabs
-  const [feesTab, setFeesTab] = useState<'allocations' | 'history' | 'structures' | 'ledger'>('allocations');
-  const [examsTab, setExamsTab] = useState<'list' | 'entry'>('list');
-  const [staffTab, setStaffTab] = useState<'list' | 'leaves'>('list');
-
-  // Attendance Sheet
+  // Attendance states
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().substring(0, 10));
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
 
-  // Exam Marks Entry
-  const [selectedExamId, setSelectedExamId] = useState('');
-  const [subjectsList, setSubjectsList] = useState<any[]>([]);
-  const [examStudents, setExamStudents] = useState<any[]>([]);
+  // Indian HR and Leaves States
+  const [staffForm, setStaffForm] = useState({ firstName: '', lastName: '', email: '', employeeId: '', designation: 'TEACHER', role: 'TEACHER', salary: '', phone: '' });
+  const [leaveForm, setLeaveForm] = useState({ startDate: '', endDate: '', reason: '' });
+  const [payrollStaffId, setPayrollStaffId] = useState('');
+  const [payrollAllowances, setPayrollAllowances] = useState({ hra: 8000, da: 5000, tax: 200 });
+  const [payslipData, setPayslipData] = useState<any>(null);
 
-  // Individual Student view (student/parent role)
-  const [studentReport, setStudentReport] = useState<any[]>([]);
-  const [studentAttendance, setStudentAttendance] = useState<any>(null);
-  
-  // Payment Modal
+  // Communications & Circular States
+  const [circularForm, setCircularForm] = useState({ title: '', content: '', targetRoles: [] as string[] });
+  const [whatsappGroup, setWhatsappGroup] = useState('PARENTS_ALL');
+  const [whatsappText, setWhatsappText] = useState('');
+  const [broadcastProgress, setBroadcastProgress] = useState<{ active: boolean; current: number; total: number; log: string[] } | null>(null);
+
+  // Settings & DB Backup
+  const [rbacRules, setRbacRules] = useState<Record<string, string[]>>({});
+  const [backupLog, setBackupLog] = useState<string[]>([]);
+  const [backupRunning, setBackupRunning] = useState(false);
+
+  // RFID Biometric Simulator Logs
+  const [rfidLogs, setRfidLogs] = useState<string[]>([
+    "RFID scan at 10:45:12 AM: Student Alice Miller (ROLL-10A-01) checked in at Main Gate - PRESENT",
+    "RFID scan at 10:48:44 AM: Student Bob Johnson (ROLL-10A-02) checked in at Main Gate - PRESENT",
+    "Biometric scan at 10:52:19 AM: Teacher Sarah Connor checked in at Academic Block - PRESENT"
+  ]);
+
+  // AI Assistant Chat Messages
+  const [aiChatQuery, setAiChatQuery] = useState('');
+  const [aiChatMessages, setAiChatMessages] = useState<any[]>([
+    { sender: 'assistant', text: "Hello! I am your AI Institutional Assistant. Ask me anything about syllabus completion, attendance rates, finance collections, or library inventory." }
+  ]);
+  const [aiTyping, setAiTyping] = useState(false);
+
+  // Promotion States
+  const [promotionSelectedStudents, setPromotionSelectedStudents] = useState<string[]>([]);
+  const [promotionTargetClassId, setPromotionTargetClassId] = useState('');
+
+  // Payment states
   const [paymentModal, setPaymentModal] = useState<{ open: boolean; allocId: string; studentName: string; amountDue: number; method: string; remarks: string } | null>(null);
+  const [expenseForm, setExpenseForm] = useState({ title: '', amount: '', category: 'OPERATIONAL', paymentMethod: 'CASH' });
 
-  // Success message toasts
+  // Notifications
+  const [notifications, setNotifications] = useState<any[]>([
+    { id: 1, title: 'Term 1 Fee Overdue Alert', desc: '5 students in Grade 10-A have pending tuition payments.', time: '10m ago', role: 'ACCOUNTANT' },
+    { id: 2, title: 'Library Return Overdue', desc: 'Alice Miller holds "Fundamentals of Physics" past return limit.', time: '35m ago', role: 'LIBRARIAN' },
+    { id: 3, title: 'RFID Gate Connection Active', desc: 'Biometric terminals synchronized successfully with cloud server.', time: '1h ago', role: 'SUPER_ADMIN' },
+    { id: 4, title: 'New Circular Broadcasted', desc: 'Summer Vacation announcement published to all parents.', time: '2h ago', role: 'ALL' }
+  ]);
+
   const [toastMessage, setToastMessage] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3000);
+    setTimeout(() => setToastMessage(''), 4000);
   };
 
-  // 1. Initial Load & Auth check
+  // Check Auth and Initial load
   useEffect(() => {
     const cached = localStorage.getItem('aurxon_user');
     if (!cached) {
@@ -191,43 +250,115 @@ export default function DashboardPage() {
     }
     const parsed = JSON.parse(cached);
     setUser(parsed);
+    setCurrentRole(parsed.role);
     
-    // Adjust default starting menu based on role
-    if (parsed.role === 'STUDENT' || parsed.role === 'PARENT') {
-      setActiveMenu('student-portal');
-    } else if (parsed.role === 'ACCOUNTANT') {
-      setActiveMenu('fees');
-    } else if (parsed.role === 'TEACHER') {
-      setActiveMenu('attendance');
-    } else {
-      setActiveMenu('overview');
-    }
+    // Load initial datasets
+    loadDashboardStats();
+    loadStudents();
+    loadClasses();
+    loadStaff();
+    loadNotices();
+    loadLeaves();
+    loadLessonPlans();
+    loadExpenses();
+    loadFinanceOverview();
+    loadBooks();
+    loadIssues();
 
-    loadDashboardData(parsed);
+    // Key listener for Ctrl+K
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const loadDashboardData = async (currentUser: any) => {
-    try {
-      const classList = await getClassesApi();
-      setClasses(classList);
-      if (classList.length > 0) setSelectedClass(classList[0].id);
+  // Biometric Real-time Tick Simulator
+  useEffect(() => {
+    const rfidTimer = setInterval(() => {
+      const names = ["Alice Miller", "Bob Johnson", "Charlie Brown", "Sarah Connor", "John Keating", "Robert Kiyosaki"];
+      const locations = ["Main Gate Entry", "Library Entrance Portal", "Academic Block punch", "Science Lab Scan"];
+      const randomName = names[Math.floor(Math.random() * names.length)];
+      const randomLoc = locations[Math.floor(Math.random() * locations.length)];
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setRfidLogs(prev => [
+        `RFID scan at ${timeStr}: ${randomName} verified at ${randomLoc} - MARKED PRESENT`,
+        ...prev.slice(0, 10)
+      ]);
+    }, 18000);
 
-      if (currentUser.role === 'STUDENT' || currentUser.role === 'PARENT') {
-        const profileId = currentUser.profileId || 'stud-1';
-        const report = await getStudentReportApi(profileId);
-        setStudentReport(report);
-        const attend = await getStudentAttendanceSummaryApi(profileId);
-        setStudentAttendance(attend);
-      } else {
-        const statsData = await getDashboardStatsApi();
-        setStats(statsData);
+    return () => clearInterval(rfidTimer);
+  }, []);
+
+  // PIN Code Auto-Lookup
+  useEffect(() => {
+    if (studentForm.pinCode.length === 6) {
+      const pinDetails = getPinCodeDetails(studentForm.pinCode);
+      if (pinDetails) {
+        setStudentForm(prev => ({
+          ...prev,
+          state: pinDetails.state,
+          district: pinDetails.district,
+          city: pinDetails.district
+        }));
+        triggerToast(`PIN Code mapped: ${pinDetails.district}, ${pinDetails.state}`);
       }
-
-      const noticeList = await getNoticesApi();
-      setNotices(noticeList);
-    } catch (e) {
-      console.error(e);
     }
+  }, [studentForm.pinCode]);
+
+  useEffect(() => {
+    if (aiAssistantOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [aiChatMessages, aiAssistantOpen]);
+
+  // Load routines
+  const loadDashboardStats = async () => {
+    const data = await getDashboardStatsApi();
+    setStats(data);
+  };
+  const loadStudents = async () => {
+    const data = await getStudentsApi();
+    setStudents(data);
+  };
+  const loadClasses = async () => {
+    const data = await getClassesApi();
+    setClasses(data);
+  };
+  const loadStaff = async () => {
+    const data = await getStaffApi();
+    setStaff(data);
+  };
+  const loadNotices = async () => {
+    const data = await getNoticesApi();
+    setNotices(data);
+  };
+  const loadLeaves = async () => {
+    const data = await getLeavesApi();
+    setLeaves(data);
+  };
+  const loadLessonPlans = async () => {
+    const data = await getLessonPlansApi();
+    setLessonPlans(data);
+  };
+  const loadExpenses = async () => {
+    const data = await getExpensesApi();
+    setExpenses(data);
+  };
+  const loadFinanceOverview = async () => {
+    const data = await getFinanceOverviewApi();
+    setFinanceData(data);
+  };
+  const loadBooks = async () => {
+    const data = await getBooksApi(bookSearch);
+    setBooks(data);
+  };
+  const loadIssues = async () => {
+    const data = await getIssuesApi();
+    setBookIssues(data);
   };
 
   const handleLogout = () => {
@@ -236,1081 +367,899 @@ export default function DashboardPage() {
     router.push('/');
   };
 
-  // 2. Fetch specific roster collections on tab switch
-  useEffect(() => {
-    if (!user) return;
-    if (activeMenu === 'students') {
-      loadStudents();
-    } else if (activeMenu === 'staff' || activeMenu === 'overview') {
-      loadStaff();
-    } else if (activeMenu === 'attendance') {
-      loadAttendanceGrid();
-    } else if (activeMenu === 'fees') {
-      loadFeesAllocations();
-    } else if (activeMenu === 'exams') {
-      loadExams();
-    } else if (activeMenu === 'lessons') {
-      loadLessonPlans();
-    } else if (activeMenu === 'promotions') {
-      loadStudents();
-    }
-  }, [activeMenu, selectedClass, feesTab, staffTab, examsTab]);
-
-  const loadStudents = async () => {
-    const list = await getStudentsApi(selectedClass || undefined, searchQuery || undefined);
-    setStudents(list);
-  };
-
-  const loadStaff = async () => {
-    const list = await getStaffApi();
-    setStaff(list);
-    const leaveList = await getLeavesApi();
-    setLeaves(leaveList);
-  };
-
-  const loadExams = async () => {
-    const list = await getExamsApi();
-    const subs = await getSubjectsApi();
-    setSubjectsList(subs);
-    if (list.length > 0) setSelectedExamId(list[0].id);
-  };
-
-  // Attendance triggers
-  const loadAttendanceGrid = async () => {
-    if (!selectedClass) return;
-    const grid = await getClassAttendanceApi(selectedClass, attendanceDate);
-    setAttendanceRecords(grid);
-  };
-
-  const toggleAttendance = (studentId: string, status: string) => {
-    setAttendanceRecords(prev =>
-      prev.map(r => r.studentId === studentId ? { ...r, status } : r)
-    );
-  };
-
-  const submitAttendance = async () => {
-    await submitAttendanceApi(selectedClass, attendanceDate, attendanceRecords);
-    triggerToast('Attendance register successfully saved!');
-    loadDashboardData(user);
-  };
-
-  const loadFinanceOverview = async () => {
-    try {
-      const data = await getFinanceOverviewApi();
-      setFinanceData(data);
-      const expList = await getExpensesApi();
-      setExpenses(expList);
-    } catch (e) {
-      console.error('Error loading finance details:', e);
+  // Role switching defense
+  const handleRoleChange = (role: string) => {
+    setCurrentRole(role);
+    triggerToast(`Switched active view scope to: ${role}`);
+    
+    // Auto redirect to category if current category isn't allowed
+    const category = SIDEBAR_CATEGORIES.find(c => c.id === activeCategory);
+    if (category && category.roles[0] !== '*') {
+      const allowed = category.roles.includes(role);
+      if (!allowed) {
+        setActiveCategory('overview');
+      }
     }
   };
 
-  const loadLessonPlans = async () => {
-    try {
-      const plans = await getLessonPlansApi();
-      setLessonPlans(plans);
-    } catch (e) {
-      console.error('Error loading lesson plans:', e);
-    }
-  };
-
-  // Fee Desk Triggers
-  const [feeAllocations, setFeeAllocations] = useState<any[]>([]);
-  const [feeHistory, setFeeHistory] = useState<any[]>([]);
-  const [feeStructures, setFeeStructures] = useState<any[]>([]);
-
-  const loadFeesAllocations = async () => {
-    if (feesTab === 'allocations') {
-      const list = await getFeesAllocationsApi(selectedClass || undefined);
-      setFeeAllocations(list);
-    } else if (feesTab === 'history') {
-      const history = await getFeesAllocationsApi(); // Mock returns payments history
-      setFeeHistory(history);
-    } else if (feesTab === 'structures') {
-      const list = await getFeesStructuresApi();
-      setFeeStructures(list);
-    } else if (feesTab === 'ledger') {
-      await loadFinanceOverview();
-    }
-  };
-
-  const openPaymentModal = (alloc: any) => {
-    setPaymentModal({
-      open: true,
-      allocId: alloc.id,
-      studentName: `${alloc.student.firstName} ${alloc.student.lastName}`,
-      amountDue: alloc.amountDue - alloc.amountPaid,
-      method: 'CASH',
-      remarks: '',
-    });
-  };
-
-  const submitPayment = async () => {
-    if (!paymentModal) return;
-    await payFeeApi(paymentModal.allocId, paymentModal.amountDue, paymentModal.method, paymentModal.remarks);
-    setPaymentModal(null);
-    triggerToast('Payment transaction captured successfully! Receipt printed.');
-    loadFeesAllocations();
-    loadDashboardData(user);
-  };
-
-  const handleCreateFeeStructure = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await createFeeStructureApi(feeForm);
-    setFeeForm({ name: '', amount: '', dueDate: '', description: '' });
-    triggerToast('New Fee Structure created successfully!');
-    loadFeesAllocations();
-  };
-
-  // Exam Marks triggers
-  useEffect(() => {
-    if (examsTab === 'entry' && selectedExamId) {
-      loadExamResultsGrid();
-    }
-  }, [examsTab, selectedExamId]);
-
-  const loadExamResultsGrid = async () => {
-    const list = await getExamResultsApi(selectedExamId);
-    setExamStudents(list);
-  };
-
-  const updateMarks = (studentId: string, val: string) => {
-    setExamStudents(prev =>
-      prev.map(r => r.studentId === studentId ? { ...r, marksObtained: parseFloat(val) || 0 } : r)
-    );
-  };
-
-  const updateRemarks = (studentId: string, val: string) => {
-    setExamStudents(prev =>
-      prev.map(r => r.studentId === studentId ? { ...r, remarks: val } : r)
-    );
-  };
-
-  const submitExamResults = async () => {
-    await submitExamResultsApi(selectedExamId, examStudents);
-    triggerToast('Exam marks sheets successfully updated!');
-  };
-
-  const handleCreateExam = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await createExamApi(examForm);
-    setExamForm({ name: '', subjectId: subjectsList[0]?.id || '', maxMarks: '100', examDate: '' });
-    triggerToast('New Exam scheduled successfully!');
-    loadExams();
-  };
-
-  // Student CRUD forms
+  // Create Student
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createStudentApi(studentForm);
-    setStudentForm({
-      firstName: '',
-      lastName: '',
-      email: '',
-      rollNumber: '',
-      classId: selectedClass,
-      dateOfBirth: '2010-01-01',
-      gender: 'MALE',
-      aadhaarNumber: '',
-      samagraId: '',
-      familyId: '',
-      penNumber: '',
-      birthCertificateNumber: '',
-      bloodGroup: '',
-      religion: '',
-      casteCategory: 'GENERAL',
-      nationality: 'Indian',
-      motherTongue: '',
-      fatherName: '',
-      motherName: '',
-      fatherOccupation: '',
-      motherOccupation: '',
-      annualIncome: '',
-      bankName: '',
-      accHolderName: '',
-      accNumber: '',
-      ifscCode: '',
-      bankBranch: '',
-      houseNo: '',
-      street: '',
-      city: '',
-      district: '',
-      state: '',
-      pinCode: '',
-      prevSchoolName: '',
-      tcNumber: '',
-      migrationCertNo: ''
-    });
-    triggerToast('Student enrolled successfully!');
-    loadStudents();
-    loadDashboardData(user);
+    if (studentForm.aadhaarNumber && studentForm.aadhaarNumber.length !== 12) {
+      alert('Aadhaar Number must be exactly 12 digits.');
+      return;
+    }
+    if (studentForm.samagraId && studentForm.samagraId.length !== 9) {
+      alert('Samagra Id must be exactly 9 digits.');
+      return;
+    }
+    try {
+      const data = {
+        ...studentForm,
+        rollNumber: studentForm.rollNumber || `ROLL-${Date.now().toString().slice(-4)}`
+      };
+      await createStudentApi(data);
+      triggerToast('Indian scholar record successfully registered!');
+      setStudentForm({
+        firstName: '', lastName: '', email: '', rollNumber: '', classId: '', dateOfBirth: '2010-01-01', gender: 'MALE',
+        aadhaarNumber: '', samagraId: '', familyId: '', penNumber: '', birthCertificateNumber: '', bloodGroup: '',
+        religion: '', casteCategory: 'GENERAL', nationality: 'Indian', motherTongue: '', fatherName: '', motherName: '',
+        fatherOccupation: '', motherOccupation: '', annualIncome: '', houseNo: '', street: '', city: '', district: '',
+        state: '', pinCode: '', bankName: '', accHolderName: '', accNumber: '', ifscCode: '', bankBranch: '',
+        prevSchoolName: '', tcNumber: '', migrationCertNo: ''
+      });
+      loadStudents();
+      setStudentTab('list');
+    } catch (err: any) {
+      alert(err.message || 'Admissions failed.');
+    }
   };
 
-  const handleDeleteStudent = async (id: string) => {
-    if (confirm('Are you sure you want to delete this student profile?')) {
-      await deleteStudentApi(id);
-      triggerToast('Student record deleted successfully.');
+  // Add Book
+  const handleCreateBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createBookApi({
+        title: bookForm.title,
+        author: bookForm.author,
+        isbn: bookForm.isbn,
+        totalCopies: parseInt(bookForm.totalCopies) || 1
+      });
+      triggerToast('New library book catalogued successfully!');
+      setBookForm({ title: '', author: '', isbn: '', totalCopies: '5' });
+      loadBooks();
+    } catch (err: any) {
+      alert(err.message || 'Failed to add book');
+    }
+  };
+
+  // Issue book
+  const handleIssueBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!issueForm.studentId || !issueForm.bookId) {
+      alert('Select student and book');
+      return;
+    }
+    try {
+      await issueBookApi(issueForm.studentId, issueForm.bookId);
+      triggerToast('Book issue checkout record created!');
+      setIssueForm({ studentId: '', bookId: '' });
+      loadBooks();
+      loadIssues();
+    } catch (err: any) {
+      alert(err.message || 'Check out failed');
+    }
+  };
+
+  // Return Book
+  const handleReturnBook = async (id: string) => {
+    try {
+      await returnBookApi(id);
+      triggerToast('Book returned to rack. Inventory updated.');
+      loadBooks();
+      loadIssues();
+    } catch (err: any) {
+      alert(err.message || 'Failed to process return');
+    }
+  };
+
+  // Create Exam
+  const handleCreateExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createExamApi(examForm);
+      triggerToast('Exam schedule and grading parameters defined.');
+      setExamForm({ name: '', subjectId: '', maxMarks: '100', examDate: '', examType: 'UNIT_TEST' });
+      loadDashboardStats();
+    } catch (err: any) {
+      alert(err.message || 'Failed to schedule exam');
+    }
+  };
+
+  // Exam Marks loading
+  const loadExamMarksSheet = async (examId: string) => {
+    setSelectedExamId(examId);
+    if (!examId) return;
+    const studentsList = await getExamResultsApi(examId);
+    setExamStudents(studentsList);
+    setExamsTab('entry');
+  };
+
+  // Submit Exam Results
+  const handleSaveExamResults = async () => {
+    try {
+      await submitExamResultsApi(selectedExamId, examStudents);
+      triggerToast('Examination marks list saved and graded!');
+      setExamsTab('list');
+    } catch (err: any) {
+      alert(err.message || 'Failed to save results');
+    }
+  };
+
+  // Calculate CBSE grade letter
+  const getGrade = (marks: number, max: number) => {
+    const pct = (marks / max) * 100;
+    if (pct >= 91) return 'A1';
+    if (pct >= 81) return 'A2';
+    if (pct >= 71) return 'B1';
+    if (pct >= 61) return 'B2';
+    if (pct >= 51) return 'C1';
+    if (pct >= 41) return 'C2';
+    if (pct >= 33) return 'D';
+    return 'E/Fail';
+  };
+
+  // Submit Attendance
+  const handleSaveAttendance = async () => {
+    try {
+      await submitAttendanceApi(selectedClass, attendanceDate, attendanceRecords);
+      triggerToast('Daily attendance roster submitted successfully!');
+    } catch (err) {
+      alert('Attendance save error');
+    }
+  };
+
+  const loadAttendanceRoster = async (classId: string) => {
+    setSelectedClass(classId);
+    if (!classId) return;
+    const data = await getClassAttendanceApi(classId, attendanceDate);
+    setAttendanceRecords(data);
+  };
+
+  // Promote students
+  const handlePromoteStudents = async () => {
+    if (promotionSelectedStudents.length === 0) {
+      alert('Select students to promote');
+      return;
+    }
+    if (!promotionTargetClassId) {
+      alert('Select target class');
+      return;
+    }
+    try {
+      await promoteStudentsApi(promotionSelectedStudents, promotionTargetClassId);
+      triggerToast(`Successfully promoted ${promotionSelectedStudents.length} students to new grade!`);
+      setPromotionSelectedStudents([]);
       loadStudents();
-      loadDashboardData(user);
+      setStudentTab('list');
+    } catch (err) {
+      alert('Promotion failure');
+    }
+  };
+
+  // Expense
+  const handleCreateExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createExpenseApi({
+        title: expenseForm.title,
+        amount: parseFloat(expenseForm.amount),
+        category: expenseForm.category,
+        paymentMethod: expenseForm.paymentMethod
+      });
+      triggerToast('Operating expense debited successfully!');
+      setExpenseForm({ title: '', amount: '', category: 'OPERATIONAL', paymentMethod: 'CASH' });
+      loadExpenses();
+      loadFinanceOverview();
+    } catch (err) {
+      alert('Expense creation failed');
+    }
+  };
+
+  // Delete expense
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await deleteExpenseApi(id);
+      triggerToast('Expense item deleted');
+      loadExpenses();
+      loadFinanceOverview();
+    } catch (err) {
+      alert('Expense deletion failed');
+    }
+  };
+
+  // Pay fee
+  const handlePayFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentModal) return;
+    try {
+      await payFeeApi(paymentModal.allocId, paymentModal.amountDue, paymentModal.method, paymentModal.remarks);
+      triggerToast('Fee receipt generated! Collection recorded.');
+      setPaymentModal(null);
+      loadFinanceOverview();
+      loadDashboardStats();
+    } catch (err) {
+      alert('Payment submission failed');
     }
   };
 
   // Staff creation
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createStaffApi(staffForm);
-    setStaffForm({ firstName: '', lastName: '', email: '', employeeId: '', designation: 'TEACHER', role: 'TEACHER', salary: '', phone: '' });
-    triggerToast('Staff profile registered successfully!');
-    loadStaff();
-    loadDashboardData(user);
+    try {
+      await createStaffApi(staffForm);
+      triggerToast('New employee profile and credentials active.');
+      setStaffForm({ firstName: '', lastName: '', email: '', employeeId: '', designation: 'TEACHER', role: 'TEACHER', salary: '', phone: '' });
+      loadStaff();
+    } catch (err) {
+      alert('Employee save error');
+    }
   };
 
-  const handleApproveLeave = async (id: string, status: string) => {
-    await approveLeaveApi(id, status);
-    triggerToast(`Leave request ${status.toLowerCase()} successfully.`);
-    loadStaff();
-  };
-
-  // Leave Submit
-  const handleLeaveSubmit = async (e: React.FormEvent) => {
+  // Leave submission
+  const handleCreateLeave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await submitLeaveApi(leaveForm.startDate, leaveForm.endDate, leaveForm.reason);
-    setLeaveForm({ startDate: '', endDate: '', reason: '' });
-    triggerToast('Leave application submitted to administration.');
-    const list = await getLeavesApi(user.profileId);
-    setLeaves(list);
+    try {
+      await submitLeaveApi(leaveForm.startDate, leaveForm.endDate, leaveForm.reason);
+      triggerToast('Leave request submitted to principal desk.');
+      setLeaveForm({ startDate: '', endDate: '', reason: '' });
+      loadLeaves();
+    } catch (err) {
+      alert('Leave submission error');
+    }
   };
 
-  // Broadcast notices
+  // Leave approval
+  const handleApproveLeave = async (id: string, status: string) => {
+    try {
+      await approveLeaveApi(id, status);
+      triggerToast(`Leave request marked ${status}`);
+      loadLeaves();
+    } catch (err) {
+      alert('Leave evaluation error');
+    }
+  };
+
+  // Payslip Generator
+  const generatePayslip = (sId: string) => {
+    const employee = staff.find(s => s.id === sId);
+    if (!employee) {
+      alert('Select an employee');
+      return;
+    }
+    const base = parseFloat(employee.salary) || 30000;
+    const hra = allowances.hra;
+    const da = allowances.da;
+    const tax = allowances.tax;
+    const net = base + hra + da - tax;
+    setPayslipData({
+      name: `${employee.firstName} ${employee.lastName}`,
+      employeeId: employee.employeeId,
+      designation: employee.designation,
+      baseSalary: base,
+      hra,
+      da,
+      tax,
+      netPay: net,
+      period: 'May 2026',
+      receiptNo: `PAY-${Date.now().toString().slice(-6)}`
+    });
+    triggerToast('Payslip preview calculated!');
+  };
+
+  const [allowances, setAllowances] = useState({ hra: 8000, da: 5000, tax: 200 });
+
+  // Broadcast Circular Notices
   const handleCreateNotice = async (e: React.FormEvent) => {
     e.preventDefault();
-    const roles = noticeForm.roles.length > 0 ? noticeForm.roles : ['ALL'];
-    await createNoticeApi(noticeForm.title, noticeForm.content, roles);
-    setNoticeForm({ title: '', content: '', roles: [] });
-    triggerToast('Announcement circular successfully posted!');
-    const noticeList = await getNoticesApi();
-    setNotices(noticeList);
-    loadDashboardData(user);
-  };
-
-  const toggleNoticeRole = (role: string) => {
-    setNoticeForm(prev => {
-      const roles = prev.roles.includes(role)
-        ? prev.roles.filter(r => r !== role)
-        : [...prev.roles, role];
-      return { ...prev, roles };
-    });
-  };
-
-  // 3. Indian Educational ERP Actions
-  const handleCreateExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await createExpenseApi({
-      title: expenseForm.title,
-      amount: parseFloat(expenseForm.amount),
-      category: expenseForm.category,
-      paymentMethod: expenseForm.paymentMethod
-    });
-    setExpenseForm({ title: '', amount: '', category: 'OPERATIONAL', paymentMethod: 'CASH' });
-    triggerToast('Expense ledger transaction created successfully!');
-    await loadFinanceOverview();
-  };
-
-  const handleDeleteExpense = async (id: string) => {
-    if (confirm('Delete this operational expense record from accounting ledgers?')) {
-      await deleteExpenseApi(id);
-      triggerToast('Expense record deleted.');
-      await loadFinanceOverview();
+    const target = circularForm.targetRoles.length > 0 ? circularForm.targetRoles : ['ALL'];
+    try {
+      await createNoticeApi(circularForm.title, circularForm.content, target);
+      triggerToast('Circular notification broadcasted to all terminals!');
+      setCircularForm({ title: '', content: '', targetRoles: [] });
+      loadNotices();
+    } catch (err) {
+      alert('Circular create error');
     }
   };
 
-  const handleCreateLessonPlan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await createLessonPlanApi({
-      title: lessonForm.title,
-      content: lessonForm.content,
-      subjectId: lessonForm.subjectId || subjectsList[0]?.id,
-      syllabusPercent: lessonForm.syllabusPercent
+  const toggleCircularRole = (role: string) => {
+    setCircularForm(prev => {
+      const roles = prev.targetRoles.includes(role)
+        ? prev.targetRoles.filter(r => r !== role)
+        : [...prev.targetRoles, role];
+      return { ...prev, targetRoles: roles };
     });
-    setLessonForm({ title: '', content: '', subjectId: subjectsList[0]?.id || '', syllabusPercent: 0 });
-    triggerToast('Academic lesson plan created successfully!');
-    await loadLessonPlans();
   };
 
-  const handleUpdateLessonPercent = async (id: string, status: string, percent: number) => {
-    await updateLessonPlanApi(id, { status, syllabusPercent: percent });
-    triggerToast('Lesson syllabus progress updated.');
-    await loadLessonPlans();
-  };
-
-  const handleDeleteLessonPlan = async (id: string) => {
-    if (confirm('Delete this academic lesson plan?')) {
-      await deleteLessonPlanApi(id);
-      triggerToast('Lesson plan deleted.');
-      await loadLessonPlans();
-    }
-  };
-
-  const handlePromoteStudents = async () => {
-    if (promotionSelectedStudents.length === 0) {
-      alert('Please select at least one student for class promotion.');
+  // WhatsApp/SMS simulated broadcaster
+  const handleWhatsappBroadcast = () => {
+    if (!whatsappText) {
+      alert('Please enter message text');
       return;
     }
-    if (!promotionTargetClassId) {
-      alert('Please select a target class for promotion.');
-      return;
+    let count = 0;
+    let list: string[] = [];
+    if (whatsappGroup === 'PARENTS_ALL') {
+      list = students.map(s => `+91 ${Math.floor(6000000000 + Math.random() * 3999999999)} (Parent of ${s.firstName})`);
+    } else if (whatsappGroup === 'TEACHERS_ALL') {
+      list = staff.filter(s => s.designation === 'TEACHER').map(s => `+91 ${s.phone || '9988776655'} (${s.firstName})`);
+    } else {
+      list = [`+91 9876543210 (Principal Desk)`, `+91 9998887776 (Registrar)`];
     }
-    const result = await promoteStudentsApi(promotionSelectedStudents, promotionTargetClassId);
-    setPromotionSelectedStudents([]);
-    triggerToast(`Bulk Academic Promotion complete! Promoted ${result.count} students.`);
-    setActiveMenu('students');
+
+    setBroadcastProgress({
+      active: true,
+      current: 0,
+      total: list.length,
+      log: [`Broadcaster initialized for ${list.length} targets...`]
+    });
+
+    const runSim = (idx: number) => {
+      if (idx >= list.length) {
+        setBroadcastProgress(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            log: [...prev.log, `Broadcast finished successfully. ${list.length} messages delivered.`]
+          };
+        });
+        triggerToast('WhatsApp / SMS Broadcast completed!');
+        setWhatsappText('');
+        return;
+      }
+      setTimeout(() => {
+        setBroadcastProgress(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            current: idx + 1,
+            log: [...prev.log, `Delivered: "${whatsappText.substring(0, 15)}..." to ${list[idx]}`]
+          };
+        });
+        runSim(idx + 1);
+      }, 500);
+    };
+    runSim(0);
   };
 
-  if (!user) return <div className="p-8 text-center text-zinc-500">Checking auth token credentials...</div>;
+  // AI assistant prompt triggers
+  const triggerAiQuery = (query: string) => {
+    setAiChatMessages(prev => [...prev, { sender: 'user', text: query }]);
+    setAiTyping(true);
+
+    setTimeout(() => {
+      let reply = "";
+      const q = query.toLowerCase();
+      
+      if (q.includes('health') || q.includes('report') || q.includes('analytics')) {
+        reply = `**AURXON ERP Institutional Health Analysis:**
+- Academic Roster: **${students.length} students** enrolled across **${classes.length} grades**.
+- Term Fees Collections: **${stats?.feeOverview?.collectionRate || 85}%** collection rate. Net collections ₹${stats?.feeOverview?.totalPaid || 0}.
+- Attendance Rate: **${stats?.attendanceRate || 95.8}%** biometric check-ins active today.
+- Overall Rating: **Grade A+ Elite**`;
+      } else if (q.includes('book') || q.includes('library') || q.includes('overdue')) {
+        const issued = bookIssues.filter(i => i.status === 'ISSUED');
+        reply = `**Library Circulation Audit:**
+- catalogued inventory: **${books.length} titles** available.
+- Checked out: **${issued.length} books** currently with students.
+- Overdue logs: **1 alert** pending return check for student Alice Miller (ROLL-10A-01).`;
+      } else if (q.includes('absent') || q.includes('attendance')) {
+        reply = `**Biometric attendance log summary:**
+- Today's rate: **${stats?.attendanceRate || 95.8}%** present.
+- Absent flags: **1 student** flagged (Bob Johnson, Grade 10-A, sick leave).
+- Biometric terminals online: **4/4 gates operational**.`;
+      } else if (q.includes('fee') || q.includes('financial')) {
+        reply = `**Financial Collections Ledger:**
+- Total Due: **₹${stats?.feeOverview?.totalDue || 0}**
+- Total Collected: **₹${stats?.feeOverview?.totalPaid || 0}**
+- Pending Balance: **₹${stats?.feeOverview?.totalPending || 0}**
+- Cash Desk: ₹${expenses.reduce((sum, e) => sum + e.amount, 0)} operating expense recorded.`;
+      } else {
+        reply = `I have received your request. Here are the core statistics for Aurxon:
+- **Students**: ${students.length}
+- **Staff**: ${staff.length}
+- **Attendance**: ${stats?.attendanceRate || 95.8}%
+- **Fees collection**: ${stats?.feeOverview?.collectionRate || 85}%
+Type "financial health" or "attendance" to get detailed lists.`;
+      }
+
+      setAiChatMessages(prev => [...prev, { sender: 'assistant', text: reply }]);
+      setAiTyping(false);
+    }, 1200);
+  };
+
+  // Settings DB Backup Sim
+  const runDbBackup = () => {
+    setBackupRunning(true);
+    setBackupLog(["[INFO] Initializing system vault backup...", "[INFO] Exporting PostgreSQL schemas from Neon serverless pooler..."]);
+    
+    setTimeout(() => {
+      setBackupLog(prev => [...prev, "[INFO] Compressing tables: student, staff, book, payment, attendance...", "[INFO] Database dump created (4.82MB, GZIP compression active)."]);
+    }, 1000);
+
+    setTimeout(() => {
+      const filename = `aurxon-erp-backup-${new Date().toISOString().substring(0,10)}.sql`;
+      setBackupLog(prev => [...prev, `[SUCCESS] Secure tunnel transmission completed.`, `[SUCCESS] Dump file "${filename}" vaulted in AWS S3 Symmetrical Cloud storage.`]);
+      setBackupRunning(false);
+      triggerToast('Database backup successfully vaulted!');
+    }, 2500);
+  };
+
+  if (!user) return <div className="p-8 text-center text-zinc-500 font-medium">Authorizing credentials. Syncing ERP modules...</div>;
 
   return (
-    <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-50 overflow-hidden">
       
-      {/* Dynamic Success Toast */}
+      {/* Toast Alert */}
       {toastMessage && (
-        <div className="absolute top-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-emerald-500/20">
-          <Check className="h-4 w-4" />
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-sky-500/20 animate-fade-in border border-sky-400">
+          <Sparkles className="h-4 w-4 text-sky-200 animate-pulse" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* 1. NOTION-LIKE SIDEBAR */}
-      <aside className="hidden w-64 flex-col border-r border-zinc-200 bg-white p-5 dark:border-zinc-800/80 dark:bg-zinc-900 md:flex">
-        
-        {/* Branch / Institute Brand branding */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-white font-bold">
+      {/* COMMAND PALETTE POPUP */}
+      {commandPaletteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/50 backdrop-blur-sm" onClick={() => setCommandPaletteOpen(false)}>
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center border-b border-zinc-100 px-4 dark:border-zinc-800">
+              <Search className="h-4 w-4 text-zinc-400" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search command shortcuts... (e.g. library, admit student, principal)"
+                className="w-full border-none bg-transparent px-3 py-4 text-sm text-zinc-900 outline-none placeholder-zinc-400 dark:text-white"
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+              <button onClick={() => setCommandPaletteOpen(false)} className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400 dark:bg-zinc-800">ESC</button>
+            </div>
+            
+            {/* Filtered options list */}
+            <div className="max-h-72 overflow-y-auto p-2">
+              <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Actions & Navigation</p>
+              {[
+                { title: "Dashboard Overview", action: () => { setActiveCategory('overview'); setCommandPaletteOpen(false); }, desc: "View key metrics and RFID logs" },
+                { title: "Admit Student Form", action: () => { setActiveCategory('students'); setStudentTab('admission'); setCommandPaletteOpen(false); }, desc: "Enroll new pupil with Indian demographic IDs" },
+                { title: "Issue a Library Book", action: () => { setActiveCategory('library'); setLibrarySubTab('checkout'); setCommandPaletteOpen(false); }, desc: "Borrow register checkout slips" },
+                { title: "Quick Switch Role: Principal", action: () => { handleRoleChange('PRINCIPAL'); setCommandPaletteOpen(false); }, desc: "Change ERP permission view" },
+                { title: "Quick Switch Role: Accountant", action: () => { handleRoleChange('ACCOUNTANT'); setCommandPaletteOpen(false); }, desc: "Access Fees ledger" },
+                { title: "Quick Switch Role: Librarian", action: () => { handleRoleChange('LIBRARIAN'); setCommandPaletteOpen(false); }, desc: "Borrow lists and book inventory" },
+                { title: "Ask AI Assistant", action: () => { setAiAssistantOpen(true); setCommandPaletteOpen(false); }, desc: "Open side chat dialog box" },
+                { title: "Simulate DB Backup Vault", action: () => { setActiveCategory('settings'); setCommandPaletteOpen(false); }, desc: "Neon postgres backup simulation" },
+                { title: "Dark Theme Toggle", action: () => { document.documentElement.classList.toggle('dark'); setCommandPaletteOpen(false); }, desc: "Toggle color modes" }
+              ].filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.desc.toLowerCase().includes(searchQuery.toLowerCase())).map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={item.action}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+                >
+                  <div>
+                    <p className="font-semibold text-zinc-800 dark:text-zinc-200">{item.title}</p>
+                    <p className="text-[10px] text-zinc-400">{item.desc}</p>
+                  </div>
+                  <ChevronRight className="h-3 w-3 text-zinc-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DYNAMIC COLLAPSIBLE SIDEBAR */}
+      <aside className={`flex flex-col border-r border-zinc-200 bg-white dark:border-zinc-800/80 dark:bg-zinc-900 transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'} h-full shrink-0`}>
+        {/* Branding header */}
+        <div className="flex h-16 items-center gap-3 px-5 border-b border-zinc-200 dark:border-zinc-800/80">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white font-extrabold shadow-md shadow-sky-500/25">
             A
           </div>
-          <div className="overflow-hidden">
-            <h1 className="text-sm font-bold tracking-tight truncate">{user.institutionName}</h1>
-            <p className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">Lite ERP</p>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="overflow-hidden">
+              <h1 className="text-sm font-extrabold tracking-tight truncate dark:text-white">{user.institutionName}</h1>
+              <p className="text-[9px] uppercase tracking-wider font-bold text-sky-600 dark:text-sky-400">Mini Lite ERP</p>
+            </div>
+          )}
         </div>
 
-        {/* User Card badge */}
-        <div className="mt-6 flex items-center gap-3 rounded-xl bg-zinc-50 p-3 transition dark:bg-zinc-950/50">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-xs font-bold text-sky-600">
-            {user.profileName.slice(0, 2).toUpperCase()}
+        {/* Current profile badge */}
+        {!sidebarCollapsed ? (
+          <div className="mx-4 mt-6 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-100 dark:border-zinc-800/50">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-xs font-bold text-sky-600">
+                {user.profileName.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="overflow-hidden">
+                <h4 className="text-xs font-bold truncate text-zinc-700 dark:text-zinc-300">{user.profileName}</h4>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[9px] font-bold text-zinc-400 truncate uppercase">{currentRole.replace('_', ' ')}</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="overflow-hidden">
-            <h4 className="text-xs font-semibold truncate">{user.profileName}</h4>
-            <p className="text-[9px] font-medium text-zinc-400 uppercase">{user.role}</p>
+        ) : (
+          <div className="flex justify-center mt-6">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/10 text-xs font-bold text-sky-600">
+              {user.profileName.slice(0, 2).toUpperCase()}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Sidebar Nav Items */}
-        <nav className="mt-8 flex-1 space-y-1">
-          {/* Admin options */}
-          {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN') && (
-            <>
+        {/* Nav Items */}
+        <nav className="flex-1 mt-6 px-3 space-y-1 overflow-y-auto">
+          {SIDEBAR_CATEGORIES.map((cat) => {
+            const isAllowed = cat.roles.includes('*') || cat.roles.includes(currentRole);
+            if (!isAllowed) return null;
+            const Icon = cat.icon;
+            const isActive = activeCategory === cat.id;
+
+            return (
               <button
-                onClick={() => setActiveMenu('overview')}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'overview' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-xs font-bold transition-all ${
+                  isActive
+                    ? 'bg-sky-600 text-white shadow-lg shadow-sky-500/20 dark:bg-sky-500 dark:shadow-sky-500/10'
+                    : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/40'
+                }`}
+                title={cat.label}
               >
-                <LayoutDashboard className="h-4 w-4" />
-                <span>Dashboard Overview</span>
+                <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-zinc-400'}`} />
+                {!sidebarCollapsed && <span className="truncate">{cat.label}</span>}
               </button>
-
-              <button
-                onClick={() => setActiveMenu('students')}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'students' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-              >
-                <Users className="h-4 w-4" />
-                <span>Student Management</span>
-              </button>
-
-              <button
-                onClick={() => setActiveMenu('staff')}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'staff' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-              >
-                <Briefcase className="h-4 w-4" />
-                <span>Staff & HR Records</span>
-              </button>
-            </>
-          )}
-
-          {/* Teacher and Admin options */}
-          {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN' || user.role === 'TEACHER') && (
-            <>
-              <button
-                onClick={() => setActiveMenu('attendance')}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'attendance' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-              >
-                <CalendarCheck className="h-4 w-4" />
-                <span>Daily Attendance</span>
-              </button>
-              
-              <button
-                onClick={() => setActiveMenu('lessons')}
-                className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'lessons' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                <span>Syllabus & Lessons</span>
-              </button>
-            </>
-          )}
-
-          {/* Accountant and Admin options */}
-          {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN' || user.role === 'ACCOUNTANT') && (
-            <button
-              onClick={() => setActiveMenu('fees')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'fees' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-            >
-              <CreditCard className="h-4 w-4" />
-              <span>Financials & Fees</span>
-            </button>
-          )}
-
-          {/* Academic bulk promotion - admin only */}
-          {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN') && (
-            <button
-              onClick={() => setActiveMenu('promotions')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'promotions' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-            >
-              <TrendingUp className="h-4 w-4" />
-              <span>Year-End Promotions</span>
-            </button>
-          )}
-
-          {/* Exam options */}
-          {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN' || user.role === 'TEACHER') && (
-            <button
-              onClick={() => setActiveMenu('exams')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'exams' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-            >
-              <GraduationCap className="h-4 w-4" />
-              <span>Exams & Grading</span>
-            </button>
-          )}
-
-          {/* Student Portal for students and parents */}
-          {(user.role === 'STUDENT' || user.role === 'PARENT') && (
-            <button
-              onClick={() => setActiveMenu('student-portal')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'student-portal' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-            >
-              <GraduationCap className="h-4 w-4" />
-              <span>Student Profile Desk</span>
-            </button>
-          )}
-
-          {/* Notices */}
-          <button
-            onClick={() => setActiveMenu('notices')}
-            className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${activeMenu === 'notices' ? 'bg-sky-600 text-white shadow-md' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'}`}
-          >
-            <Megaphone className="h-4 w-4" />
-            <span>Circular Alerts</span>
-          </button>
+            );
+          })}
         </nav>
 
-        {/* Sidebar Footer Logout */}
-        <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/80">
+        {/* Sidebar Footer */}
+        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800/80">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-950/20 dark:hover:text-red-400 transition"
+            className="flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-xs font-bold text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400 transition"
           >
-            <LogOut className="h-4 w-4" />
-            <span>Logout</span>
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span>Logout</span>}
           </button>
         </div>
       </aside>
 
-      {/* 2. DYNAMIC CONTENT MAIN AREA */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      {/* DYNAMIC CONTENT MAIN DESK */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         
-        {/* Dynamic header */}
-        <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-8 dark:border-zinc-800/80 dark:bg-zinc-900/40">
-          <div className="flex items-center gap-2 md:gap-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">AURXON</span>
-            <ChevronRight className="h-3 w-3 text-zinc-400" />
-            <span className="text-xs font-bold capitalize text-sky-600 dark:text-sky-400">{activeMenu.replace('-', ' ')}</span>
+        {/* TOP NAVBAR */}
+        <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6 dark:border-zinc-800/80 dark:bg-zinc-900/40 shrink-0">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition">
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="flex items-center gap-1 text-xs text-zinc-400 font-semibold">
+              <span className="uppercase">AURXON</span>
+              <ChevronRight className="h-3 w-3" />
+              <span className="text-sky-600 dark:text-sky-400 capitalize">{activeCategory} desk</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Display simple color branding */}
-            <span className="text-xs font-medium text-zinc-400">Institutional Color:</span>
-            <div
-              className="h-4 w-4 rounded-full"
-              style={{ backgroundColor: user.primaryColor || '#0284c7' }}
-            />
+            
+            {/* Global search command triggers */}
+            <div className="relative hidden sm:block">
+              <Search className="absolute top-2.5 left-3 h-4 w-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search commands... (Ctrl+K)"
+                readOnly
+                onClick={() => setCommandPaletteOpen(true)}
+                className="w-56 cursor-pointer rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-9 pr-4 text-xs font-medium text-zinc-800 placeholder-zinc-400 outline-none transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-white"
+              />
+            </div>
 
+            {/* AI Assistant Chat toggle button */}
             <button
-              onClick={() => {
-                const root = document.documentElement;
-                root.classList.toggle('dark');
-              }}
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-500 dark:hover:bg-zinc-800"
+              onClick={() => setAiAssistantOpen(!aiAssistantOpen)}
+              className="flex items-center gap-1.5 rounded-xl bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-500/20 dark:bg-indigo-400/10 dark:text-indigo-400 transition"
             >
-              <Sun className="h-4 w-4 hidden dark:block" />
-              <Moon className="h-4 w-4 dark:hidden" />
+              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+              <span className="hidden md:inline">Ask AI Assistant</span>
             </button>
+
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 transition"
+              >
+                <Bell className="h-4.5 w-4.5" />
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+              </button>
+              
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 z-50 w-80 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Real-time alerts</p>
+                    <button className="text-[10px] font-bold text-sky-600 dark:text-sky-400" onClick={() => setNotificationsOpen(false)}>Close</button>
+                  </div>
+                  <div className="mt-2 space-y-3 max-h-64 overflow-y-auto">
+                    {notifications.map((n) => (
+                      <div key={n.id} className="rounded-lg bg-zinc-50 p-2.5 dark:bg-zinc-950/40 border border-zinc-100/50 dark:border-zinc-800/30 text-xs">
+                        <div className="flex justify-between items-center font-bold text-zinc-800 dark:text-zinc-200">
+                          <span>{n.title}</span>
+                          <span className="text-[9px] font-medium text-zinc-400">{n.time}</span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{n.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Glacier Theme toggler */}
+            <button
+              onClick={() => document.documentElement.classList.toggle('dark')}
+              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 transition"
+            >
+              <Sun className="h-4.5 w-4.5 hidden dark:block" />
+              <Moon className="h-4.5 w-4.5 dark:hidden" />
+            </button>
+
+            {/* DYNAMIC ROLE SWITCHER */}
+            <div className="relative">
+              <select
+                value={currentRole}
+                onChange={e => handleRoleChange(e.target.value)}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-bold text-zinc-700 outline-none shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+              >
+                {ROLES_LIST.map((role) => (
+                  <option key={role.value} value={role.value}>{role.label}</option>
+                ))}
+              </select>
+            </div>
+
           </div>
         </header>
 
-        {/* 3. PANELS SECTION */}
-        <div className="flex-1 p-8 space-y-8">
+        {/* WORKSPACE PANELS CONTAINER */}
+        <div className="flex-1 p-6 overflow-y-auto space-y-6">
 
-          {/* 3A. OVERVIEW PANEL */}
-          {activeMenu === 'overview' && stats && (
-            <div className="space-y-8 animate-in fade-in duration-300">
+          {/* A. OVERVIEW PANEL */}
+          {activeCategory === 'overview' && stats && (
+            <div className="space-y-6">
               
-              {/* Core metrics cards */}
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Students Enrolled</span>
-                    <Users className="h-5 w-5 text-indigo-500" />
+              {/* Header metrics strip */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-xs font-bold uppercase tracking-wider">Students</span>
+                    <Users className="h-4 w-4 text-sky-500" />
                   </div>
-                  <h3 className="mt-4 text-3xl font-bold tracking-tight">{stats.studentCount}</h3>
-                  <p className="mt-2 text-xs text-zinc-400">Active roster database size</p>
+                  <h3 className="mt-2 text-2xl font-black">{students.length}</h3>
+                  <p className="mt-1 text-[10px] font-medium text-emerald-500">+2 new admissions today</p>
                 </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Staff Count</span>
-                    <Briefcase className="h-5 w-5 text-violet-500" />
+                <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-xs font-bold uppercase tracking-wider">Staff Roster</span>
+                    <Briefcase className="h-4 w-4 text-emerald-500" />
                   </div>
-                  <h3 className="mt-4 text-3xl font-bold tracking-tight">{stats.staffCount}</h3>
-                  <p className="mt-2 text-xs text-zinc-400">Teachers, accountants, admins</p>
+                  <h3 className="mt-2 text-2xl font-black">{staff.length}</h3>
+                  <p className="mt-1 text-[10px] font-medium text-zinc-400">3 designation tiers</p>
                 </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Fees Collection</span>
-                    <DollarSign className="h-5 w-5 text-emerald-500" />
+                <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-xs font-bold uppercase tracking-wider">Attendance Rate</span>
+                    <CalendarCheck className="h-4 w-4 text-indigo-500" />
                   </div>
-                  <h3 className="mt-4 text-3xl font-bold tracking-tight">${stats.feeOverview?.totalPaid}</h3>
-                  <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{stats.feeOverview?.collectionRate}% collected (${stats.feeOverview?.totalPending} pending)</p>
+                  <h3 className="mt-2 text-2xl font-black">{stats.attendanceRate || 95.8}%</h3>
+                  <p className="mt-1 text-[10px] font-medium text-emerald-500">Live RFID syncing active</p>
                 </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Attendance Rate</span>
-                    <Percent className="h-5 w-5 text-cyan-500" />
+                <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-xs font-bold uppercase tracking-wider">Fee Collections</span>
+                    <Percent className="h-4 w-4 text-sky-500" />
                   </div>
-                  <h3 className="mt-4 text-3xl font-bold tracking-tight">{stats.attendanceRate}%</h3>
-                  <p className="mt-2 text-xs text-zinc-400">Average over past 7 school days</p>
+                  <h3 className="mt-2 text-2xl font-black">{stats.feeOverview?.collectionRate || 85}%</h3>
+                  <p className="mt-1 text-[10px] font-medium text-sky-600 dark:text-sky-400">₹{stats.feeOverview?.totalPaid || 0} collected</p>
                 </div>
               </div>
 
-              {/* Grid panel */}
-              <div className="grid gap-6 lg:grid-cols-3">
-                {/* Enrolls per class */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400">Enrolled Batches / Classes</h4>
-                  <div className="mt-6 space-y-4">
-                    {stats.classes?.map((c: any) => (
-                      <div key={c.id} className="flex items-center justify-between rounded-xl bg-zinc-50 p-4 dark:bg-zinc-950/40">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-xs font-bold text-sky-600">
-                            {c.name.slice(0, 2)}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold">{c.name}</p>
-                            <p className="text-[10px] text-zinc-400">Section {c.section || 'A'} • Head Teacher: {c.classTeacher || 'Assigned'}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
-                            {c.studentCount} Students
-                          </span>
-                        </div>
+              {/* Main content grid: RFID scan log + notices */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* RFID Biometric scans stream */}
+                <div className="lg:col-span-2 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                      <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Biometric / RFID Scan Logger (Simulated)</h4>
+                    </div>
+                    <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-600 dark:text-sky-400">Live feed</span>
+                  </div>
+                  <div className="mt-4 space-y-3 max-h-80 overflow-y-auto pr-1">
+                    {rfidLogs.map((log, idx) => (
+                      <div key={idx} className="flex items-start gap-3 rounded-xl bg-zinc-50/60 p-3 text-xs dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-800/40 animate-slide-in">
+                        <Clock className="mt-0.5 h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                        <p className="text-zinc-600 dark:text-zinc-300 font-medium leading-relaxed">{log}</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* AI Predictions & Risk Alerts */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-sky-600 dark:text-sky-400">AI Predictive Risk Alerts</h4>
-                    <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-600">Active ML</span>
-                  </div>
-                  
-                  <div className="mt-4 space-y-3.5 text-[11px] leading-relaxed">
-                    {/* Attendance Risk */}
-                    <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-rose-700 dark:text-rose-400">⚠️ Attendance Alert</span>
-                        <span className="rounded bg-rose-100 px-1 py-0.5 text-[9px] font-bold text-rose-700 dark:bg-rose-950/40">Critical Risk</span>
-                      </div>
-                      <p className="font-semibold text-zinc-700 dark:text-zinc-300 mt-1">Bob Johnson (Roll: 10A02) has 66% attendance.</p>
-                      <p className="text-[10px] text-zinc-400 mt-1">AI Recommendation: Parent warning & remedial support.</p>
-                    </div>
-
-                    {/* Academic Performance Risk */}
-                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-amber-700 dark:text-amber-400">📝 Academic Warning</span>
-                        <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-950/40">Moderate Risk</span>
-                      </div>
-                      <p className="font-semibold text-zinc-700 dark:text-zinc-300 mt-1">Charlie Brown (Roll: 11A01) scored 42% in Algebra.</p>
-                      <p className="text-[10px] text-zinc-400 mt-1">AI Recommendation: Schedule math tutorials.</p>
-                    </div>
-
-                    {/* High Performer Eligibility */}
-                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-emerald-700 dark:text-emerald-400">✨ Promotion Predictor</span>
-                        <span className="rounded bg-emerald-100 px-1 py-0.5 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950/40 font-mono">Eligible</span>
-                      </div>
-                      <p className="font-semibold text-zinc-700 dark:text-zinc-300 mt-1">Alice Miller: 94% marks average, 100% attendance.</p>
-                      <p className="text-[10px] text-zinc-400 mt-1">AI Recommendation: Ready for Grade 11 promotion.</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Circular announcements */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400">Circular Alerts</h4>
-                  <div className="mt-6 space-y-4">
-                    {stats.recentNotices?.map((notice: any) => (
-                      <div key={notice.id} className="rounded-xl border border-zinc-200 p-4 transition hover:border-sky-500 dark:border-zinc-800 dark:bg-zinc-950/20">
-                        <h5 className="text-xs font-bold text-sky-600">{notice.title}</h5>
-                        <p className="mt-2 text-[10px] text-zinc-500 leading-relaxed truncate">{notice.content}</p>
-                        <div className="mt-3 flex items-center justify-between text-[9px] text-zinc-400">
-                          <span>By {notice.authorName}</span>
+                {/* Circular alert board */}
+                <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-3 dark:border-zinc-800">Circular Announcements</h4>
+                  <div className="mt-4 space-y-4 max-h-80 overflow-y-auto">
+                    {notices.map((notice) => (
+                      <div key={notice.id} className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 dark:border-zinc-800/50 dark:bg-zinc-950/25">
+                        <h5 className="font-bold text-xs dark:text-white">{notice.title}</h5>
+                        <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed">{notice.content}</p>
+                        <div className="mt-3 flex justify-between items-center text-[10px] text-zinc-400 font-medium border-t border-zinc-100/50 pt-2 dark:border-zinc-800/50">
+                          <span>By: {notice.authorName}</span>
                           <span>{new Date(notice.createdAt).toLocaleDateString()}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
+
               </div>
+
             </div>
           )}
 
-
-          {/* 3B. STUDENT MANAGEMENT PANEL */}
-          {activeMenu === 'students' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              {/* Filter headers */}
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900/40">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-zinc-400 uppercase">Batch Filter:</span>
-                  <select
-                    value={selectedClass}
-                    onChange={(e) => setSelectedClass(e.target.value)}
-                    className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-bold outline-none dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+          {/* B. ACADEMIC MANAGEMENT */}
+          {activeCategory === 'academic' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">Academic & Syllabus Desk</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => setAcademicTab('timetable')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${academicTab === 'timetable' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Weekly Timetable</button>
+                  <button onClick={() => setAcademicTab('lessons')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${academicTab === 'lessons' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Syllabus Logs</button>
                 </div>
-
-                {/* Search */}
-                <div className="relative max-w-xs flex-1">
-                  <Search className="absolute top-2.5 left-3 h-3.5 w-3.5 text-zinc-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by student name or roll..."
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pr-4 pl-9 text-xs outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                  />
-                </div>
-                <button
-                  onClick={loadStudents}
-                  className="rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
-                >
-                  Apply Search
-                </button>
               </div>
 
-              {/* Grid content */}
-              <div className="grid gap-8 lg:grid-cols-3">
-                {/* Enrolled Students list table */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 lg:col-span-2 overflow-x-auto">
-                  <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400">Class Roster Grid</h4>
-                    <span className="text-xs text-zinc-500 font-semibold">{students.length} Registered</span>
-                  </div>
-
-                  <table className="w-full mt-4 text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                        <th className="pb-3 font-semibold uppercase">Roll No</th>
-                        <th className="pb-3 font-semibold uppercase">Full Name</th>
-                        <th className="pb-3 font-semibold uppercase">Gender</th>
-                        <th className="pb-3 font-semibold uppercase">Parent / Phone</th>
-                        <th className="pb-3 text-right font-semibold uppercase">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                      {students.map((student) => (
-                        <tr key={student.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20">
-                          <td className="py-3.5 font-bold text-indigo-500">{student.rollNumber}</td>
-                          <td className="py-3.5 font-semibold">
-                            <button
-                              onClick={async () => {
-                                const details = await getStudentApi(student.id);
-                                setSelectedStudent(details);
-                              }}
-                              className="hover:underline text-left"
-                            >
-                              {student.firstName} {student.lastName}
-                            </button>
-                          </td>
-                          <td className="py-3.5 text-zinc-400 capitalize">{student.gender.toLowerCase()}</td>
-                          <td className="py-3.5">
-                            <p className="font-semibold">{student.parent?.firstName} {student.parent?.lastName}</p>
-                            <p className="text-[10px] text-zinc-400">{student.parent?.phone || 'No phone'}</p>
-                          </td>
-                          <td className="py-3.5 text-right">
-                            <button
-                              onClick={() => handleDeleteStudent(student.id)}
-                              className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
+              {academicTab === 'timetable' && (
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Grade 10-A Timetable Matrix</h4>
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Day</th>
+                          <th className="p-3">Period 1 (09:00 AM)</th>
+                          <th className="p-3">Period 2 (10:00 AM)</th>
+                          <th className="p-3">Period 3 (11:00 AM)</th>
+                          <th className="p-3">Period 4 (12:00 PM)</th>
+                          <th className="p-3">Period 5 (02:00 PM)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        <tr>
+                          <td className="p-3 font-bold bg-zinc-50/55 dark:bg-zinc-950/20">Monday</td>
+                          <td className="p-3">Advanced Mathematics</td>
+                          <td className="p-3">Introductory Physics</td>
+                          <td className="p-3 bg-zinc-100/50 dark:bg-zinc-800/20">Library hour</td>
+                          <td className="p-3">Chemistry</td>
+                          <td className="p-3">Physical Ed.</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold bg-zinc-50/55 dark:bg-zinc-950/20">Tuesday</td>
+                          <td className="p-3">Chemistry</td>
+                          <td className="p-3">English Literature</td>
+                          <td className="p-3 bg-zinc-100/50 dark:bg-zinc-800/20">Self study</td>
+                          <td className="p-3">Advanced Mathematics</td>
+                          <td className="p-3">Social Science</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold bg-zinc-50/55 dark:bg-zinc-950/20">Wednesday</td>
+                          <td className="p-3">Advanced Mathematics</td>
+                          <td className="p-3">Introductory Physics</td>
+                          <td className="p-3 bg-zinc-100/50 dark:bg-zinc-800/20">Library hour</td>
+                          <td className="p-3">English Literature</td>
+                          <td className="p-3">Computer Science</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold bg-zinc-50/55 dark:bg-zinc-950/20">Thursday</td>
+                          <td className="p-3">Social Science</td>
+                          <td className="p-3">Chemistry</td>
+                          <td className="p-3 bg-zinc-100/50 dark:bg-zinc-800/20">Library hour</td>
+                          <td className="p-3">Advanced Mathematics</td>
+                          <td className="p-3">Biology</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold bg-zinc-50/55 dark:bg-zinc-950/20">Friday</td>
+                          <td className="p-3">Introductory Physics</td>
+                          <td className="p-3">Biology</td>
+                          <td className="p-3 bg-zinc-100/50 dark:bg-zinc-800/20">Computer Science</td>
+                          <td className="p-3">Social Science</td>
+                          <td className="p-3">English Literature</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+              )}
 
-                {/* Create Student Form */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Enroll New Student</h4>
-                  <form onSubmit={handleCreateStudent} className="mt-6 space-y-4 text-xs max-h-[70vh] overflow-y-auto pr-1">
-                    {/* SECTION 1: Core Details */}
+              {academicTab === 'lessons' && (
+                <div className="space-y-6">
+                  {/* Create Lesson plan */}
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const title = (e.target as any).elements.title.value;
+                    const content = (e.target as any).elements.content.value;
+                    const classId = selectedClass || 'class-1';
+                    // Find matching subject
+                    const subjs = subjectsList.length > 0 ? subjectsList : [{id: 'subj-1'}];
+                    await createLessonPlanApi({ title, content, subjectId: subjs[0].id, syllabusPercent: 0 });
+                    triggerToast('Syllabus item plan created!');
+                    (e.target as any).reset();
+                    loadLessonPlans();
+                  }} className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
                     <div>
-                      <h5 className="font-bold text-sky-600 dark:text-sky-400 uppercase text-[10px] tracking-wider mb-2">1. Academic & Core Details</h5>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block font-semibold text-zinc-400">First Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={studentForm.firstName}
-                            onChange={(e) => setStudentForm({ ...studentForm, firstName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Last Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={studentForm.lastName}
-                            onChange={(e) => setStudentForm({ ...studentForm, lastName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Email Address (Login ID)</label>
-                          <input
-                            type="email"
-                            required
-                            value={studentForm.email}
-                            onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
-                            placeholder="student@aurxon.com"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Gender</label>
-                          <select
-                            value={studentForm.gender}
-                            onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                          >
-                            <option value="MALE">Male</option>
-                            <option value="FEMALE">Female</option>
-                            <option value="OTHER">Other</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Class Allocation</label>
-                          <select
-                            value={studentForm.classId}
-                            onChange={(e) => setStudentForm({ ...studentForm, classId: e.target.value })}
-                            required
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                          >
-                            <option value="">Select Class...</option>
-                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Roll Number</label>
-                          <input
-                            type="text"
-                            required
-                            value={studentForm.rollNumber}
-                            onChange={(e) => setStudentForm({ ...studentForm, rollNumber: e.target.value })}
-                            placeholder="e.g. ROLL-10A-04"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                      </div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Lesson Title</label>
+                      <input name="title" required placeholder="e.g. Organic Chemistry Carbon compounds" className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
                     </div>
-
-                    {/* SECTION 2: Indian Identities */}
-                    <div className="border-t border-dashed border-zinc-200 dark:border-zinc-800 pt-4">
-                      <h5 className="font-bold text-sky-600 dark:text-sky-400 uppercase text-[10px] tracking-wider mb-2">2. Indian Demographics & IDs</h5>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Aadhaar Card No.</label>
-                          <input
-                            type="text"
-                            maxLength={12}
-                            value={studentForm.aadhaarNumber}
-                            onChange={(e) => setStudentForm({ ...studentForm, aadhaarNumber: e.target.value })}
-                            placeholder="12-digit Aadhaar Number"
-                            className={`mt-1 w-full rounded-lg border px-3 py-2 outline-none bg-zinc-50 dark:bg-zinc-950 ${studentForm.aadhaarNumber && !/^\d{12}$/.test(studentForm.aadhaarNumber) ? 'border-amber-500 focus:border-amber-500' : 'border-zinc-200 focus:border-sky-600 dark:border-zinc-800'}`}
-                          />
-                          {studentForm.aadhaarNumber && !/^\d{12}$/.test(studentForm.aadhaarNumber) && (
-                            <p className="text-[10px] text-amber-500 mt-1">Must be exactly 12 numeric digits</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Samagra ID (SSSMID)</label>
-                          <input
-                            type="text"
-                            maxLength={9}
-                            value={studentForm.samagraId}
-                            onChange={(e) => setStudentForm({ ...studentForm, samagraId: e.target.value })}
-                            placeholder="9-digit Student ID"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Caste Category</label>
-                          <select
-                            value={studentForm.casteCategory}
-                            onChange={(e) => setStudentForm({ ...studentForm, casteCategory: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                          >
-                            <option value="GENERAL">GENERAL</option>
-                            <option value="OBC">OBC</option>
-                            <option value="SC">SC</option>
-                            <option value="ST">ST</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Mother Tongue</label>
-                          <input
-                            type="text"
-                            value={studentForm.motherTongue}
-                            onChange={(e) => setStudentForm({ ...studentForm, motherTongue: e.target.value })}
-                            placeholder="e.g. Hindi, Tamil, Punjabi"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                      </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Scope Details</label>
+                      <input name="content" required placeholder="Syllabus chapter guidelines" className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
                     </div>
-
-                    {/* SECTION 3: Parents & Banking */}
-                    <div className="border-t border-dashed border-zinc-200 dark:border-zinc-800 pt-4">
-                      <h5 className="font-bold text-sky-600 dark:text-sky-400 uppercase text-[10px] tracking-wider mb-2">3. Parentage & Finance</h5>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Father's Name</label>
-                          <input
-                            type="text"
-                            value={studentForm.fatherName}
-                            onChange={(e) => setStudentForm({ ...studentForm, fatherName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Mother's Name</label>
-                          <input
-                            type="text"
-                            value={studentForm.motherName}
-                            onChange={(e) => setStudentForm({ ...studentForm, motherName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Annual Family Income (₹)</label>
-                          <input
-                            type="number"
-                            value={studentForm.annualIncome}
-                            onChange={(e) => setStudentForm({ ...studentForm, annualIncome: e.target.value })}
-                            placeholder="e.g. 450000"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Bank Name</label>
-                          <input
-                            type="text"
-                            value={studentForm.bankName}
-                            onChange={(e) => setStudentForm({ ...studentForm, bankName: e.target.value })}
-                            placeholder="e.g. State Bank of India"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Account Number</label>
-                          <input
-                            type="text"
-                            value={studentForm.accNumber}
-                            onChange={(e) => setStudentForm({ ...studentForm, accNumber: e.target.value })}
-                            placeholder="11 to 16 digit account"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Bank IFSC Code</label>
-                          <input
-                            type="text"
-                            maxLength={11}
-                            value={studentForm.ifscCode}
-                            onChange={(e) => setStudentForm({ ...studentForm, ifscCode: e.target.value })}
-                            placeholder="e.g. SBIN0004520"
-                            className={`mt-1 w-full rounded-lg border px-3 py-2 outline-none bg-zinc-50 dark:bg-zinc-950 ${studentForm.ifscCode && !/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(studentForm.ifscCode) ? 'border-amber-500 focus:border-amber-500' : 'border-zinc-200 focus:border-sky-600 dark:border-zinc-800'}`}
-                          />
-                          {studentForm.ifscCode && !/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(studentForm.ifscCode) && (
-                            <p className="text-[10px] text-amber-500 mt-1">IFSC must match RBI layout (e.g. HDFC0001234)</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SECTION 4: Address Details */}
-                    <div className="border-t border-dashed border-zinc-200 dark:border-zinc-800 pt-4">
-                      <h5 className="font-bold text-sky-600 dark:text-sky-400 uppercase text-[10px] tracking-wider mb-2">4. Address & PIN Autofill</h5>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block font-semibold text-zinc-400">PIN Code</label>
-                          <input
-                            type="text"
-                            maxLength={6}
-                            required
-                            value={studentForm.pinCode}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const details = getPinCodeDetails(val);
-                              setStudentForm(prev => ({
-                                ...prev,
-                                pinCode: val,
-                                ...(details ? { state: details.state, district: details.district, city: details.district } : {})
-                              }));
-                            }}
-                            placeholder="e.g. 452001"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950 font-mono"
-                          />
-                          {studentForm.pinCode && studentForm.pinCode.length === 6 && getPinCodeDetails(studentForm.pinCode) && (
-                            <p className="text-[10px] text-emerald-600 mt-1 font-medium">✓ Location autofilled successfully</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">District</label>
-                          <input
-                            type="text"
-                            value={studentForm.district}
-                            onChange={(e) => setStudentForm({ ...studentForm, district: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">State</label>
-                          <input
-                            type="text"
-                            value={studentForm.state}
-                            onChange={(e) => setStudentForm({ ...studentForm, state: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">House No & Street</label>
-                          <input
-                            type="text"
-                            value={studentForm.street}
-                            onChange={(e) => setStudentForm({ ...studentForm, street: e.target.value })}
-                            placeholder="e.g. 104, Royal Palace Apartment"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full rounded-lg bg-sky-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-sky-500 mt-6"
-                    >
-                      Enlist Student
-                    </button>
-                  </form>
-                </div>
-              </div>
-
-              {/* Student detail slide-over modal */}
-              {selectedStudent && (
-                <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs">
-                  <div className="w-full max-w-lg bg-white p-8 shadow-2xl dark:bg-zinc-900 overflow-y-auto animate-in slide-in-from-right duration-200">
-                    <div className="flex items-center justify-between pb-6 border-b border-zinc-200 dark:border-zinc-800">
-                      <div>
-                        <h3 className="text-lg font-bold">{selectedStudent.firstName} {selectedStudent.lastName}</h3>
-                        <p className="text-xs text-indigo-500 font-semibold">{selectedStudent.rollNumber} • {selectedStudent.class?.name}</p>
-                      </div>
-                      <button
-                        onClick={() => setSelectedStudent(null)}
-                        className="rounded-lg p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                      >
-                        <X className="h-5 w-5" />
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-sky-600 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                        <Plus className="h-4 w-4" />
+                        <span>Add Chapter plan</span>
                       </button>
                     </div>
+                  </form>
 
-                    {/* Timeline and fee status */}
-                    <div className="mt-8 space-y-6 text-xs">
-                      <div>
-                        <h4 className="font-bold text-zinc-400 uppercase tracking-wide">Parent Information</h4>
-                        <div className="mt-3 rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/40">
-                          <p className="font-semibold">{selectedStudent.parent?.firstName} {selectedStudent.parent?.lastName}</p>
-                          <p className="text-zinc-500">Phone: {selectedStudent.parent?.phone}</p>
-                          <p className="text-zinc-500">Occupation: {selectedStudent.parent?.occupation || 'Not defined'}</p>
-                          <p className="text-zinc-500">Address: {selectedStudent.parent?.address || 'Not defined'}</p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-bold text-zinc-400 uppercase tracking-wide">Admission Timeline Milestones</h4>
-                        <div className="mt-3 space-y-3">
-                          {selectedStudent.timeline?.map((event: any) => (
-                            <div key={event.id} className="flex gap-3">
-                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500">
-                                <Clock className="h-3 w-3" />
-                              </div>
-                              <div>
-                                <p className="font-semibold">{event.description}</p>
-                                <p className="text-[10px] text-zinc-400">{new Date(event.eventDate).toLocaleString()}</p>
-                              </div>
+                  {/* List of plans with syllabus sliders */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Syllabus Completion & Lesson Tracker</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {lessonPlans.map((plan) => (
+                        <div key={plan.id} className="rounded-xl border border-zinc-100 p-4 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 uppercase">{plan.subject?.name || 'Academics'}</span>
+                              <h5 className="mt-2 text-xs font-black text-zinc-800 dark:text-white">{plan.title}</h5>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-bold text-zinc-400 uppercase tracking-wide">Fees Structure Status</h4>
-                        <div className="mt-3 space-y-2">
-                          {selectedStudent.feeAllocations?.map((alloc: any) => (
-                            <div key={alloc.id} className="flex items-center justify-between rounded-lg bg-zinc-50 p-3 dark:bg-zinc-950/40">
-                              <div>
-                                <p className="font-semibold">{alloc.feeStructure?.name}</p>
-                                <p className="text-[10px] text-zinc-400">Due Date: {new Date(alloc.feeStructure?.dueDate).toLocaleDateString()}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-bold">${alloc.amountPaid} / ${alloc.amountDue}</p>
-                                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${alloc.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : alloc.status === 'PARTIAL' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                                  {alloc.status}
-                                </span>
-                              </div>
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">{plan.status}</span>
+                          </div>
+                          
+                          <p className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">{plan.content}</p>
+                          
+                          {/* Syllabus progress bar + slider */}
+                          <div className="mt-4 space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-zinc-400">
+                              <span>Syllabus Covered</span>
+                              <span>{plan.syllabusPercent}%</span>
                             </div>
-                          ))}
+                            <div className="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                              <div className="h-full bg-sky-500 transition-all duration-300" style={{ width: `${plan.syllabusPercent}%` }} />
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={plan.syllabusPercent}
+                              onChange={async (e) => {
+                                const val = parseInt(e.target.value);
+                                const status = val === 100 ? 'COMPLETED' : val > 0 ? 'IN_PROGRESS' : 'PENDING';
+                                await updateLessonPlanApi(plan.id, { syllabusPercent: val, status });
+                                loadLessonPlans();
+                              }}
+                              className="w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer range-xs dark:bg-zinc-700 accent-sky-600"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1318,210 +1267,577 @@ export default function DashboardPage() {
             </div>
           )}
 
-
-          {/* 3C. ATTENDANCE PANEL */}
-          {activeMenu === 'attendance' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900/40">
-                <div className="flex items-center gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-400 uppercase">Batch Class:</span>
-                    <select
-                      value={selectedClass}
-                      onChange={(e) => setSelectedClass(e.target.value)}
-                      className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none dark:border-zinc-800 dark:bg-zinc-900"
-                    >
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-400 uppercase">Date:</span>
-                    <input
-                      type="date"
-                      value={attendanceDate}
-                      onChange={(e) => setAttendanceDate(e.target.value)}
-                      className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none dark:border-zinc-800 dark:bg-zinc-900"
-                    />
-                  </div>
+          {/* C. STUDENT DESK */}
+          {activeCategory === 'students' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">Student & Scholar Registry</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => setStudentTab('list')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${studentTab === 'list' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Roster List</button>
+                  <button onClick={() => setStudentTab('admission')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${studentTab === 'admission' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Admission Desk</button>
+                  <button onClick={() => setStudentTab('promotions')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${studentTab === 'promotions' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Promotions</button>
                 </div>
-
-                <button
-                  onClick={loadAttendanceGrid}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
-                >
-                  Load Attendance Grid
-                </button>
               </div>
 
-              {/* Roster sheet */}
-              <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-x-auto">
-                <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400">Class Roll Call Registry</h4>
-                  <div className="flex items-center gap-4 text-xs text-zinc-500">
-                    <span>Present: {attendanceRecords.filter(r => r.status === 'PRESENT').length}</span>
-                    <span>Absent: {attendanceRecords.filter(r => r.status === 'ABSENT').length}</span>
+              {/* Roster list */}
+              {studentTab === 'list' && (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Scholar No</th>
+                          <th className="p-3">Student Name</th>
+                          <th className="p-3">Roll No</th>
+                          <th className="p-3">Grade</th>
+                          <th className="p-3">Aadhaar (Indian UID)</th>
+                          <th className="p-3">PEN No</th>
+                          <th className="p-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        {students.map((student) => (
+                          <tr key={student.id}>
+                            <td className="p-3">
+                              <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-600 dark:text-sky-400 uppercase">
+                                {student.scholarNumber || `SCH-${student.id.substring(5,9).toUpperCase()}`}
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold">{student.firstName} {student.lastName}</td>
+                            <td className="p-3 text-zinc-500">{student.rollNumber}</td>
+                            <td className="p-3">{student.class?.name}</td>
+                            <td className="p-3 text-zinc-500 font-mono">{student.aadhaarNumber || '12-digit UID Not Linked'}</td>
+                            <td className="p-3">
+                              <span className="rounded bg-indigo-500/10 px-2 py-0.5 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                                {student.penNumber || 'PEN Pending'}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <button onClick={() => {
+                                if (confirm('Remove student record?')) {
+                                  deleteStudentApi(student.id);
+                                  loadStudents();
+                                }
+                              }} className="text-red-500 hover:text-red-700">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Admission Desk form */}
+              {studentTab === 'admission' && (
+                <form onSubmit={handleCreateStudent} className="space-y-6">
+                  
+                  {/* Basic section */}
+                  <div className="bg-zinc-50/50 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800">
+                    <h4 className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-4">1. Primary demographic details</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">First Name</label>
+                        <input required value={studentForm.firstName} onChange={e => setStudentForm({...studentForm, firstName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Last Name</label>
+                        <input required value={studentForm.lastName} onChange={e => setStudentForm({...studentForm, lastName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Email Address</label>
+                        <input type="email" required value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Class Stream</label>
+                        <select required value={studentForm.classId} onChange={e => setStudentForm({...studentForm, classId: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
+                          <option value="">Select Grade</option>
+                          {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Demographic & Indian Identity Details */}
+                  <div className="bg-zinc-50/50 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800">
+                    <h4 className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-4">2. Demographic & Indian Identity Verification</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Aadhaar (UIDAI - 12 digits)</label>
+                        <input maxLength={12} placeholder="e.g. 562180429402" value={studentForm.aadhaarNumber} onChange={e => setStudentForm({...studentForm, aadhaarNumber: e.target.value.replace(/\D/g, '')})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Samagra ID (State SSSMID - 9 digits)</label>
+                        <input maxLength={9} placeholder="e.g. 194029401" value={studentForm.samagraId} onChange={e => setStudentForm({...studentForm, samagraId: e.target.value.replace(/\D/g, '')})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">PEN (Permanent Education Number)</label>
+                        <input placeholder="e.g. PEN202610425" value={studentForm.penNumber} onChange={e => setStudentForm({...studentForm, penNumber: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Caste Category</label>
+                        <select value={studentForm.casteCategory} onChange={e => setStudentForm({...studentForm, casteCategory: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
+                          <option value="GENERAL">General</option>
+                          <option value="OBC">OBC (Other Backward Classes)</option>
+                          <option value="SC">SC (Scheduled Caste)</option>
+                          <option value="ST">ST (Scheduled Tribe)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Indian Pin code Lookup Address */}
+                  <div className="bg-zinc-50/50 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800">
+                    <h4 className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-4">3. Postal Address (Automatic Pin Code Lookup)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Pin Code (India)</label>
+                        <input maxLength={6} placeholder="e.g. 560001 (Bengaluru)" value={studentForm.pinCode} onChange={e => setStudentForm({...studentForm, pinCode: e.target.value.replace(/\D/g, '')})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">House / Street Address</label>
+                        <input value={studentForm.street} onChange={e => setStudentForm({...studentForm, street: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">District / City</label>
+                        <input readOnly value={studentForm.district} className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">State</label>
+                        <input readOnly value={studentForm.state} className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Banking credentials */}
+                  <div className="bg-zinc-50/50 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800">
+                    <h4 className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-4">4. Banking Credentials (Scholarship routing)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Bank Name</label>
+                        <input placeholder="State Bank of India" value={studentForm.bankName} onChange={e => setStudentForm({...studentForm, bankName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">IFSC Code (11 digits)</label>
+                        <input maxLength={11} placeholder="SBIN0000001" value={studentForm.ifscCode} onChange={e => setStudentForm({...studentForm, ifscCode: e.target.value.toUpperCase()})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">Account Number</label>
+                        <input placeholder="394020942042" value={studentForm.accNumber} onChange={e => setStudentForm({...studentForm, accNumber: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">UPI Address (optional)</label>
+                        <input placeholder="scholar@sbi" value={studentForm.prevSchoolName} onChange={e => setStudentForm({...studentForm, prevSchoolName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="rounded-xl bg-sky-600 px-6 py-3.5 text-xs font-bold text-white hover:bg-sky-500">Submit Admission Record</button>
+                </form>
+              )}
+
+              {/* Promotions desk */}
+              {studentTab === 'promotions' && (
+                <div className="space-y-6">
+                  <div className="rounded-xl bg-sky-500/10 p-4 border border-sky-400/30 text-xs">
+                    <h4 className="font-bold text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>Year-End Bulk Academic Promotions</span>
+                    </h4>
+                    <p className="mt-1 text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                      Select students below and choose a target class. The system will automatically promote classes and increment roll credentials in CBSE standard format.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Left Column: Selector list */}
+                    <div className="md:col-span-2 border border-zinc-100 rounded-xl p-4 dark:border-zinc-800 max-h-96 overflow-y-auto space-y-2">
+                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Select Students</h4>
+                      {students.map((student) => {
+                        const isChecked = promotionSelectedStudents.includes(student.id);
+                        return (
+                          <div key={student.id} className="flex items-center gap-3 rounded-lg bg-zinc-50/50 p-2.5 text-xs dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-800/40">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setPromotionSelectedStudents(prev =>
+                                  isChecked ? prev.filter(id => id !== student.id) : [...prev, student.id]
+                                );
+                              }}
+                              className="rounded border-zinc-300 text-sky-600 focus:ring-sky-500"
+                            />
+                            <div className="flex-1 font-medium">
+                              <p className="font-bold">{student.firstName} {student.lastName}</p>
+                              <p className="text-[10px] text-zinc-400">Roll No: {student.rollNumber} | Class: {student.class?.name}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Right Column: Target Grade */}
+                    <div className="bg-zinc-50/40 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800 space-y-4">
+                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Promotion Target</h4>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400">Target Grade</label>
+                        <select
+                          value={promotionTargetClassId}
+                          onChange={e => setPromotionTargetClassId(e.target.value)}
+                          className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none bg-white dark:border-zinc-800 dark:bg-zinc-950"
+                        >
+                          <option value="">Select Grade</option>
+                          {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handlePromoteStudents}
+                        className="w-full rounded-xl bg-sky-600 py-3.5 text-xs font-bold text-white hover:bg-sky-500 shadow-md"
+                      >
+                        Execute Batch Promotion ({promotionSelectedStudents.length} selected)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* D. TEACHER PANEL */}
+          {activeCategory === 'teachers' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-4 dark:border-zinc-800">Teacher & Workload Desk</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Workload log list */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Teacher Weekly Lecture Workload</h4>
+                  <div className="space-y-4">
+                    {[
+                      { name: "Sarah Connor", designation: "Mathematics Head", hours: 24, max: 30, color: "bg-sky-500" },
+                      { name: "John Keating", designation: "Literature & Arts Lead", hours: 18, max: 30, color: "bg-indigo-500" },
+                      { name: "Robert Kiyosaki", designation: "Accountant / Econ Desk", hours: 12, max: 20, color: "bg-emerald-500" }
+                    ].map((t, idx) => (
+                      <div key={idx} className="rounded-xl border border-zinc-100 p-4 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20">
+                        <div className="flex justify-between items-center text-xs font-bold">
+                          <div>
+                            <p className="font-bold">{t.name}</p>
+                            <p className="text-[10px] text-zinc-400 font-medium">{t.designation}</p>
+                          </div>
+                          <span>{t.hours} hrs / week</span>
+                        </div>
+                        <div className="mt-3 h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                          <div className={`h-full ${t.color}`} style={{ width: `${(t.hours / t.max) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {attendanceRecords.length === 0 ? (
-                  <p className="mt-8 text-center text-xs text-zinc-400">Click Load Attendance Grid to view class roll call.</p>
-                ) : (
-                  <>
-                    <table className="w-full mt-4 text-left border-collapse text-xs">
+                {/* Timetable schedule preview */}
+                <div className="rounded-xl border border-zinc-100 p-4 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Teacher Schedule Block</h4>
+                  <div className="text-xs space-y-3 font-medium">
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Mon (09:00 AM)</span>
+                      <span>Math (Grade 10-A)</span>
+                    </div>
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Mon (10:00 AM)</span>
+                      <span>Physics (Grade 10-A)</span>
+                    </div>
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Tue (12:00 PM)</span>
+                      <span>Math (Grade 10-A)</span>
+                    </div>
+                    <div className="flex justify-between pb-1">
+                      <span>Wed (09:00 AM)</span>
+                      <span>Math (Grade 10-A)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* E. EXAMINATIONS PANEL */}
+          {activeCategory === 'exams' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">Exams & CBSE Grading Desk</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => setExamsTab('list')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${examsTab === 'list' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Exams List</button>
+                  <button onClick={() => setExamsTab('entry')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${examsTab === 'entry' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Marks Entry</button>
+                </div>
+              </div>
+
+              {examsTab === 'list' && (
+                <div className="space-y-6">
+                  {/* Create exam form */}
+                  <form onSubmit={handleCreateExam} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Exam Title</label>
+                      <input required placeholder="Term 1 Algebra Test" value={examForm.name} onChange={e => setExamForm({...examForm, name: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Subject ID</label>
+                      <input required placeholder="subj-1" value={examForm.subjectId} onChange={e => setExamForm({...examForm, subjectId: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Max Marks</label>
+                      <input type="number" required placeholder="100" value={examForm.maxMarks} onChange={e => setExamForm({...examForm, maxMarks: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-sky-600 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                        <Plus className="h-4 w-4" />
+                        <span>Schedule Exam</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* List */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Scheduled Evaluations</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {stats?.recentNotices && (
+                        <div className="rounded-xl border border-zinc-100 p-4 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-bold text-sky-600 uppercase">Algebra Mid-term</span>
+                            <span className="font-bold text-zinc-400">Max Marks: 100</span>
+                          </div>
+                          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">Subject: Advanced Mathematics | Class: Grade 10-A</p>
+                          <button onClick={() => loadExamMarksSheet('exam-1')} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-sky-600 dark:text-sky-400">
+                            <span>Open Marks Grader</span>
+                            <ChevronRight className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {examsTab === 'entry' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                    <h4>CBSE Roster Marks Entry</h4>
+                    <span className="rounded bg-sky-500/10 px-2 py-0.5 text-sky-600 uppercase">Exam ID: {selectedExamId}</span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                          <th className="pb-3 font-semibold uppercase">Roll No</th>
-                          <th className="pb-3 font-semibold uppercase">Student Name</th>
-                          <th className="pb-3 font-semibold uppercase">Status Selector</th>
-                          <th className="pb-3 font-semibold uppercase">Remarks / Notes</th>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Roll No</th>
+                          <th className="p-3">Student Name</th>
+                          <th className="p-3">Theory Marks (Max 80)</th>
+                          <th className="p-3">Internal/Practical (Max 20)</th>
+                          <th className="p-3">Total Obtained (Max 100)</th>
+                          <th className="p-3">CBSE Grade</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                        {attendanceRecords.map((record) => (
-                          <tr key={record.studentId}>
-                            <td className="py-3 font-bold text-indigo-500">{record.rollNumber}</td>
-                            <td className="py-3 font-semibold">{record.firstName} {record.lastName}</td>
-                            <td className="py-3">
-                              <div className="inline-flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-950">
-                                <button
-                                  onClick={() => toggleAttendance(record.studentId, 'PRESENT')}
-                                  className={`rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors ${record.status === 'PRESENT' ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                                >
-                                  Present
-                                </button>
-                                <button
-                                  onClick={() => toggleAttendance(record.studentId, 'ABSENT')}
-                                  className={`rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors ${record.status === 'ABSENT' ? 'bg-red-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                                >
-                                  Absent
-                                </button>
-                                <button
-                                  onClick={() => toggleAttendance(record.studentId, 'LATE')}
-                                  className={`rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors ${record.status === 'LATE' ? 'bg-amber-500 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                                >
-                                  Late
-                                </button>
-                              </div>
-                            </td>
-                            <td className="py-3">
-                              <input
-                                type="text"
-                                value={record.remarks}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setAttendanceRecords(prev =>
-                                    prev.map(r => r.studentId === record.studentId ? { ...r, remarks: val } : r)
-                                  );
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        {examStudents.map((stud, idx) => {
+                          const total = parseFloat(stud.marksObtained || 0);
+                          const theory = Math.round(total * 0.8);
+                          const practical = Math.round(total * 0.2);
+                          return (
+                            <tr key={stud.studentId}>
+                              <td className="p-3 text-zinc-500">{stud.rollNumber}</td>
+                              <td className="p-3 font-bold">{stud.firstName} {stud.lastName}</td>
+                              <td className="p-3">
+                                <input
+                                  type="number"
+                                  value={theory}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    const newRecords = [...examStudents];
+                                    newRecords[idx].marksObtained = Math.min(100, Math.round(val + practical));
+                                    setExamStudents(newRecords);
+                                  }}
+                                  className="w-20 rounded border border-zinc-200 p-1 outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                                />
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="number"
+                                  value={practical}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    const newRecords = [...examStudents];
+                                    newRecords[idx].marksObtained = Math.min(100, Math.round(theory + val));
+                                    setExamStudents(newRecords);
+                                  }}
+                                  className="w-20 rounded border border-zinc-200 p-1 outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                                />
+                              </td>
+                              <td className="p-3 font-bold">{total} / 100</td>
+                              <td className="p-3">
+                                <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                                  {getGrade(total, 100)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={handleSaveExamResults} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-500">Save Marks & Grade Sheet</button>
+                    <button onClick={() => setExamsTab('list')} className="rounded-xl border border-zinc-200 px-5 py-2.5 text-xs font-bold text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800">Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* F. ATTENDANCE PANEL */}
+          {activeCategory === 'attendance' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-4 dark:border-zinc-800">Biometric Attendance Register</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Grade Class</label>
+                  <select
+                    value={selectedClass}
+                    onChange={e => loadAttendanceRoster(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                  >
+                    <option value="">Select Grade</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Attendance Date</label>
+                  <input
+                    type="date"
+                    value={attendanceDate}
+                    onChange={e => setAttendanceDate(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                  />
+                </div>
+              </div>
+
+              {selectedClass && (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Roll No</th>
+                          <th className="p-3">Student Name</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        {attendanceRecords.map((rec, idx) => (
+                          <tr key={rec.studentId}>
+                            <td className="p-3 text-zinc-500">{rec.rollNumber}</td>
+                            <td className="p-3 font-bold">{rec.firstName} {rec.lastName}</td>
+                            <td className="p-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const list = [...attendanceRecords];
+                                  list[idx].status = 'PRESENT';
+                                  setAttendanceRecords(list);
                                 }}
-                                placeholder="Add notes (e.g. sick leave)..."
-                                className="w-full max-w-xs rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
+                                className={`rounded px-2.5 py-1 text-[10px] font-bold transition ${rec.status === 'PRESENT' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                              >
+                                Present
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const list = [...attendanceRecords];
+                                  list[idx].status = 'ABSENT';
+                                  setAttendanceRecords(list);
+                                }}
+                                className={`rounded px-2.5 py-1 text-[10px] font-bold transition ${rec.status === 'ABSENT' ? 'bg-red-600 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                              >
+                                Absent
+                              </button>
+                            </td>
+                            <td className="p-3">
+                              <input
+                                placeholder="Add remarks..."
+                                value={rec.remarks || ''}
+                                onChange={(e) => {
+                                  const list = [...attendanceRecords];
+                                  list[idx].remarks = e.target.value;
+                                  setAttendanceRecords(list);
+                                }}
+                                className="w-full rounded border border-zinc-200 p-1 outline-none dark:border-zinc-800 dark:bg-zinc-950"
                               />
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                  </div>
 
-                    <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-                      <button
-                        onClick={submitAttendance}
-                        className="rounded-lg bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow hover:bg-indigo-500"
-                      >
-                        Submit Daily Register
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+                  <button onClick={handleSaveAttendance} className="rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-500">Submit Daily Register</button>
+                </div>
+              )}
             </div>
           )}
 
-
-          {/* 3D. FEES PANEL */}
-          {activeMenu === 'fees' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              {/* Fee Desk navigation */}
-              <div className="flex border-b border-zinc-200 dark:border-zinc-800">
-                <button
-                  onClick={() => setFeesTab('allocations')}
-                  className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${feesTab === 'allocations' ? 'border-sky-600 text-sky-600' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                >
-                  Student Fee Allocations
-                </button>
-                <button
-                  onClick={() => setFeesTab('structures')}
-                  className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${feesTab === 'structures' ? 'border-sky-600 text-sky-600' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                >
-                  Create Fee Structures
-                </button>
-                {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN' || user.role === 'ACCOUNTANT') && (
-                  <button
-                    onClick={() => setFeesTab('ledger')}
-                    className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${feesTab === 'ledger' ? 'border-sky-600 text-sky-600' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                  >
-                    Financial P&L Ledger
-                  </button>
-                )}
+          {/* G. FEES & FINANCE PANEL */}
+          {activeCategory === 'fees' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">Fees Collections & Financial Ledger</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => setFeesTab('allocations')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${feesTab === 'allocations' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Fee Desk</button>
+                  <button onClick={() => setFeesTab('structures')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${feesTab === 'structures' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Fee Structures</button>
+                  <button onClick={() => setFeesTab('ledger')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${feesTab === 'ledger' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>P&L Financial Ledger</button>
+                </div>
               </div>
 
-              {/* Allocations view */}
               {feesTab === 'allocations' && (
-                <div className="space-y-6">
-                  
-                  {/* Select class filter */}
-                  <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900/40">
-                    <span className="text-xs font-semibold text-zinc-400 uppercase">Class filter:</span>
-                    <select
-                      value={selectedClass}
-                      onChange={(e) => setSelectedClass(e.target.value)}
-                      className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-bold outline-none dark:border-zinc-800 dark:bg-zinc-900"
-                    >
-                      <option value="">All Batches...</option>
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <button
-                      onClick={loadFeesAllocations}
-                      className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
-                    >
-                      Filter List
-                    </button>
-                  </div>
-
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-x-auto">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Fees Allocation desk</h4>
-                    <table className="w-full mt-4 text-left border-collapse text-xs">
+                <div className="space-y-4">
+                  {/* List of allocations */}
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                          <th className="pb-3 font-semibold uppercase">Student Name</th>
-                          <th className="pb-3 font-semibold uppercase">Roll No</th>
-                          <th className="pb-3 font-semibold uppercase">Structure Term</th>
-                          <th className="pb-3 font-semibold uppercase">Amount Due</th>
-                          <th className="pb-3 font-semibold uppercase">Amount Paid</th>
-                          <th className="pb-3 font-semibold uppercase">Status</th>
-                          <th className="pb-3 text-right font-semibold uppercase">Actions</th>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Student Name</th>
+                          <th className="p-3">Particulars</th>
+                          <th className="p-3">Amount Due</th>
+                          <th className="p-3">Amount Paid</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                        {feeAllocations.map((alloc) => (
-                          <tr key={alloc.id}>
-                            <td className="py-3 font-semibold">{alloc.student?.firstName} {alloc.student?.lastName}</td>
-                            <td className="py-3 text-zinc-500 font-medium">{alloc.student?.rollNumber}</td>
-                            <td className="py-3 font-semibold text-indigo-500">{alloc.feeStructure?.name}</td>
-                            <td className="py-3 font-bold">${alloc.amountDue}</td>
-                            <td className="py-3 font-bold">${alloc.amountPaid}</td>
-                            <td className="py-3">
-                              <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold ${alloc.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : alloc.status === 'PARTIAL' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                                {alloc.status}
-                              </span>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        {[
+                          { id: "alloc-1", studentName: "Alice Miller", feeName: "Term 1 Tuition Fee", due: 1500, paid: 1500, status: "PAID" },
+                          { id: "alloc-2", studentName: "Bob Johnson", feeName: "Term 1 Tuition Fee", due: 1500, paid: 500, status: "PARTIAL" },
+                          { id: "alloc-3", studentName: "Charlie Brown", feeName: "Term 1 Tuition Fee", due: 1500, paid: 0, status: "UNPAID" }
+                        ].map((item) => (
+                          <tr key={item.id}>
+                            <td className="p-3 font-bold">{item.studentName}</td>
+                            <td className="p-3 text-zinc-500">{item.feeName}</td>
+                            <td className="p-3 font-mono">₹{item.due}</td>
+                            <td className="p-3 font-mono">₹{item.paid}</td>
+                            <td className="p-3">
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                                item.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600' :
+                                item.status === 'PARTIAL' ? 'bg-amber-500/10 text-amber-600' : 'bg-red-500/10 text-red-600'
+                              }`}>{item.status}</span>
                             </td>
-                            <td className="py-3 text-right">
-                              {alloc.status !== 'PAID' && (
+                            <td className="p-3">
+                              {item.status !== 'PAID' && (
                                 <button
-                                  onClick={() => openPaymentModal(alloc)}
-                                  className="rounded-lg bg-indigo-600 px-3 py-1 text-[10px] font-bold text-white hover:bg-indigo-500 shadow-sm"
+                                  onClick={() => setPaymentModal({ open: true, allocId: item.id, studentName: item.studentName, amountDue: item.due - item.paid, method: 'ONLINE', remarks: '' })}
+                                  className="rounded bg-sky-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-sky-500"
                                 >
                                   Collect Fee
                                 </button>
@@ -1532,210 +1848,309 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
 
-              {/* Create structure view */}
-              {feesTab === 'structures' && (
-                <div className="grid gap-8 md:grid-cols-2">
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Establish Fee structure</h4>
-                    <form onSubmit={handleCreateFeeStructure} className="mt-6 space-y-4 text-xs">
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Structure Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={feeForm.name}
-                          onChange={(e) => setFeeForm({ ...feeForm, name: e.target.value })}
-                          placeholder="e.g. Annual Tuition Term 2"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Amount ($)</label>
-                        <input
-                          type="number"
-                          required
-                          value={feeForm.amount}
-                          onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })}
-                          placeholder="e.g. 1500"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Due Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={feeForm.dueDate}
-                          onChange={(e) => setFeeForm({ ...feeForm, dueDate: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Description</label>
-                        <textarea
-                          value={feeForm.description}
-                          onChange={(e) => setFeeForm({ ...feeForm, description: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950 h-24"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-indigo-500"
-                      >
-                        Create Fee Template
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Allocated lists */}
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Fee templates overview</h4>
-                    <div className="mt-6 space-y-3">
-                      {feeStructures.map(f => (
-                        <div key={f.id} className="flex justify-between rounded-xl bg-zinc-50 p-4 dark:bg-zinc-950/40 text-xs">
-                          <div>
-                            <p className="font-bold text-indigo-500">{f.name}</p>
-                            <p className="text-zinc-400 mt-1">{f.description}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-sm">${f.amount}</p>
-                            <p className="text-[10px] text-zinc-400 mt-1">Due {new Date(f.dueDate).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Financial Ledger view */}
-              {feesTab === 'ledger' && financeData && (
-                <div className="space-y-6 animate-in fade-in duration-300">
-                  {/* Ledger Metrics Cards */}
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Total Revenue (Collections)</span>
-                      <h3 className="mt-2 text-2xl font-bold text-emerald-600">₹{financeData.totalRevenue?.toLocaleString('en-IN')}</h3>
-                      <p className="mt-1 text-[10px] text-zinc-400">Fee collections logged</p>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Staff Salaries Payout</span>
-                      <h3 className="mt-2 text-2xl font-bold text-amber-600">₹{financeData.totalSalaries?.toLocaleString('en-IN')}</h3>
-                      <p className="mt-1 text-[10px] text-zinc-400">Monthly base salary totals</p>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Operational Expenses</span>
-                      <h3 className="mt-2 text-2xl font-bold text-rose-600">₹{financeData.totalExpenses?.toLocaleString('en-IN')}</h3>
-                      <p className="mt-1 text-[10px] text-zinc-400">Utility, infrastructure, affiliation costs</p>
-                    </div>
-                    <div className={`rounded-2xl border p-6 shadow-sm ${financeData.netProfit >= 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Net Operational Balance (P&L)</span>
-                      <h3 className={`mt-2 text-2xl font-bold ${financeData.netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        ₹{financeData.netProfit?.toLocaleString('en-IN')}
-                      </h3>
-                      <p className="mt-1 text-[10px] text-zinc-400">Margin: {financeData.profitMargin}%</p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-8 lg:grid-cols-3">
-                    {/* Log Expense Form */}
-                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                      <h4 className="text-xs font-bold tracking-tight uppercase text-zinc-400 pb-3 border-b border-zinc-200 dark:border-zinc-800">Log Operational Cost</h4>
-                      <form onSubmit={handleCreateExpense} className="mt-4 space-y-4 text-xs">
+                  {paymentModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/45 backdrop-blur-sm">
+                      <form onSubmit={handlePayFee} className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 space-y-4">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Collect payment receipt</h4>
                         <div>
-                          <label className="block font-semibold text-zinc-400">Expense Title</label>
-                          <input
-                            type="text"
-                            required
-                            value={expenseForm.title}
-                            onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
-                            placeholder="e.g. CBSE Syllabus Booklets"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase">Student Name</label>
+                          <input readOnly value={paymentModal.studentName} className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400" />
                         </div>
                         <div>
-                          <label className="block font-semibold text-zinc-400">Amount (₹)</label>
-                          <input
-                            type="number"
-                            required
-                            value={expenseForm.amount}
-                            onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                            placeholder="e.g. 15000"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase">Amount (₹)</label>
+                          <input type="number" required value={paymentModal.amountDue} onChange={e => setPaymentModal({...paymentModal, amountDue: parseFloat(e.target.value) || 0})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
                         </div>
                         <div>
-                          <label className="block font-semibold text-zinc-400">Category</label>
-                          <select
-                            value={expenseForm.category}
-                            onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                          >
-                            <option value="ACADEMIC">Academic / Syllabus</option>
-                            <option value="UTILITY">Utility (Broadband, Water, Electric)</option>
-                            <option value="OPERATIONAL">Operational Office Costs</option>
-                            <option value="MAINTENANCE">Maintenance & Construction</option>
-                            <option value="SALARY">Salary / Stipends</option>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase">Method</label>
+                          <select value={paymentModal.method} onChange={e => setPaymentModal({...paymentModal, method: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
+                            <option value="CASH">Cash Desk</option>
+                            <option value="ONLINE">Online bank transfer</option>
+                            <option value="UPI">UPI (BHIM, GPay)</option>
                           </select>
                         </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Payment Channel</label>
-                          <select
-                            value={expenseForm.paymentMethod}
-                            onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                          >
-                            <option value="CASH">Cash Drawer</option>
-                            <option value="BANK_TRANSFER">Bank Net-banking / RTGS</option>
-                            <option value="ONLINE">Corporate Card</option>
-                            <option value="UPI">Unified Payments Interface (UPI)</option>
-                          </select>
+                        <div className="flex gap-2">
+                          <button type="submit" className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-500">Collect Receipt</button>
+                          <button type="button" onClick={() => setPaymentModal(null)} className="rounded-xl border border-zinc-200 px-4 py-2 text-xs font-bold text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800">Cancel</button>
                         </div>
-                        <button
-                          type="submit"
-                          className="w-full rounded-lg bg-sky-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-sky-500"
-                        >
-                          Commit Transaction
-                        </button>
                       </form>
                     </div>
+                  )}
+                </div>
+              )}
 
-                    {/* Expense Register List */}
-                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 lg:col-span-2 overflow-x-auto">
-                      <h4 className="text-xs font-bold tracking-tight uppercase text-zinc-400 pb-3 border-b border-zinc-200 dark:border-zinc-800">Operational Expense Register</h4>
-                      <table className="w-full mt-4 text-left border-collapse text-xs">
+              {feesTab === 'structures' && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const name = (e.target as any).elements.name.value;
+                  const amount = (e.target as any).elements.amount.value;
+                  const dueDate = (e.target as any).elements.dueDate.value;
+                  await createFeeStructureApi({ name, amount, dueDate });
+                  triggerToast('Fee structure scheduled!');
+                  (e.target as any).reset();
+                  loadDashboardStats();
+                }} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Structure Title</label>
+                    <input name="name" required placeholder="Term 2 Tuition Fee" className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Amount (₹)</label>
+                    <input name="amount" type="number" required placeholder="3500" className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Due Date</label>
+                    <input name="dueDate" type="date" required className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                  </div>
+                  <div className="flex items-end">
+                    <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-sky-600 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                      <Plus className="h-4 w-4" />
+                      <span>Define Fee Structure</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {feesTab === 'ledger' && financeData && (
+                <div className="space-y-6">
+                  
+                  {/* Expense Form */}
+                  <form onSubmit={handleCreateExpense} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Expense Title</label>
+                      <input required placeholder="Office printer cartridge replacement" value={expenseForm.title} onChange={e => setExpenseForm({...expenseForm, title: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Debit Amount (₹)</label>
+                      <input type="number" required placeholder="4200" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Debit Category</label>
+                      <select value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
+                        <option value="UTILITY">Broadband & Utilities</option>
+                        <option value="MAINTENANCE">Academic block maintenance</option>
+                        <option value="SALARY">Salaries</option>
+                        <option value="OPERATIONAL">Operational costs</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-red-600 py-3 text-xs font-bold text-white shadow-md hover:bg-red-500">
+                        <Plus className="h-4 w-4" />
+                        <span>Record Debit Expense</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Profit & Loss Table */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Profit & Loss (P&L) Statement</h4>
+                    <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 p-4 dark:bg-zinc-950/20">
+                      <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                            <th className="pb-2 font-semibold uppercase">Date</th>
-                            <th className="pb-2 font-semibold uppercase">Expense Particulars</th>
-                            <th className="pb-2 font-semibold uppercase">Category</th>
-                            <th className="pb-2 font-semibold uppercase">Channel</th>
-                            <th className="pb-2 text-right font-semibold uppercase">Amount</th>
-                            <th className="pb-2 text-right font-semibold uppercase">Actions</th>
+                          <tr className="font-bold border-b border-zinc-200 pb-2 dark:border-zinc-800">
+                            <th className="pb-2">Account Particulars</th>
+                            <th className="pb-2 text-right">Income (Credits)</th>
+                            <th className="pb-2 text-right">Expense (Debits)</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                          {expenses.map((exp) => (
-                            <tr key={exp.id}>
-                              <td className="py-2.5 text-zinc-400">{new Date(exp.expenseDate).toLocaleDateString()}</td>
-                              <td className="py-2.5 font-semibold">{exp.title}</td>
-                              <td className="py-2.5">
-                                <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 dark:bg-sky-950/40 dark:text-sky-400">
-                                  {exp.category}
+                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                          <tr>
+                            <td className="py-2.5">Tuition & Term Exam Fees Collected</td>
+                            <td className="py-2.5 text-right text-emerald-600 font-bold">₹{financeData.totalRevenue}</td>
+                            <td className="py-2.5 text-right">-</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2.5">Teachers & Employees Base Salaries</td>
+                            <td className="py-2.5 text-right">-</td>
+                            <td className="py-2.5 text-right text-red-600">₹{financeData.totalSalaries}</td>
+                          </tr>
+                          {expenses.map(e => (
+                            <tr key={e.id}>
+                              <td className="py-2.5">{e.title} ({e.category})</td>
+                              <td className="py-2.5 text-right">-</td>
+                              <td className="py-2.5 text-right text-red-600 flex justify-end items-center gap-1">
+                                <span>₹{e.amount}</span>
+                                <button onClick={() => handleDeleteExpense(e.id)} className="text-zinc-400 hover:text-red-500 ml-2">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-t-2 border-zinc-300 font-bold bg-white dark:bg-zinc-950">
+                            <td className="py-3">Net Institutional Surplus (Profit)</td>
+                            <td colSpan={2} className="py-3 text-right text-sky-600 dark:text-sky-400 font-black text-sm">
+                              ₹{financeData.netProfit} ({financeData.profitMargin}% surplus margin)
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* H. COMMS HUB */}
+          {activeCategory === 'comms' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-4 dark:border-zinc-800">Communications Hub</h3>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Circular announcements target selection */}
+                <form onSubmit={handleCreateNotice} className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Publish Circular Notice</h4>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">Circular Title</label>
+                    <input required placeholder="Term exam syllabus distribution details" value={circularForm.title} onChange={e => setCircularForm({...circularForm, title: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">Message Content</label>
+                    <textarea required placeholder="Write broadcast text..." rows={4} value={circularForm.content} onChange={e => setCircularForm({...circularForm, content: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-2">Target Roles</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['STUDENT', 'PARENT', 'TEACHER', 'STAFF', 'ACCOUNTANT'].map((r) => {
+                        const isSelected = circularForm.targetRoles.includes(r);
+                        return (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => toggleCircularRole(r)}
+                            className={`rounded-full px-3 py-1 text-[10px] font-bold border transition ${
+                              isSelected
+                                ? 'bg-sky-600 border-sky-600 text-white'
+                                : 'border-zinc-200 text-zinc-500 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <button type="submit" className="rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold text-white hover:bg-sky-500">Broadcast Circular Notice</button>
+                </form>
+
+                {/* WhatsApp & SMS Broadcaster Simulator */}
+                <div className="bg-zinc-50/40 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800 space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">WhatsApp & SMS Broadcast Simulator</h4>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">Target Audience</label>
+                    <select value={whatsappGroup} onChange={e => setWhatsappGroup(e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none bg-white dark:border-zinc-800 dark:bg-zinc-950">
+                      <option value="PARENTS_ALL">All Parents circular (SMS list)</option>
+                      <option value="TEACHERS_ALL">All Teachers Block (WhatsApp group)</option>
+                      <option value="OFFICE_STAFF">Office staff (WhatsApp group)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">WhatsApp Message Text</label>
+                    <textarea placeholder="e.g. Dear Parents, please note that the terminal fees due date is extended..." rows={3} value={whatsappText} onChange={e => setWhatsappText(e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none bg-white dark:border-zinc-800 dark:bg-zinc-950" />
+                  </div>
+                  <button type="button" onClick={handleWhatsappBroadcast} className="w-full rounded-xl bg-indigo-600 py-3.5 text-xs font-bold text-white hover:bg-indigo-500 shadow-md">
+                    Initiate Delivery Simulation
+                  </button>
+
+                  {/* Progress panel */}
+                  {broadcastProgress && (
+                    <div className="rounded-xl bg-zinc-100 p-3 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] space-y-2">
+                      <div className="flex justify-between font-bold text-zinc-700 dark:text-zinc-300">
+                        <span>Delivery Rate</span>
+                        <span>{broadcastProgress.current} / {broadcastProgress.total} sent</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-zinc-200 dark:bg-indigo-950 rounded-full overflow-hidden">
+                        <div className="h-full bg-indigo-500" style={{ width: `${(broadcastProgress.current / broadcastProgress.total) * 100}%` }} />
+                      </div>
+                      <div className="max-h-24 overflow-y-auto space-y-1 font-mono text-zinc-400 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                        {broadcastProgress.log.map((l, i) => <p key={i}>{l}</p>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* I. LIBRARY PANEL */}
+          {activeCategory === 'library' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">Library & Book Circulation Desk</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => setLibrarySubTab('inventory')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${librarySubTab === 'inventory' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Book Inventory</button>
+                  <button onClick={() => setLibrarySubTab('checkout')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${librarySubTab === 'checkout' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Issue Checkout Slip</button>
+                  <button onClick={() => setLibrarySubTab('issues')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${librarySubTab === 'issues' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Active Issues</button>
+                </div>
+              </div>
+
+              {librarySubTab === 'inventory' && (
+                <div className="space-y-6">
+                  {/* Create book form */}
+                  <form onSubmit={handleCreateBook} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Book Title</label>
+                      <input required placeholder="Introduction to Algorithms" value={bookForm.title} onChange={e => setBookForm({...bookForm, title: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Author</label>
+                      <input required placeholder="Thomas H. Cormen" value={bookForm.author} onChange={e => setBookForm({...bookForm, author: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">ISBN Code</label>
+                      <input required placeholder="978-0262033848" value={bookForm.isbn} onChange={e => setBookForm({...bookForm, isbn: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-sky-600 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                        <Plus className="h-4 w-4" />
+                        <span>Catalogue Book</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Search and list */}
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 left-3 h-4 w-4 text-zinc-400" />
+                      <input
+                        type="text"
+                        placeholder="Search books in catalogue..."
+                        value={bookSearch}
+                        onChange={e => { setBookSearch(e.target.value); getBooksApi(e.target.value).then(setBooks); }}
+                        className="w-full rounded-xl border border-zinc-200 py-2 pl-9 pr-4 text-xs font-medium outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                      />
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                            <th className="p-3">Title</th>
+                            <th className="p-3">Author</th>
+                            <th className="p-3">ISBN</th>
+                            <th className="p-3">Total Copies</th>
+                            <th className="p-3">Available Copies</th>
+                            <th className="p-3">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                          {books.map((book) => (
+                            <tr key={book.id}>
+                              <td className="p-3 font-bold">{book.title}</td>
+                              <td className="p-3 text-zinc-500">{book.author}</td>
+                              <td className="p-3 font-mono">{book.isbn}</td>
+                              <td className="p-3">{book.totalCopies}</td>
+                              <td className="p-3">
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${book.availableCopies > 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
+                                  {book.availableCopies} available
                                 </span>
                               </td>
-                              <td className="py-2.5 font-medium text-zinc-500 uppercase">{exp.paymentMethod}</td>
-                              <td className="py-2.5 text-right font-bold text-rose-500">₹{exp.amount?.toLocaleString('en-IN')}</td>
-                              <td className="py-2.5 text-right">
-                                <button
-                                  onClick={() => handleDeleteExpense(exp.id)}
-                                  className="text-zinc-400 hover:text-red-500 rounded p-1 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                              <td className="p-3">
+                                <button onClick={() => { deleteBookApi(book.id); loadBooks(); }} className="text-red-500 hover:text-red-700">
+                                  <Trash2 className="h-4 w-4" />
                                 </button>
                               </td>
                             </tr>
@@ -1746,827 +2161,360 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-            </div>
-          )}
 
-
-          {/* 3E. EXAMINATION PANEL */}
-          {activeMenu === 'exams' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              <div className="flex border-b border-zinc-200 dark:border-zinc-800">
-                <button
-                  onClick={() => setExamsTab('list')}
-                  className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${examsTab === 'list' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                >
-                  Scheduled Exams
-                </button>
-                <button
-                  onClick={() => setExamsTab('entry')}
-                  className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${examsTab === 'entry' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                >
-                  Marks Entry Desk
-                </button>
-              </div>
-
-              {/* List tab */}
-              {examsTab === 'list' && (
-                <div className="grid gap-8 md:grid-cols-2">
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Schedule new exam</h4>
-                    <form onSubmit={handleCreateExam} className="mt-6 space-y-4 text-xs">
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Exam Title</label>
-                        <input
-                          type="text"
-                          required
-                          value={examForm.name}
-                          onChange={(e) => setExamForm({ ...examForm, name: e.target.value })}
-                          placeholder="e.g. Mid-Term Geometry Quiz"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Subject Course</label>
-                        <select
-                          value={examForm.subjectId}
-                          onChange={(e) => setExamForm({ ...examForm, subjectId: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        >
-                          <option value="">Select Subject...</option>
-                          {subjectsList.map(s => <option key={s.id} value={s.id}>{s.name} ({s.class?.name})</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Max Score Marks</label>
-                        <input
-                          type="number"
-                          required
-                          value={examForm.maxMarks}
-                          onChange={(e) => setExamForm({ ...examForm, maxMarks: e.target.value })}
-                          placeholder="100"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Exam Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={examForm.examDate}
-                          onChange={(e) => setExamForm({ ...examForm, examDate: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-indigo-500"
-                      >
-                        Schedule Exam
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Active exams schedule */}
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-x-auto">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Current active exams</h4>
-                    <div className="mt-6 space-y-3">
-                      {examsList.map(e => (
-                        <div key={e.id} className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-950/40 text-xs">
-                          <div className="flex justify-between font-bold">
-                            <span className="text-indigo-500">{e.name}</span>
-                            <span>Max Marks: {e.maxMarks}</span>
-                          </div>
-                          <div className="mt-2 flex justify-between text-[10px] text-zinc-400">
-                            <span>Course: {e.subject?.name} ({e.subject?.class?.name})</span>
-                            <span>Date: {new Date(e.examDate).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Marks entry sheet */}
-              {examsTab === 'entry' && (
-                <div className="space-y-6">
-                  <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900/40 text-xs font-semibold">
-                    <span className="text-zinc-400 uppercase">Select Exam Paper:</span>
+              {librarySubTab === 'checkout' && (
+                <form onSubmit={handleIssueBook} className="w-full max-w-md rounded-2xl border border-zinc-100 bg-zinc-50/50 p-6 dark:border-zinc-800 dark:bg-zinc-950/20 space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Generate Book Checkout Slip</h4>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">Select Student</label>
                     <select
-                      value={selectedExamId}
-                      onChange={(e) => setSelectedExamId(e.target.value)}
-                      className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none dark:border-zinc-800 dark:bg-zinc-900"
+                      value={issueForm.studentId}
+                      onChange={e => setIssueForm({...issueForm, studentId: e.target.value})}
+                      className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950"
                     >
-                      {examsList.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                      <option value="">Select Student</option>
+                      {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.rollNumber})</option>)}
                     </select>
                   </div>
-
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-x-auto">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Grades Evaluation sheet</h4>
-                    {examStudents.length === 0 ? (
-                      <p className="mt-8 text-center text-xs text-zinc-400">Select an exam paper to edit student scores.</p>
-                    ) : (
-                      <>
-                        <table className="w-full mt-4 text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                              <th className="pb-3 font-semibold uppercase">Roll No</th>
-                              <th className="pb-3 font-semibold uppercase">Student Name</th>
-                              <th className="pb-3 font-semibold uppercase">Marks Obtained</th>
-                              <th className="pb-3 font-semibold uppercase">Auditor Remarks</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                            {examStudents.map((record) => (
-                              <tr key={record.studentId}>
-                                <td className="py-3 font-bold text-indigo-500">{record.rollNumber}</td>
-                                <td className="py-3 font-semibold">{record.firstName} {record.lastName}</td>
-                                <td className="py-3">
-                                  <input
-                                    type="number"
-                                    value={record.marksObtained}
-                                    onChange={(e) => updateMarks(record.studentId, e.target.value)}
-                                    placeholder="0"
-                                    className="w-24 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950 font-bold"
-                                  />
-                                </td>
-                                <td className="py-3">
-                                  <input
-                                    type="text"
-                                    value={record.remarks}
-                                    onChange={(e) => updateRemarks(record.studentId, e.target.value)}
-                                    placeholder="Outstanding performance..."
-                                    className="w-full max-w-sm rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-
-                        <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-                          <button
-                            onClick={submitExamResults}
-                            className="rounded-lg bg-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow hover:bg-indigo-500"
-                          >
-                            Submit Scoresheet
-                          </button>
-                        </div>
-                      </>
-                    )}
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">Select Book Title</label>
+                    <select
+                      value={issueForm.bookId}
+                      onChange={e => setIssueForm({...issueForm, bookId: e.target.value})}
+                      className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                    >
+                      <option value="">Select Catalogued Book</option>
+                      {books.filter(b => b.availableCopies > 0).map(b => <option key={b.id} value={b.id}>{b.title} ({b.availableCopies} left)</option>)}
+                    </select>
                   </div>
+                  <button type="submit" className="w-full rounded-xl bg-sky-600 py-3.5 text-xs font-bold text-white hover:bg-sky-500 shadow-md">
+                    Generate Checkout Slip
+                  </button>
+                </form>
+              )}
+
+              {librarySubTab === 'issues' && (
+                <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                        <th className="p-3">Book Title</th>
+                        <th className="p-3">Issued To</th>
+                        <th className="p-3">Issue Date</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                      {bookIssues.map((issue) => (
+                        <tr key={issue.id}>
+                          <td className="p-3 font-bold">{issue.book?.title}</td>
+                          <td className="p-3">{issue.student?.firstName} {issue.student?.lastName} ({issue.student?.rollNumber})</td>
+                          <td className="p-3 text-zinc-500">{new Date(issue.issueDate).toLocaleDateString()}</td>
+                          <td className="p-3">
+                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                              issue.status === 'ISSUED' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'
+                            }`}>{issue.status}</span>
+                          </td>
+                          <td className="p-3">
+                            {issue.status === 'ISSUED' && (
+                              <button onClick={() => handleReturnBook(issue.id)} className="rounded bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-emerald-500">
+                                Return Book
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
           )}
 
-
-          {/* 3F. STAFF & HR PANEL */}
-          {activeMenu === 'staff' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              <div className="flex border-b border-zinc-200 dark:border-zinc-800">
-                <button
-                  onClick={() => setStaffTab('list')}
-                  className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${staffTab === 'list' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                >
-                  Employee Directory
-                </button>
-                <button
-                  onClick={() => setStaffTab('leaves')}
-                  className={`border-b-2 px-6 py-3 text-xs font-bold transition-colors ${staffTab === 'leaves' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                >
-                  Leave Requests
-                </button>
+          {/* J. HR & EMPLOYEE SYSTEM */}
+          {activeCategory === 'hr' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">HR, Staff Leaves & Payroll Desk</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => setStaffTab('list')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${staffTab === 'list' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Employees List</button>
+                  <button onClick={() => setStaffTab('leaves')} className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${staffTab === 'leaves' ? 'bg-sky-600 text-white' : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}>Leaves Approval</button>
+                </div>
               </div>
 
-              {/* Directory list */}
               {staffTab === 'list' && (
-                <div className="grid gap-8 lg:grid-cols-3">
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 lg:col-span-2 overflow-x-auto">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Institutional Employees roster</h4>
-                    <table className="w-full mt-4 text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                          <th className="pb-3 font-semibold uppercase">ID</th>
-                          <th className="pb-3 font-semibold uppercase">Staff Name</th>
-                          <th className="pb-3 font-semibold uppercase">Designation</th>
-                          <th className="pb-3 font-semibold uppercase">Phone</th>
-                          <th className="pb-3 font-semibold uppercase">Joining Date</th>
-                          <th className="pb-3 text-right font-semibold uppercase">Salary</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                        {staff.map((employee) => (
-                          <tr key={employee.id}>
-                            <td className="py-3 font-bold text-indigo-500">{employee.employeeId}</td>
-                            <td className="py-3 font-semibold">{employee.firstName} {employee.lastName}</td>
-                            <td className="py-3">
-                              <span className="rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
-                                {employee.designation}
-                              </span>
-                            </td>
-                            <td className="py-3 text-zinc-500">{employee.phone}</td>
-                            <td className="py-3 text-zinc-400">{new Date(employee.joiningDate).toLocaleDateString()}</td>
-                            <td className="py-3 text-right font-bold">${employee.salary}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Add Staff form */}
-                  {user.role === 'INSTITUTE_ADMIN' && (
-                    <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                      <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Register Staff Member</h4>
-                      <form onSubmit={handleCreateStaff} className="mt-6 space-y-4 text-xs">
-                        <div>
-                          <label className="block font-semibold text-zinc-400">First Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={staffForm.firstName}
-                            onChange={(e) => setStaffForm({ ...staffForm, firstName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Last Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={staffForm.lastName}
-                            onChange={(e) => setStaffForm({ ...staffForm, lastName: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Email Address (Login ID)</label>
-                          <input
-                            type="email"
-                            required
-                            value={staffForm.email}
-                            onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Employee ID Code</label>
-                          <input
-                            type="text"
-                            required
-                            value={staffForm.employeeId}
-                            onChange={(e) => setStaffForm({ ...staffForm, employeeId: e.target.value })}
-                            placeholder="e.g. EMP004"
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Department Role</label>
-                          <select
-                            value={staffForm.designation}
-                            onChange={(e) => setStaffForm({ ...staffForm, designation: e.target.value, role: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                          >
-                            <option value="TEACHER">Teacher / Academic Staff</option>
-                            <option value="ACCOUNTANT">Accountant / Treasurer</option>
-                            <option value="STAFF">Office Assistant</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-zinc-400">Base Salary ($)</label>
-                          <input
-                            type="number"
-                            required
-                            value={staffForm.salary}
-                            onChange={(e) => setStaffForm({ ...staffForm, salary: e.target.value })}
-                            className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                          />
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-indigo-500"
-                        >
-                          Enlist Employee
-                        </button>
-                      </form>
+                <div className="space-y-6">
+                  {/* Create staff form */}
+                  <form onSubmit={handleCreateStaff} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">First Name</label>
+                      <input required placeholder="Sarah" value={staffForm.firstName} onChange={e => setStaffForm({...staffForm, firstName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
                     </div>
-                  )}
-                </div>
-              )}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Last Name</label>
+                      <input required placeholder="Connor" value={staffForm.lastName} onChange={e => setStaffForm({...staffForm, lastName: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Employee ID</label>
+                      <input required placeholder="EMP004" value={staffForm.employeeId} onChange={e => setStaffForm({...staffForm, employeeId: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Monthly Salary (₹)</label>
+                      <input type="number" required placeholder="45000" value={staffForm.salary} onChange={e => setStaffForm({...staffForm, salary: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Designation Role</label>
+                      <select value={staffForm.designation} onChange={e => setStaffForm({...staffForm, designation: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
+                        <option value="TEACHER">Teacher Desk</option>
+                        <option value="ACCOUNTANT">Accountant Desk</option>
+                        <option value="LIBRARIAN">Librarian Desk</option>
+                        <option value="STAFF">General Office Staff</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Phone</label>
+                      <input placeholder="+91 9988776655" value={staffForm.phone} onChange={e => setStaffForm({...staffForm, phone: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Email</label>
+                      <input required placeholder="teacher@aurxon.com" value={staffForm.email} onChange={e => setStaffForm({...staffForm, email: e.target.value})} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
+                    </div>
+                    <div className="flex items-end">
+                      <button type="submit" className="w-full flex justify-center items-center gap-2 rounded-xl bg-sky-600 py-3 text-xs font-bold text-white shadow-md hover:bg-sky-500">
+                        <Plus className="h-4 w-4" />
+                        <span>Hire Employee</span>
+                      </button>
+                    </div>
+                  </form>
 
-              {/* Leaves review */}
-              {staffTab === 'leaves' && (
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-x-auto">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Leave applications board</h4>
-                  <table className="w-full mt-4 text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                        <th className="pb-3 font-semibold uppercase">Staff Member</th>
-                        <th className="pb-3 font-semibold uppercase">Duration Dates</th>
-                        <th className="pb-3 font-semibold uppercase">Reason / Justification</th>
-                        <th className="pb-3 font-semibold uppercase">Status</th>
-                        {user.role === 'INSTITUTE_ADMIN' && <th className="pb-3 text-right font-semibold uppercase">Approvals</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                      {leaves.map((l) => (
-                        <tr key={l.id}>
-                          <td className="py-3 font-semibold">
-                            <p>{l.staff?.firstName} {l.staff?.lastName}</p>
-                            <p className="text-[9px] text-zinc-400">{l.staff?.designation}</p>
-                          </td>
-                          <td className="py-3 text-zinc-500">
-                            {new Date(l.startDate).toLocaleDateString()} to {new Date(l.endDate).toLocaleDateString()}
-                          </td>
-                          <td className="py-3 text-zinc-400 max-w-xs truncate">{l.reason}</td>
-                          <td className="py-3">
-                            <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold ${l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : l.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {l.status}
-                            </span>
-                          </td>
-                          {user.role === 'INSTITUTE_ADMIN' && (
-                            <td className="py-3 text-right space-x-1.5">
-                              {l.status === 'PENDING' ? (
-                                <>
-                                  <button
-                                    onClick={() => handleApproveLeave(l.id, 'APPROVED')}
-                                    className="rounded bg-emerald-600 p-1 text-white hover:bg-emerald-500"
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleApproveLeave(l.id, 'REJECTED')}
-                                    className="rounded bg-red-600 p-1 text-white hover:bg-red-500"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="text-[10px] text-zinc-400">Processed</span>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 3I. ACADEMIC SYLLABUS & LESSON PLANS */}
-          {activeMenu === 'lessons' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="grid gap-8 lg:grid-cols-3">
-                {/* Log/Create Lesson Plan form */}
-                {(user.role === 'TEACHER' || user.role === 'INSTITUTE_ADMIN' || user.role === 'SUPER_ADMIN') && (
-                  <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Establish Lesson Plan</h4>
-                    <form onSubmit={handleCreateLessonPlan} className="mt-6 space-y-4 text-xs">
+                  {/* Payroll generator preview */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Left side parameters */}
+                    <div className="bg-zinc-50/40 p-4 rounded-xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800 space-y-4 text-xs">
+                      <h4 className="font-bold text-zinc-500 uppercase">CBSE Payroll slips Calculator</h4>
                       <div>
-                        <label className="block font-semibold text-zinc-400">Lesson / Topic Title</label>
-                        <input
-                          type="text"
-                          required
-                          value={lessonForm.title}
-                          onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
-                          placeholder="e.g. Organic Chemistry - Hydrocarbons"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Syllabus Details & Description</label>
-                        <textarea
-                          required
-                          value={lessonForm.content}
-                          onChange={(e) => setLessonForm({ ...lessonForm, content: e.target.value })}
-                          placeholder="Log syllabus topics, reading assignments..."
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-sky-600 dark:border-zinc-800 dark:bg-zinc-950 h-24"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Subject Course</label>
-                        <select
-                          value={lessonForm.subjectId}
-                          onChange={(e) => setLessonForm({ ...lessonForm, subjectId: e.target.value })}
-                          required
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        >
-                          <option value="">Select Subject...</option>
-                          {subjectsList.map(s => <option key={s.id} value={s.id}>{s.name} ({s.class?.name})</option>)}
+                        <label className="block text-[10px] font-bold text-zinc-400">Select Employee</label>
+                        <select value={payrollStaffId} onChange={e => setPayrollStaffId(e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950">
+                          <option value="">Select Employee</option>
+                          {staff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.designation})</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="block font-semibold text-zinc-400">Syllabus Completion ({lessonForm.syllabusPercent}%)</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={lessonForm.syllabusPercent}
-                          onChange={(e) => setLessonForm({ ...lessonForm, syllabusPercent: parseInt(e.target.value) })}
-                          className="mt-2 w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-sky-600 dark:bg-zinc-800"
-                        />
+                        <label className="block text-[10px] font-bold text-zinc-400">House Rent Allowance (HRA)</label>
+                        <input type="number" value={allowances.hra} onChange={e => setAllowances({...allowances, hra: parseInt(e.target.value) || 0})} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
                       </div>
-                      <button
-                        type="submit"
-                        className="w-full rounded-lg bg-sky-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-sky-500"
-                      >
-                        Publish Lesson Plan
-                      </button>
-                    </form>
-                  </div>
-                )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400">Dearness Allowance (DA)</label>
+                        <input type="number" value={allowances.da} onChange={e => setAllowances({...allowances, da: parseInt(e.target.value) || 0})} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold" />
+                      </div>
+                      <button type="button" onClick={() => generatePayslip(payrollStaffId)} className="w-full rounded-xl bg-indigo-600 py-3 font-bold text-white hover:bg-indigo-500">Calculate Pay & Allowances</button>
+                    </div>
 
-                {/* Lesson plans grid list */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 lg:col-span-2 space-y-4">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Syllabus Completion Tracker</h4>
-                  
-                  {lessonPlans.length === 0 ? (
-                    <p className="text-center text-xs text-zinc-400 py-8">No lesson plans created yet.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {lessonPlans.map((plan) => (
-                        <div key={plan.id} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800 dark:bg-zinc-950/20 text-xs space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h5 className="font-bold text-sky-600 text-sm">{plan.title}</h5>
-                              <p className="text-[10px] text-zinc-400 mt-0.5">Subject: {plan.subject?.name} • Class: {plan.subject?.class?.name} • Teacher: {plan.teacher?.firstName} {plan.teacher?.lastName}</p>
+                    {/* Right side preview */}
+                    <div className="md:col-span-2 border border-zinc-100 rounded-xl p-5 dark:border-zinc-800 bg-zinc-50/20">
+                      <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">Payslip Print Preview</h4>
+                      {payslipData ? (
+                        <div className="bg-white p-5 rounded-xl border border-zinc-200 text-xs font-mono text-zinc-800 space-y-4 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-300">
+                          <div className="text-center border-b border-zinc-200 pb-3 dark:border-zinc-800">
+                            <h5 className="font-extrabold text-sm text-sky-600 dark:text-sky-400">AURXON INTERNATIONAL ACADEMY</h5>
+                            <p className="text-[10px] text-zinc-400">Salary Slip for Period: {payslipData.period}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <p><strong>Employee Name:</strong> {payslipData.name}</p>
+                            <p className="text-right"><strong>ID Number:</strong> {payslipData.employeeId}</p>
+                            <p><strong>Designation:</strong> {payslipData.designation}</p>
+                            <p className="text-right"><strong>Voucher Reference:</strong> {payslipData.receiptNo}</p>
+                          </div>
+                          <div className="border-t border-b border-zinc-200 py-2.5 dark:border-zinc-800 space-y-1.5 text-[11px]">
+                            <div className="flex justify-between">
+                              <span>Base Salary</span>
+                              <span>₹{payslipData.baseSalary}</span>
                             </div>
-                            <div className="flex gap-2">
-                              <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold ${plan.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : plan.status === 'IN_PROGRESS' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {plan.status}
-                              </span>
-                              {(user.role === 'TEACHER' || user.role === 'INSTITUTE_ADMIN') && (
-                                <button
-                                  onClick={() => handleDeleteLessonPlan(plan.id)}
-                                  className="text-zinc-400 hover:text-red-500 rounded p-0.5"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
+                            <div className="flex justify-between text-emerald-600">
+                              <span>(+) House Rent Allowance (HRA)</span>
+                              <span>₹{payslipData.hra}</span>
+                            </div>
+                            <div className="flex justify-between text-emerald-600">
+                              <span>(+) Dearness Allowance (DA)</span>
+                              <span>₹{payslipData.da}</span>
+                            </div>
+                            <div className="flex justify-between text-red-600">
+                              <span>(-) Professional Tax (debit)</span>
+                              <span>₹{payslipData.tax}</span>
                             </div>
                           </div>
-                          <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">{plan.content}</p>
-                          
-                          {/* Syllabus progress bar */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-[10px] font-semibold text-zinc-400">
-                              <span>Syllabus Completion Rate</span>
-                              <span>{plan.syllabusPercent}%</span>
-                            </div>
-                            <div className="w-full bg-zinc-100 rounded-full h-2 dark:bg-zinc-800">
-                              <div
-                                className="bg-sky-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${plan.syllabusPercent}%` }}
-                              />
-                            </div>
+                          <div className="flex justify-between font-black text-xs text-sky-600 dark:text-sky-400 pt-2">
+                            <span>NET EARNINGS PAID</span>
+                            <span>₹{payslipData.netPay}</span>
                           </div>
-
-                          {/* Quick progress slider edit */}
-                          {(user.role === 'TEACHER' || user.role === 'INSTITUTE_ADMIN') && (
-                            <div className="pt-2 border-t border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-2 flex-1">
-                                <span className="text-[10px] text-zinc-400 font-semibold">Adjust Completion:</span>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  value={plan.syllabusPercent}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    const nextStatus = val === 100 ? 'COMPLETED' : val > 0 ? 'IN_PROGRESS' : 'PENDING';
-                                    handleUpdateLessonPercent(plan.id, nextStatus, val);
-                                  }}
-                                  className="h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-sky-600 dark:bg-zinc-800 flex-1 max-w-[150px]"
-                                />
-                              </div>
-                              <div className="flex gap-1.5">
-                                <button
-                                  onClick={() => handleUpdateLessonPercent(plan.id, 'IN_PROGRESS', 50)}
-                                  className="rounded border border-zinc-200 px-2 py-1 text-[9px] font-medium text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                                >
-                                  Halfway (50%)
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateLessonPercent(plan.id, 'COMPLETED', 100)}
-                                  className="rounded bg-sky-600 px-2 py-1 text-[9px] font-bold text-white hover:bg-sky-500"
-                                >
-                                  Mark Completed
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="h-48 flex justify-center items-center text-xs text-zinc-400 font-medium">Select employee and calculate to preview voucher.</div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 3J. YEAR-END ACADEMIC PROMOTIONS */}
-          {activeMenu === 'promotions' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
-                <h4 className="text-sm font-bold tracking-tight uppercase text-sky-600 dark:text-sky-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-                  Bulk Year-End Promotions & Roll Reset
-                </h4>
-                
-                <div className="mt-6 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 space-y-2 leading-relaxed">
-                  <p className="font-bold">⚠️ IEEE Standard 1012 Validation Rules on Academic Transition:</p>
-                  <p>Promoting students will shift their core enrollment profile to the next academic level, archive their old roll number under milestone logs, and auto-generate new roll numbers based on the target class roster size.</p>
-                </div>
-
-                <div className="mt-6 grid gap-6 md:grid-cols-2 text-xs font-semibold">
-                  <div>
-                    <label className="block font-semibold text-zinc-400 uppercase">1. Select Class to Promote From</label>
-                    <select
-                      value={selectedClass}
-                      onChange={(e) => {
-                        setSelectedClass(e.target.value);
-                        setPromotionSelectedStudents([]);
-                      }}
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold"
-                    >
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-zinc-400 uppercase">2. Select Target Promotion Class</label>
-                    <select
-                      value={promotionTargetClassId}
-                      onChange={(e) => setPromotionTargetClassId(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold"
-                    >
-                      <option value="">Choose class...</option>
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
                   </div>
                 </div>
+              )}
 
-                <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
-                  <div className="flex justify-between items-center pb-4">
-                    <h5 className="font-bold text-xs uppercase text-zinc-400">Class Roster Promotion Selection ({promotionSelectedStudents.length} selected)</h5>
-                    <button
-                      onClick={() => {
-                        if (promotionSelectedStudents.length === students.length) {
-                          setPromotionSelectedStudents([]);
-                        } else {
-                          setPromotionSelectedStudents(students.map(s => s.id));
-                        }
-                      }}
-                      className="text-xs text-sky-600 hover:underline font-bold"
-                    >
-                      Toggle Select All
-                    </button>
-                  </div>
-
-                  <table className="w-full text-left border-collapse text-xs mt-2">
-                    <thead>
-                      <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                        <th className="pb-2 font-semibold uppercase w-12">Select</th>
-                        <th className="pb-2 font-semibold uppercase">Roll No</th>
-                        <th className="pb-2 font-semibold uppercase">Student Name</th>
-                        <th className="pb-2 font-semibold uppercase">Scholar Number</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                      {students.map((student) => (
-                        <tr key={student.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20">
-                          <td className="py-2.5">
-                            <input
-                              type="checkbox"
-                              checked={promotionSelectedStudents.includes(student.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setPromotionSelectedStudents([...promotionSelectedStudents, student.id]);
-                                } else {
-                                  setPromotionSelectedStudents(promotionSelectedStudents.filter(id => id !== student.id));
-                                }
-                              }}
-                              className="rounded text-sky-600 focus:ring-sky-500"
-                            />
-                          </td>
-                          <td className="py-2.5 font-bold text-zinc-500">{student.rollNumber}</td>
-                          <td className="py-2.5 font-semibold">{student.firstName} {student.lastName}</td>
-                          <td className="py-2.5 font-mono text-zinc-400">{student.scholarNumber || 'Pending'}</td>
+              {staffTab === 'leaves' && (
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Leave Applications Desk</h4>
+                  <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="p-3">Staff Name</th>
+                          <th className="p-3">Designation</th>
+                          <th className="p-3">Reason</th>
+                          <th className="p-3">Interval</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-                    <button
-                      onClick={handlePromoteStudents}
-                      className="rounded-lg bg-sky-600 px-6 py-2.5 text-xs font-bold text-white shadow hover:bg-sky-500"
-                    >
-                      Confirm Bulk Graduation / Promotion
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {/* 3G. NOTICES CIRCULARS FEED PANEL */}
-          {activeMenu === 'notices' && (
-            <div className="grid gap-8 lg:grid-cols-3 animate-in fade-in duration-300">
-              
-              {/* Notices Feed */}
-              <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 lg:col-span-2 space-y-4">
-                <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Circular notice board</h4>
-                {notices.map((n) => (
-                  <div key={n.id} className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800 dark:bg-zinc-950/20 text-xs">
-                    <div className="flex justify-between font-bold">
-                      <span className="text-indigo-500 text-sm">{n.title}</span>
-                      <span className="text-zinc-400 text-[10px]">{new Date(n.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <p className="mt-3 text-zinc-600 dark:text-zinc-300 leading-relaxed">{n.content}</p>
-                    <div className="mt-4 pt-3 border-t border-dashed border-zinc-200 dark:border-zinc-800/85 flex justify-between text-[10px] text-zinc-400">
-                      <span>Posted by {n.authorName}</span>
-                      <span className="uppercase tracking-wider font-semibold">Targets: {n.targetRoles}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Notice creation */}
-              {(user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN' || user.role === 'TEACHER') && (
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 text-xs">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Broadcast Announcement</h4>
-                  <form onSubmit={handleCreateNotice} className="mt-6 space-y-4">
-                    <div>
-                      <label className="block font-semibold text-zinc-400">Announcement Title</label>
-                      <input
-                        type="text"
-                        required
-                        value={noticeForm.title}
-                        onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
-                        placeholder="e.g. Schedule for Sports Day Practice"
-                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-zinc-400">Notice Body Content</label>
-                      <textarea
-                        required
-                        value={noticeForm.content}
-                        onChange={(e) => setNoticeForm({ ...noticeForm, content: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950 h-32"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-zinc-400 mb-2">Target Roles audience</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {['STUDENT', 'PARENT', 'TEACHER', 'STAFF', 'ACCOUNTANT'].map((r) => (
-                          <label key={r} className="flex items-center gap-2 font-medium">
-                            <input
-                              type="checkbox"
-                              checked={noticeForm.roles.includes(r)}
-                              onChange={() => toggleNoticeRole(r)}
-                              className="rounded text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span>{r.toLowerCase()}</span>
-                          </label>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 font-medium">
+                        {leaves.map((leave) => (
+                          <tr key={leave.id}>
+                            <td className="p-3 font-bold">{leave.staff?.firstName} {leave.staff?.lastName}</td>
+                            <td className="p-3 text-zinc-500">{leave.staff?.designation}</td>
+                            <td className="p-3">{leave.reason}</td>
+                            <td className="p-3">{new Date(leave.startDate).toLocaleDateString()} to {new Date(leave.endDate).toLocaleDateString()}</td>
+                            <td className="p-3">
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                                leave.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-600' :
+                                leave.status === 'REJECTED' ? 'bg-red-500/10 text-red-600' : 'bg-amber-500/10 text-amber-600'
+                              }`}>{leave.status}</span>
+                            </td>
+                            <td className="p-3 flex gap-2">
+                              {leave.status === 'PENDING' && (
+                                <>
+                                  <button onClick={() => handleApproveLeave(leave.id, 'APPROVED')} className="rounded bg-emerald-600 px-2 py-1 text-[9px] font-bold text-white hover:bg-emerald-500">Approve</button>
+                                  <button onClick={() => handleApproveLeave(leave.id, 'REJECTED')} className="rounded bg-red-600 px-2 py-1 text-[9px] font-bold text-white hover:bg-red-500">Reject</button>
+                                </>
+                              )}
+                            </td>
+                          </tr>
                         ))}
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white shadow hover:bg-indigo-500"
-                    >
-                      Broadcast Notice
-                    </button>
-                  </form>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-
-          {/* 3H. STUDENT / PARENT PORTAL PANEL */}
-          {activeMenu === 'student-portal' && (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              
-              {/* Profile Card Header */}
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold">{user.profileName}</h3>
-                  <p className="text-xs text-indigo-500 font-semibold">Registered Academic Roll: {user.profileId}</p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-500/25">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
+          {/* K. ANALYTICS PANEL */}
+          {activeCategory === 'analytics' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400">Institutional health analytics</h3>
+                <button onClick={() => window.print()} className="flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-500 dark:text-sky-400">
+                  <Printer className="h-4 w-4" />
+                  <span>Download Health Report</span>
+                </button>
               </div>
 
-              {/* Sub grid */}
-              <div className="grid gap-6 md:grid-cols-3">
-                {/* Academic results card */}
-                <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 md:col-span-2">
-                  <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-4 border-b border-zinc-200 dark:border-zinc-800">Academic Marks Report Card</h4>
+              {/* Analytics grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* School Health Report */}
+                <div className="bg-zinc-50/50 p-6 rounded-2xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800 space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">AI Institutional Audit</h4>
+                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black text-emerald-600 uppercase tracking-wider">A+ Standard</span>
+                  </div>
                   
-                  {studentReport.length === 0 ? (
-                    <p className="mt-8 text-center text-xs text-zinc-400">No examination scores published yet.</p>
-                  ) : (
-                    <table className="w-full mt-4 text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-zinc-200 text-zinc-400 dark:border-zinc-800">
-                          <th className="pb-3 font-semibold uppercase">Exam Description</th>
-                          <th className="pb-3 font-semibold uppercase">Course Subject</th>
-                          <th className="pb-3 font-semibold uppercase">Marks Obtained</th>
-                          <th className="pb-3 font-semibold uppercase">Grade</th>
-                          <th className="pb-3 font-semibold uppercase">Auditor Comments</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/50">
-                        {studentReport.map((res, i) => (
-                          <tr key={i}>
-                            <td className="py-3 font-semibold text-indigo-500">{res.examName}</td>
-                            <td className="py-3 font-medium">{res.subjectName}</td>
-                            <td className="py-3 font-bold">{res.marksObtained} / {res.maxMarks}</td>
-                            <td className="py-3">
-                              <span className="rounded bg-indigo-50 px-2 py-0.5 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                                {res.grade}
-                              </span>
-                            </td>
-                            <td className="py-3 text-zinc-400">{res.remarks || 'No notes'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-4">
+                    {[
+                      { title: "Syllabus Completion Index", value: "74.8%", color: "bg-sky-500" },
+                      { title: "Biometric attendance Rate", value: "95.8%", color: "bg-indigo-500" },
+                      { title: "Library Book Circulation", value: "82.5%", color: "bg-emerald-500" },
+                      { title: "Financial collection Rate", value: "85.2%", color: "bg-sky-500" }
+                    ].map((idx, index) => (
+                      <div key={index} className="space-y-2">
+                        <div className="flex justify-between text-xs font-bold">
+                          <span>{idx.title}</span>
+                          <span>{idx.value}</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                          <div className={`h-full ${idx.color}`} style={{ width: idx.value }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Audit recommendation */}
+                <div className="rounded-2xl border border-zinc-100 p-6 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">AI Operations Suggestion</h4>
+                  <div className="rounded-xl bg-white p-4 border border-zinc-100 text-xs dark:bg-zinc-900 dark:border-zinc-800 font-medium leading-relaxed space-y-3">
+                    <p className="text-zinc-600 dark:text-zinc-300">
+                      💡 **Collections Alert**: ₹{stats?.feeOverview?.totalPending || 0} in tuition fees is currently overdue. Sending WhatsApp notices in Comms Hub is recommended.
+                    </p>
+                    <p className="text-zinc-600 dark:text-zinc-300">
+                      💡 **Biometric Sync**: Biometric punch rates are peak at 08:45 AM. Terminal network load is nominal.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* L. SETTINGS PANEL */}
+          {activeCategory === 'settings' && (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400 border-b border-zinc-100 pb-4 dark:border-zinc-800">Settings & Administration</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* DB Backup Simulator */}
+                <div className="bg-zinc-50/50 p-6 rounded-2xl border border-zinc-100 dark:bg-zinc-950/20 dark:border-zinc-800 space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Database Backup Console</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Backup your schema and institutional records securely to cloud vault dumps.</p>
+                  
+                  <button
+                    disabled={backupRunning}
+                    onClick={runDbBackup}
+                    className="flex justify-center items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-xs font-bold text-white hover:bg-sky-500 shadow-md disabled:opacity-50"
+                  >
+                    {backupRunning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+                    <span>{backupRunning ? 'Backing up records...' : 'Initiate Secure Dump Backup'}</span>
+                  </button>
+
+                  {backupLog.length > 0 && (
+                    <div className="rounded-xl bg-zinc-950 p-4 border border-zinc-800 text-[10px] font-mono text-zinc-400 space-y-1.5">
+                      {backupLog.map((log, i) => (
+                        <p key={i} className={log.includes('SUCCESS') ? 'text-emerald-500' : 'text-sky-400'}>{log}</p>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                {/* Individual stats widget */}
-                <div className="space-y-6">
-                  {/* Attendance Rate */}
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                    <h5 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Attendance Rate</h5>
-                    {studentAttendance ? (
-                      <>
-                        <h2 className="mt-4 text-4xl font-extrabold tracking-tight text-indigo-500">{studentAttendance.rate}%</h2>
-                        <div className="mt-4 text-[10px] text-zinc-400 space-y-1 font-medium">
-                          <p>Total recorded days: {studentAttendance.total}</p>
-                          <p>Present days: {studentAttendance.present} • Absents: {studentAttendance.absent}</p>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="mt-4 text-xs text-zinc-400">Loading attendance summaries...</p>
-                    )}
-                  </div>
-
-                  {/* Submit staff leave requests inside portal */}
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
-                    <h4 className="text-sm font-bold tracking-tight uppercase text-zinc-400 pb-3 border-b border-zinc-200 dark:border-zinc-800">Apply Staff Leave</h4>
-                    <form onSubmit={handleLeaveSubmit} className="mt-4 space-y-4 text-xs">
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Start Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={leaveForm.startDate}
-                          onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">End Date</label>
-                        <input
-                          type="date"
-                          required
-                          value={leaveForm.endDate}
-                          onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-zinc-400">Reason</label>
-                        <input
-                          type="text"
-                          required
-                          value={leaveForm.reason}
-                          onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
-                          placeholder="e.g. Family medical appointment"
-                          className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        className="w-full rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white shadow hover:bg-indigo-500"
-                      >
-                        Submit Leave Application
-                      </button>
-                    </form>
+                {/* Role Permission manager */}
+                <div className="rounded-2xl border border-zinc-100 p-6 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/20 space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Role Access Controls Matrix</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Configure terminal visibility of sub-desks for your roles.</p>
+                  <div className="text-xs space-y-3 font-bold text-zinc-600 dark:text-zinc-400">
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Super Admin</span>
+                      <span className="text-[10px] text-sky-600">All access</span>
+                    </div>
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Librarian</span>
+                      <span className="text-[10px] text-sky-600">Dashboard, Library</span>
+                    </div>
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Accountant</span>
+                      <span className="text-[10px] text-sky-600">Dashboard, Fees, HR payroll</span>
+                    </div>
+                    <div className="flex justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
+                      <span>Student</span>
+                      <span className="text-[10px] text-sky-600">Dashboard, Academics, Comms</span>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
           )}
@@ -2574,75 +2522,87 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* 4. PAYMENT POPUP MODAL */}
-      {paymentModal?.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white p-8 rounded-2xl border border-zinc-200 shadow-2xl dark:bg-zinc-900 dark:border-zinc-800 text-xs">
-            <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Record Fee Collection</h3>
-              <button
-                onClick={() => setPaymentModal(null)}
-                className="rounded-lg p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                <X className="h-4.5 w-4.5" />
+      {/* AI ASSISTANT SLIDE-OUT PANEL */}
+      {aiAssistantOpen && (
+        <div className="fixed inset-y-0 right-0 z-50 w-96 bg-white border-l border-zinc-200 shadow-2xl dark:bg-zinc-900 dark:border-zinc-800 flex flex-col transition-all duration-300 animate-slide-left">
+          {/* Header */}
+          <div className="flex h-16 items-center justify-between px-5 border-b border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-indigo-500 animate-pulse" />
+              <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-white">AI Operations Desk</h4>
+            </div>
+            <button onClick={() => setAiAssistantOpen(false)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+            {aiChatMessages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`rounded-2xl px-4 py-2.5 text-xs max-w-[85%] leading-relaxed ${
+                  msg.sender === 'user'
+                    ? 'bg-sky-600 text-white font-medium'
+                    : 'bg-zinc-50 text-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-300 border border-zinc-100/50 dark:border-zinc-800/40'
+                }`}>
+                  {msg.text.split('\n').map((line: string, lineIdx: number) => {
+                    if (line.startsWith('- ') || line.startsWith('* ')) {
+                      return <li key={lineIdx} className="ml-2 list-disc">{line.replace(/^[-*]\s*/, '')}</li>;
+                    }
+                    return <p key={lineIdx} className="mb-1">{line}</p>;
+                  })}
+                </div>
+              </div>
+            ))}
+            
+            {aiTyping && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl px-4 py-2.5 bg-zinc-50 text-zinc-400 dark:bg-zinc-950/40 border border-zinc-100/50 dark:border-zinc-800/40 text-xs flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Presets & Input */}
+          <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Institutional health report",
+                "Overdue library books",
+                "Who is absent today?",
+                "Analyze collections balance"
+              ].map((p, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => triggerAiQuery(p)}
+                  className="rounded-lg border border-zinc-200 px-2 py-1 text-[9px] font-bold text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:text-zinc-400"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!aiChatQuery) return;
+              triggerAiQuery(aiChatQuery);
+              setAiChatQuery('');
+            }} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ask assistant query..."
+                value={aiChatQuery}
+                onChange={e => setAiChatQuery(e.target.value)}
+                className="flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950"
+              />
+              <button type="submit" className="rounded-xl bg-indigo-600 p-2 text-white hover:bg-indigo-500 shrink-0">
+                <Send className="h-4 w-4" />
               </button>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div>
-                <span className="font-semibold text-zinc-400">Payer Student:</span>
-                <p className="font-bold text-sm mt-1">{paymentModal.studentName}</p>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-400">Amount Collected ($)</label>
-                <input
-                  type="number"
-                  value={paymentModal.amountDue}
-                  onChange={(e) => setPaymentModal({ ...paymentModal, amountDue: parseFloat(e.target.value) || 0 })}
-                  className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-400">Payment Channel</label>
-                <select
-                  value={paymentModal.method}
-                  onChange={(e) => setPaymentModal({ ...paymentModal, method: e.target.value })}
-                  className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none dark:border-zinc-800 dark:bg-zinc-950 font-bold"
-                >
-                  <option value="CASH">Cash Desk Payment</option>
-                  <option value="CARD">Swipe Credit Card</option>
-                  <option value="ONLINE">Online Bank Transfer</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-400">Audit Remarks / Notes</label>
-                <input
-                  type="text"
-                  value={paymentModal.remarks}
-                  onChange={(e) => setPaymentModal({ ...paymentModal, remarks: e.target.value })}
-                  placeholder="Receipt handed to parent..."
-                  className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 outline-none focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-3">
-                <button
-                  onClick={() => setPaymentModal(null)}
-                  className="rounded-lg border border-zinc-200 bg-white px-4 py-2 font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitPayment}
-                  className="rounded-lg bg-indigo-600 px-6 py-2 font-bold text-white shadow hover:bg-indigo-500"
-                >
-                  Confirm payment
-                </button>
-              </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
@@ -2650,8 +2610,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-// Temporary items matching state compilation checks
-const examsList = [
-  { id: 'exam-1', name: 'Mid-Term Algebra Exam', maxMarks: 100, examDate: '2026-04-10', subject: { name: 'Advanced Mathematics', class: { name: 'Grade 10-A' } } }
-];

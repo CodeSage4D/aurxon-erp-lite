@@ -139,6 +139,14 @@ const DEFAULT_MOCK_DB = {
   lessonPlans: [
     { id: 'lp-1', title: 'Calculus - Integration Methods', content: 'Definite integrals and substitution method applications.', status: 'IN_PROGRESS', syllabusPercent: 40, subjectId: 'subj-1', teacherId: 'staff-1', createdAt: new Date('2026-05-25').toISOString(), subject: { name: 'Advanced Mathematics', code: 'MATH101', class: { name: 'Grade 10-A' } }, teacher: { firstName: 'Sarah', lastName: 'Connor' } },
     { id: 'lp-2', title: 'Classical Mechanics - Laws of Motion', content: 'Newtonian principles and free body diagram calculations.', status: 'COMPLETED', syllabusPercent: 100, subjectId: 'subj-2', teacherId: 'staff-2', createdAt: new Date('2026-05-26').toISOString(), subject: { name: 'Introductory Physics', code: 'PHYS101', class: { name: 'Grade 10-A' } }, teacher: { firstName: 'John', lastName: 'Keating' } }
+  ],
+  books: [
+    { id: 'book-1', title: 'Fundamentals of Physics', author: 'Halliday & Resnick', isbn: '978-0470801833', totalCopies: 5, availableCopies: 4 },
+    { id: 'book-2', title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', isbn: '978-0262033848', totalCopies: 3, availableCopies: 3 },
+    { id: 'book-3', title: 'Higher Engineering Mathematics', author: 'B.S. Grewal', isbn: '978-8174091955', totalCopies: 10, availableCopies: 10 }
+  ],
+  bookIssues: [
+    { id: 'issue-1', studentId: 'stud-1', bookId: 'book-1', issueDate: '2026-05-26T10:00:00.000Z', returnDate: null, status: 'ISSUED', book: { title: 'Fundamentals of Physics', author: 'Halliday & Resnick', isbn: '978-0470801833' }, student: { firstName: 'Alice', lastName: 'Miller', scholarNumber: 'SCH-2026-001', rollNumber: 'ROLL-10A-01' } }
   ]
 };
 
@@ -1225,6 +1233,208 @@ export async function deleteLessonPlanApi(id: string) {
     }
     saveMockDb(db);
     return { id };
+  }
+}
+
+// 15. Library Management API
+export async function getBooksApi(search?: string) {
+  try {
+    const query = search ? `?search=${search}` : '';
+    const res = await fetch(`${API_URL}/library/books${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.books || [];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((b: any) =>
+        b.title.toLowerCase().includes(q) ||
+        b.author.toLowerCase().includes(q) ||
+        b.isbn.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }
+}
+
+export async function createBookApi(data: { title: string; author: string; isbn: string; totalCopies: number }) {
+  try {
+    const res = await fetch(`${API_URL}/library/books`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.books) db.books = [];
+    const existing = db.books.find((b: any) => b.isbn === data.isbn);
+    if (existing) throw new Error('A book with this ISBN already exists');
+
+    const newBook = {
+      id: `book-${Date.now()}`,
+      title: data.title,
+      author: data.author,
+      isbn: data.isbn,
+      totalCopies: parseInt(data.totalCopies as any || 1),
+      availableCopies: parseInt(data.totalCopies as any || 1),
+    };
+    db.books.push(newBook);
+    saveMockDb(db);
+    return newBook;
+  }
+}
+
+export async function updateBookApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/library/books/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.books) {
+      const idx = db.books.findIndex((b: any) => b.id === id);
+      if (idx !== -1) {
+        const book = db.books[idx];
+        const total = data.totalCopies !== undefined ? parseInt(data.totalCopies) : book.totalCopies;
+        const diff = total - book.totalCopies;
+        const available = Math.max(0, book.availableCopies + diff);
+        db.books[idx] = {
+          ...book,
+          title: data.title !== undefined ? data.title : book.title,
+          author: data.author !== undefined ? data.author : book.author,
+          isbn: data.isbn !== undefined ? data.isbn : book.isbn,
+          totalCopies: total,
+          availableCopies: available,
+        };
+      }
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+export async function deleteBookApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/books/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.books) {
+      db.books = db.books.filter((b: any) => b.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+export async function getIssuesApi() {
+  try {
+    const res = await fetch(`${API_URL}/library/issues`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.bookIssues || [];
+  }
+}
+
+export async function getStudentIssuesApi(studentId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/issues/student/${studentId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return (db.bookIssues || []).filter((i: any) => i.studentId === studentId);
+  }
+}
+
+export async function issueBookApi(studentId: string, bookId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/issue`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ studentId, bookId }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.books) db.books = [];
+    if (!db.bookIssues) db.bookIssues = [];
+
+    const bookIdx = db.books.findIndex((b: any) => b.id === bookId);
+    if (bookIdx === -1) throw new Error('Book not found');
+    if (db.books[bookIdx].availableCopies <= 0) throw new Error('No copies available');
+
+    const student = db.students.find((s: any) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+
+    const existingIssue = db.bookIssues.find((i: any) => i.studentId === studentId && i.bookId === bookId && i.status === 'ISSUED');
+    if (existingIssue) throw new Error('This book is already issued to this student');
+
+    const newIssue = {
+      id: `issue-${Date.now()}`,
+      studentId,
+      bookId,
+      issueDate: new Date().toISOString(),
+      returnDate: null,
+      status: 'ISSUED',
+      book: { ...db.books[bookIdx] },
+      student: {
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        scholarNumber: student.scholarNumber || `SCH-${Date.now().toString().slice(-4)}`,
+        rollNumber: student.rollNumber,
+        class: student.class ? { name: student.class.name } : { name: 'Grade 10-A' }
+      }
+    };
+
+    db.books[bookIdx].availableCopies -= 1;
+    db.bookIssues.push(newIssue);
+    saveMockDb(db);
+    return newIssue;
+  }
+}
+
+export async function returnBookApi(issueId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/return/${issueId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.bookIssues) db.bookIssues = [];
+
+    const issueIdx = db.bookIssues.findIndex((i: any) => i.id === issueId);
+    if (issueIdx === -1) throw new Error('Issue record not found');
+    if (db.bookIssues[issueIdx].status === 'RETURNED') throw new Error('Already returned');
+
+    db.bookIssues[issueIdx].status = 'RETURNED';
+    db.bookIssues[issueIdx].returnDate = new Date().toISOString();
+
+    const bookIdx = db.books.findIndex((b: any) => b.id === db.bookIssues[issueIdx].bookId);
+    if (bookIdx !== -1) {
+      db.books[bookIdx].availableCopies += 1;
+    }
+
+    saveMockDb(db);
+    return db.bookIssues[issueIdx];
   }
 }
 

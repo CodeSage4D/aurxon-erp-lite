@@ -12,6 +12,7 @@ import { NoticeModule } from './notice/notice.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ClassModule } from './class/class.module';
 import { LessonModule } from './lesson/lesson.module';
+import { LibraryModule } from './library/library.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { LessonModule } from './lesson/lesson.module';
     DashboardModule,
     ClassModule,
     LessonModule,
+    LibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
