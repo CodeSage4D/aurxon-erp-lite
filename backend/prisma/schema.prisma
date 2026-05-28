@@ -1,0 +1,294 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  INSTITUTE_ADMIN
+  STAFF
+  TEACHER
+  STUDENT
+  PARENT
+  ACCOUNTANT
+}
+
+model Institution {
+  id           String   @id @default(uuid())
+  name         String
+  logoUrl      String?
+  primaryColor String   @default("#3b82f6")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users     User[]
+  students  Student[]
+  staff     Staff[]
+  classes   Class[]
+  fees      FeeStructure[]
+  notices   Notice[]
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  passwordHash  String
+  role          String      // e.g. "SUPER_ADMIN", "INSTITUTE_ADMIN", etc. (Store as string or enum)
+  isActive      Boolean     @default(true)
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Profile Relations
+  studentProfile Student?
+  parentProfile  Parent?
+  staffProfile   Staff?
+  auditLogs      AuditLog[]
+}
+
+model Student {
+  id            String      @id @default(uuid())
+  userId        String      @unique
+  user          User        @relation(fields: [userId], references: [id])
+  rollNumber    String
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime
+  gender        String
+  admissionDate DateTime    @default(now())
+  status        String      @default("ACTIVE") // ACTIVE, GRADUATED, DROPPED
+  parentId      String?
+  parent        Parent?     @relation(fields: [parentId], references: [id])
+  classId       String
+  class         Class       @relation(fields: [classId], references: [id])
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  
+  attendance    Attendance[]
+  feeAllocations StudentFeeAllocation[]
+  examResults   ExamResult[]
+  documents     Document[]
+  timeline      TimelineEvent[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Parent {
+  id            String      @id @default(uuid())
+  userId        String      @unique
+  user          User        @relation(fields: [userId], references: [id])
+  firstName     String
+  lastName      String
+  phone         String
+  occupation    String?
+  address       String?
+  students      Student[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Staff {
+  id            String      @id @default(uuid())
+  userId        String      @unique
+  user          User        @relation(fields: [userId], references: [id])
+  employeeId    String
+  firstName     String
+  lastName      String
+  phone         String
+  designation   String      // TEACHER, ACCOUNTANT, STAFF
+  joiningDate   DateTime
+  salary        Float
+  status        String      @default("ACTIVE")
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  leaves        LeaveRequest[]
+  classes       Class[]     @relation("ClassTeacher") // If teacher is class head
+  subjects      Subject[]   // Subjects they teach
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Class {
+  id            String      @id @default(uuid())
+  name          String      // e.g., "Grade 10-A", "Tuition Batch B"
+  section       String?
+  classTeacherId String?
+  classTeacher  Staff?      @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  
+  students      Student[]
+  subjects      Subject[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Subject {
+  id            String      @id @default(uuid())
+  name          String
+  code          String
+  classId       String
+  class         Class       @relation(fields: [classId], references: [id])
+  teacherId     String?
+  teacher       Staff?      @relation(fields: [teacherId], references: [id])
+  exams         Exam[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id])
+  date        DateTime
+  status      String   // PRESENT, ABSENT, LATE, EXCUSED
+  remarks     String?
+  recordedById String  // Staff ID
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([studentId, date])
+}
+
+model FeeStructure {
+  id            String      @id @default(uuid())
+  name          String      // e.g., "Annual Tuition Fee 2026"
+  amount        Float
+  dueDate       DateTime
+  description   String?
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  allocations   StudentFeeAllocation[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model StudentFeeAllocation {
+  id             String       @id @default(uuid())
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id])
+  feeStructureId String
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
+  amountDue      Float
+  amountPaid     Float        @default(0)
+  status         String       @default("UNPAID") // UNPAID, PARTIAL, PAID
+  
+  payments       Payment[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Payment {
+  id             String               @id @default(uuid())
+  allocationId   String
+  allocation     StudentFeeAllocation @relation(fields: [allocationId], references: [id])
+  amount         Float
+  paymentDate    DateTime             @default(now())
+  paymentMethod  String               // CASH, CARD, ONLINE, BANK_TRANSFER
+  receiptNumber  String               @unique
+  remarks        String?
+
+  createdAt      DateTime             @default(now())
+}
+
+model Exam {
+  id            String       @id @default(uuid())
+  name          String       // e.g., "Mid-Term Exam", "Monthly Quiz 1"
+  subjectId     String
+  subject       Subject      @relation(fields: [subjectId], references: [id])
+  maxMarks      Float
+  examDate      DateTime
+
+  results       ExamResult[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model ExamResult {
+  id          String   @id @default(uuid())
+  examId      String
+  exam        Exam     @relation(fields: [examId], references: [id])
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id])
+  marksObtained Float
+  remarks     String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([examId, studentId])
+}
+
+model Notice {
+  id            String      @id @default(uuid())
+  title         String
+  content       String
+  targetRoles   String      // Store comma-separated roles like "STUDENT,PARENT" or "TEACHER"
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  authorName    String      // Cached name of creator
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  name      String
+  fileUrl   String
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model TimelineEvent {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id])
+  type        String   // ADMISSION, ACADEMIC_AWARD, DISCIPLINARY, EXAM_EXCELLENCE
+  description String
+  eventDate   DateTime @default(now())
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedById String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // e.g., "UPDATE_STUDENT", "COLLECT_FEE"
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
