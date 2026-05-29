@@ -11,24 +11,36 @@ const prisma = new PrismaClient({
 async function main() {
   console.log('Seeding Neon database with Indian Education schema...');
 
-  // 1. Clean existing records (Cascade clean)
-  await prisma.expense.deleteMany({});
-  await prisma.lessonPlan.deleteMany({});
+  // 1. Clean existing records (Cascade clean in safe dependency order)
+  await prisma.promotionHistory.deleteMany({});
+  await prisma.notification.deleteMany({});
+  await prisma.settings.deleteMany({});
   await prisma.auditLog.deleteMany({});
-  await prisma.leaveRequest.deleteMany({});
-  await prisma.timelineEvent.deleteMany({});
   await prisma.document.deleteMany({});
-  await prisma.notice.deleteMany({});
+  await prisma.timelineEvent.deleteMany({});
   await prisma.examResult.deleteMany({});
-  await prisma.exam.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.studentFeeAllocation.deleteMany({});
-  await prisma.feeStructure.deleteMany({});
   await prisma.attendance.deleteMany({});
-  await prisma.subject.deleteMany({});
-  await prisma.class.deleteMany({});
+  await prisma.leaveRequest.deleteMany({});
+  await prisma.lessonPlan.deleteMany({});
+  await prisma.bookIssue.deleteMany({});
+  await prisma.payroll.deleteMany({});
+  await prisma.visitor.deleteMany({});
+  await prisma.inventoryItem.deleteMany({});
+  await prisma.timetableEntry.deleteMany({});
+  await prisma.expense.deleteMany({});
+  await prisma.notice.deleteMany({});
+
   await prisma.student.deleteMany({});
   await prisma.parent.deleteMany({});
+  await prisma.book.deleteMany({});
+  await prisma.exam.deleteMany({});
+  await prisma.subject.deleteMany({});
+  await prisma.class.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  
+  await prisma.branch.deleteMany({});
   await prisma.staff.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.institution.deleteMany({});
@@ -44,6 +56,31 @@ async function main() {
     },
   });
 
+  // 2a. Create default Branch
+  const defaultBranch = await prisma.branch.create({
+    data: {
+      name: 'Delhi Public School Dwarka Campus',
+      code: 'DPS-DWK',
+      address: 'Sector 4, Dwarka',
+      city: 'New Delhi',
+      state: 'Delhi',
+      pinCode: '110078',
+      phone: '+91 11 25074472',
+      institutionId: institution.id,
+    },
+  });
+
+  // 2b. Create default Settings
+  await prisma.settings.create({
+    data: {
+      institutionId: institution.id,
+      academicYear: '2026-2027',
+      gradingSystem: 'CBSE',
+      timezone: 'Asia/Kolkata',
+      currency: 'INR',
+    },
+  });
+
   // 3. Create Users
   // 3a. Institute Admin
   const adminUser = await prisma.user.create({
@@ -52,6 +89,15 @@ async function main() {
       passwordHash,
       role: 'INSTITUTE_ADMIN',
       institutionId: institution.id,
+    },
+  });
+
+  // 3a_i. Create default notification
+  await prisma.notification.create({
+    data: {
+      userId: adminUser.id,
+      title: 'Welcome to AURXON ERP Lite',
+      content: 'Your school management platform is ready. Dwarka main branch registered successfully.',
     },
   });
 
@@ -76,6 +122,7 @@ async function main() {
       joiningDate: new Date('2024-08-15'),
       salary: 55000, // Monthly salary in INR
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -100,6 +147,7 @@ async function main() {
       joiningDate: new Date('2025-01-10'),
       salary: 60000,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -124,6 +172,7 @@ async function main() {
       joiningDate: new Date('2024-09-01'),
       salary: 48000,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -136,6 +185,7 @@ async function main() {
       board: 'CBSE',
       classTeacherId: teacherStaff1.id,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -147,6 +197,7 @@ async function main() {
       board: 'CBSE',
       classTeacherId: teacherStaff2.id,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -234,6 +285,7 @@ async function main() {
       parentId: parentProfile.id,
       classId: class10A.id,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -277,6 +329,7 @@ async function main() {
 
       classId: class10A.id,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
@@ -320,6 +373,7 @@ async function main() {
 
       classId: class11Sci.id,
       institutionId: institution.id,
+      branchId: defaultBranch.id,
     },
   });
 
