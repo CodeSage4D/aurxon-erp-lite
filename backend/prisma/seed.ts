@@ -377,6 +377,50 @@ async function main() {
     },
   });
 
+  // Student 4 (Grade 10 - Weak student for alerts)
+  const studentUser4 = await prisma.user.create({
+    data: {
+      email: 'student4@aurxon.com',
+      passwordHash,
+      role: 'STUDENT',
+      institutionId: institution.id,
+    },
+  });
+
+  const student4 = await prisma.student.create({
+    data: {
+      userId: studentUser4.id,
+      scholarNumber: 'SCH-2026-0004',
+      rollNumber: '10104',
+      firstName: 'Deepak',
+      lastName: 'Kumar',
+      dateOfBirth: new Date('2010-08-15'),
+      gender: 'MALE',
+      
+      aadhaarNumber: '125478963254',
+      samagraId: 'SSM-102550',
+      familyId: 'FAM-541292',
+      casteCategory: 'SC',
+      
+      bankName: 'Canara Bank',
+      accHolderName: 'Deepak Kumar',
+      accNumber: '40125896325',
+      ifscCode: 'CNRB0001201',
+      bankBranch: 'Dwarka Sector 4',
+      
+      houseNo: 'Flat 101',
+      street: 'Block D, Sector 4',
+      city: 'New Delhi',
+      district: 'South West Delhi',
+      state: 'Delhi',
+      pinCode: '110078',
+
+      classId: class10A.id,
+      institutionId: institution.id,
+      branchId: defaultBranch.id,
+    },
+  });
+
   // 7. Seed Timeline Logs
   await prisma.timelineEvent.create({
     data: {
@@ -402,6 +446,14 @@ async function main() {
         studentId: student2.id,
         date,
         status: date.getDate() === 26 ? 'ABSENT' : 'PRESENT',
+        recordedById: teacherStaff1.id,
+      },
+    });
+    await prisma.attendance.create({
+      data: {
+        studentId: student4.id,
+        date,
+        status: date.getDate() === 25 ? 'PRESENT' : 'ABSENT',
         recordedById: teacherStaff1.id,
       },
     });
@@ -507,6 +559,15 @@ async function main() {
       studentId: student2.id,
       marksObtained: 52,
       remarks: 'Needs improvement in algebra theorems',
+    },
+  });
+
+  await prisma.examResult.create({
+    data: {
+      examId: algebraExam.id,
+      studentId: student4.id,
+      marksObtained: 22, // 27.5% - below 40%
+      remarks: 'Struggles with basics, requires focus sessions.',
     },
   });
 
