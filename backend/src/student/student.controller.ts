@@ -43,7 +43,13 @@ export class StudentController {
   @Post('promote')
   @Roles('INSTITUTE_ADMIN')
   async promote(@Request() req, @Body() body: { studentIds: string[]; targetClassId: string }) {
-    return this.studentService.promote(req.user.institutionId, body);
+    return this.studentService.promote(req.user.institutionId, body, req.user.id);
+  }
+
+  @Get('promotions/history')
+  @Roles('INSTITUTE_ADMIN', 'STAFF', 'TEACHER')
+  async getPromotionHistory(@Request() req) {
+    return this.studentService.getPromotionHistory(req.user.institutionId);
   }
 
   @Delete(':id')
