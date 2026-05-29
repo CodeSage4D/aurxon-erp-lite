@@ -36,6 +36,12 @@ model Institution {
   notices   Notice[]
   expenses  Expense[]
   books     Book[]
+  visitors  Visitor[]
+  inventory InventoryItem[]
+  timetable TimetableEntry[]
+  
+  branches  Branch[]
+  settings  Settings?
 }
 
 model User {
@@ -54,6 +60,9 @@ model User {
   parentProfile  Parent?
   staffProfile   Staff?
   auditLogs      AuditLog[]
+  
+  notifications       Notification[]
+  promotionsInitiated PromotionHistory[]
 }
 
 model Student {
@@ -119,6 +128,8 @@ model Student {
   class         Class       @relation(fields: [classId], references: [id])
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
   
   attendance    Attendance[]
   feeAllocations StudentFeeAllocation[]
@@ -126,6 +137,7 @@ model Student {
   documents     Document[]
   timeline      TimelineEvent[]
   bookIssues    BookIssue[]
+  promotions    PromotionHistory[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -162,6 +174,8 @@ model Staff {
   status        String      @default("ACTIVE")
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
 
   // Advanced Indian HR/Demographics fields
   aadhaarNumber String?
@@ -192,6 +206,11 @@ model Staff {
   subjects      Subject[]   // Subjects they teach
   lessonPlans   LessonPlan[]
   payrolls      Payroll[]
+  degrees          String[]
+  skills           String[]
+  certifications   String[]
+  subjectsExpertise String[]
+  timetable        TimetableEntry[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -207,9 +226,14 @@ model Class {
   classTeacher  Staff?      @relation("ClassTeacher", fields: [classTeacherId], references: [id])
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
   
   students      Student[]
   subjects      Subject[]
+  timetable     TimetableEntry[]
+  fromPromotions PromotionHistory[] @relation("FromClassPromotions")
+  toPromotions   PromotionHistory[] @relation("ToClassPromotions")
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -225,6 +249,7 @@ model Subject {
   teacher       Staff?      @relation(fields: [teacherId], references: [id])
   exams         Exam[]
   lessonPlans   LessonPlan[]
+  timetable     TimetableEntry[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -449,4 +474,109 @@ model Payroll {
   
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model Visitor {
+  id            String      @id @default(uuid())
+  name          String
+  phone         String
+  purpose       String
+  hostName      String
+  entryTime     DateTime    @default(now())
+  exitTime      DateTime?
+  passNumber    String      @unique
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model InventoryItem {
+  id            String      @id @default(uuid())
+  name          String
+  category      String
+  quantity      Int
+  unit          String      @default("PCS")
+  status        String      @default("IN_STOCK")
+  vendor        String?
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model TimetableEntry {
+  id            String      @id @default(uuid())
+  classId       String
+  class         Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId     String
+  subject       Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId     String
+  teacher       Staff       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  dayOfWeek     String      // MONDAY, TUESDAY, etc.
+  periodNumber  Int
+  startTime     String
+  endTime       String
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([classId, dayOfWeek, periodNumber])
+  @@unique([teacherId, dayOfWeek, periodNumber])
+}
+
+model Branch {
+  id            String      @id @default(uuid())
+  name          String
+  code          String?
+  address       String?
+  city          String?
+  state         String?
+  pinCode       String?
+  phone         String?
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  
+  classes       Class[]
+  students      Student[]
+  staff         Staff[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id            String      @id @default(uuid())
+  institutionId String      @unique
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  academicYear  String      @default("2026-2027")
+  gradingSystem String      @default("CBSE")
+  timezone      String      @default("Asia/Kolkata")
+  currency      String      @default("INR")
+  updatedAt     DateTime    @updatedAt
+}
+
+model PromotionHistory {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromClassId  String
+  fromClass    Class    @relation("FromClassPromotions", fields: [fromClassId], references: [id])
+  toClassId    String
+  toClass      Class    @relation("ToClassPromotions", fields: [toClassId], references: [id])
+  academicYear String
+  promotedById String
+  promotedBy   User     @relation(fields: [promotedById], references: [id])
+  promotedAt   DateTime @default(now())
 }
