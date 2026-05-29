@@ -1,4 +1,4 @@
 {
-  "buildCommand": "npm install --prefix frontend && npm run build --prefix frontend",
+  "buildCommand": "npm install --prefix frontend --production=false && npm run build --prefix frontend",
   "outputDirectory": "frontend/.next"
 }

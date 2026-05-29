@@ -2,7 +2,7 @@
   "name": "aurxon-erp-root",
   "version": "1.0.0",
   "scripts": {
-    "vercel-build": "npm install --prefix frontend && npm run build --prefix frontend"
+    "vercel-build": "npm install --prefix frontend --production=false && npm run build --prefix frontend"
   },
   "dependencies": {
     "next": "16.2.6",
