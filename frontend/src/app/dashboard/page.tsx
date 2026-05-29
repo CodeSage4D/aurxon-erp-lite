@@ -690,8 +690,6 @@ export default function DashboardPage() {
 
           {activeCategory === 'inventory' && (
             <InventoryTab 
-              inventory={inventory}
-              loadInventory={loadInventory}
               triggerToast={triggerToast}
             />
           )}
