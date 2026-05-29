@@ -51,6 +51,56 @@ export class DashboardService {
       },
     });
 
+    // Deterministic Rule: Attendance < 70% AND Exam Marks < 40%
+    const studentsWithRecords = await this.prisma.student.findMany({
+      where: { institutionId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        rollNumber: true,
+        scholarNumber: true,
+        class: { select: { name: true } },
+        attendance: { select: { status: true } },
+        examResults: {
+          select: {
+            marksObtained: true,
+            exam: { select: { maxMarks: true } },
+          },
+        },
+      },
+    });
+
+    const weakStudents: any[] = [];
+    for (const student of studentsWithRecords) {
+      const sTotalAttendance = student.attendance.length;
+      const sPresentCount = student.attendance.filter(
+        (r) => r.status === 'PRESENT' || r.status === 'LATE',
+      ).length;
+      const sAttendanceRate = sTotalAttendance > 0 ? (sPresentCount / sTotalAttendance) * 100 : 100;
+
+      let totalMaxMarks = 0;
+      let totalMarksObtained = 0;
+      for (const res of student.examResults) {
+        totalMaxMarks += res.exam.maxMarks;
+        totalMarksObtained += res.marksObtained;
+      }
+      const examPercentage = totalMaxMarks > 0 ? (totalMarksObtained / totalMaxMarks) * 100 : 100;
+
+      if (sAttendanceRate < 70 && examPercentage < 40) {
+        weakStudents.push({
+          studentId: student.id,
+          name: `${student.firstName} ${student.lastName}`,
+          scholarNumber: student.scholarNumber,
+          rollNumber: student.rollNumber,
+          className: student.class?.name || 'Unassigned',
+          attendanceRate: Math.round(sAttendanceRate * 10) / 10,
+          examAverage: Math.round(examPercentage * 10) / 10,
+          reason: 'Attendance < 70% and Marks < 40%',
+        });
+      }
+    }
+
     return {
       studentCount,
       staffCount,
@@ -68,6 +118,7 @@ export class DashboardService {
         name: c.name,
         studentCount: c._count.students,
       })),
+      weakStudents,
     };
   }
 }
