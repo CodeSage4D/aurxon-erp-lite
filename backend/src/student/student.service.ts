@@ -227,13 +227,26 @@ export class StudentService {
     });
   }
 
-  async promote(institutionId: string, data: { studentIds: string[]; targetClassId: string }) {
+  async promote(institutionId: string, data: { studentIds: string[]; targetClassId: string }, promotedById?: string) {
     return this.prisma.$transaction(async (tx) => {
       const targetClass = await tx.class.findUnique({
         where: { id: data.targetClassId },
       });
       if (!targetClass || targetClass.institutionId !== institutionId) {
         throw new BadRequestException('Target class not found');
+      }
+
+      // Fallback admin user if promotedById is missing (e.g. CLI/tests)
+      let activePromotedById = promotedById;
+      if (!activePromotedById) {
+        const fallbackAdmin = await tx.user.findFirst({
+          where: { role: 'INSTITUTE_ADMIN', institutionId },
+        });
+        activePromotedById = fallbackAdmin ? fallbackAdmin.id : undefined;
+      }
+
+      if (!activePromotedById) {
+        throw new BadRequestException('Authorized Admin User ID is required for promotion ledger archiving.');
       }
 
       const results: any[] = [];
@@ -250,6 +263,17 @@ export class StudentService {
         });
         const classDigits = targetClass.name.replace(/\D/g, '') || '0';
         const nextRoll = `${classDigits}1${String(classStudents + 1).padStart(2, '0')}`;
+
+        // Create PromotionHistory record BEFORE updating classId to preserve history
+        await tx.promotionHistory.create({
+          data: {
+            studentId,
+            fromClassId: student.classId,
+            toClassId: data.targetClassId,
+            academicYear: '2026-2027', // Default CBSE/Indian standard academic year
+            promotedById: activePromotedById,
+          },
+        });
 
         const updated = await tx.student.update({
           where: { id: studentId },
@@ -271,6 +295,21 @@ export class StudentService {
       }
 
       return { success: true, count: results.length };
+    });
+  }
+
+  async getPromotionHistory(institutionId: string) {
+    return this.prisma.promotionHistory.findMany({
+      where: {
+        student: { institutionId },
+      },
+      include: {
+        student: { select: { firstName: true, lastName: true, scholarNumber: true } },
+        fromClass: { select: { name: true } },
+        toClass: { select: { name: true } },
+        promotedBy: { select: { email: true } },
+      },
+      orderBy: { promotedAt: 'desc' },
     });
   }
 
