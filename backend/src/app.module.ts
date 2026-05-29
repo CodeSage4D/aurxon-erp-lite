@@ -14,6 +14,12 @@ import { ClassModule } from './class/class.module';
 import { LessonModule } from './lesson/lesson.module';
 import { LibraryModule } from './library/library.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { VisitorModule } from './visitor/visitor.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { TimetableModule } from './timetable/timetable.module';
+import { BranchModule } from './branch/branch.module';
+import { SettingsModule } from './settings/settings.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -30,6 +36,12 @@ import { PayrollModule } from './payroll/payroll.module';
     LessonModule,
     LibraryModule,
     PayrollModule,
+    VisitorModule,
+    InventoryModule,
+    TimetableModule,
+    BranchModule,
+    SettingsModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
