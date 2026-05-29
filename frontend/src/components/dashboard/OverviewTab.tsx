@@ -15,7 +15,7 @@ interface OverviewTabProps {
   setStudentTab: (tab: 'list' | 'admission' | 'promotions') => void;
   setAdmissionWizardStep: (step: number) => void;
   setLibrarySubTab: (tab: 'inventory' | 'checkout' | 'issues') => void;
-  setFeesTab: (tab: 'allocations' | 'history' | 'structures' | 'ledger') => void;
+  setFeesTab: (tab: 'allocations' | 'structures' | 'ledger') => void;
   setExamsTab: (tab: 'list' | 'entry') => void;
   setAcademicTab: (tab: 'timetable' | 'lessons') => void;
   setAttendanceDate: (date: string) => void;
