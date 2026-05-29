@@ -327,7 +327,7 @@ export default function FeesTab({
         </div>
       )}
 
-      {activeCategory === 'fees' && feesTab === 'ledger' && financeData && (
+      {feesTab === 'ledger' && financeData && (
         <div className="space-y-6">
           {/* Expense Form */}
           <form onSubmit={handleCreateExpenseLocal} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-150 pb-6 dark:border-zinc-800">
