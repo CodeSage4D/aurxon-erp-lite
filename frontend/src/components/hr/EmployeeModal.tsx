@@ -327,6 +327,112 @@ export default function EmployeeModal({ employeeId, onClose, onSaved }: Employee
                   className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 disabled:bg-zinc-50 dark:disabled:bg-zinc-950/20 disabled:text-zinc-500 font-medium"
                 />
               </div>
+
+              {/* Teacher Academic Credentials & Expertise */}
+              <div className="md:col-span-2 border-t border-zinc-100 dark:border-zinc-800/80 pt-4 mt-2 space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-wider text-sky-650 dark:text-sky-400">Academic Degrees & Expertise Arrays</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Degrees */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase">Degrees & Education (Comma-separated)</label>
+                    {editMode ? (
+                      <input
+                        value={Array.isArray(formData.degrees) ? formData.degrees.join(', ') : ''}
+                        onChange={e => handleInputChange('degrees', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-medium text-zinc-850 dark:text-zinc-100"
+                        placeholder="B.Sc, M.Sc, B.Ed"
+                      />
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Array.isArray(employee.degrees) && employee.degrees.length > 0 ? (
+                          employee.degrees.map((deg, idx) => (
+                            <span key={idx} className="bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-400 text-[10px] font-bold px-2.5 py-1 rounded-lg">
+                              {deg}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-zinc-450 italic">No degrees linked.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Skills */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-450 dark:text-zinc-400 uppercase">Core Skills (Comma-separated)</label>
+                    {editMode ? (
+                      <input
+                        value={Array.isArray(formData.skills) ? formData.skills.join(', ') : ''}
+                        onChange={e => handleInputChange('skills', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-medium text-zinc-850 dark:text-zinc-100"
+                        placeholder="Calculus, Creative Writing, Public Speaking"
+                      />
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Array.isArray(employee.skills) && employee.skills.length > 0 ? (
+                          employee.skills.map((skill, idx) => (
+                            <span key={idx} className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-lg">
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-zinc-450 italic">No skills added.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Certifications */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-450 dark:text-zinc-400 uppercase">Professional Certifications (Comma-separated)</label>
+                    {editMode ? (
+                      <input
+                        value={Array.isArray(formData.certifications) ? formData.certifications.join(', ') : ''}
+                        onChange={e => handleInputChange('certifications', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-medium text-zinc-850 dark:text-zinc-100"
+                        placeholder="National Board Certified Teacher, TKT Cambridge"
+                      />
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Array.isArray(employee.certifications) && employee.certifications.length > 0 ? (
+                          employee.certifications.map((cert, idx) => (
+                            <span key={idx} className="bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold px-2.5 py-1 rounded-lg">
+                              {cert}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-zinc-450 italic">No certifications listed.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Subjects Expertise */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-450 dark:text-zinc-400 uppercase">Subject Expertise (Comma-separated)</label>
+                    {editMode ? (
+                      <input
+                        value={Array.isArray(formData.subjectsExpertise) ? formData.subjectsExpertise.join(', ') : ''}
+                        onChange={e => handleInputChange('subjectsExpertise', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-medium text-zinc-850 dark:text-zinc-100"
+                        placeholder="Advanced Mathematics, Biology, English Literature"
+                      />
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Array.isArray(employee.subjectsExpertise) && employee.subjectsExpertise.length > 0 ? (
+                          employee.subjectsExpertise.map((sub, idx) => (
+                            <span key={idx} className="bg-amber-100/70 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[10px] font-bold px-2.5 py-1 rounded-lg">
+                              {sub}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-zinc-450 italic">No subjects selected.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
