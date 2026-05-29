@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, Briefcase, CalendarCheck, Percent, Clock, Sparkles, ChevronRight } from 'lucide-react';
+import { Users, Briefcase, CalendarCheck, Percent, Clock, Sparkles, ChevronRight, AlertTriangle, MessageSquare } from 'lucide-react';
 
 interface OverviewTabProps {
   stats: any;
@@ -364,6 +364,71 @@ export default function OverviewTab({
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* DETERMINISTIC WEAK STUDENT ALERTS */}
+      <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-550 dark:text-red-400 animate-pulse" />
+            <h4 className="text-xs font-black uppercase tracking-wider text-zinc-850 dark:text-zinc-200">
+              CBSE Academic & Attendance Alerts (Deterministic Flags)
+            </h4>
+          </div>
+          <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">
+            {stats?.weakStudents?.length || 0} Flagged
+          </span>
+        </div>
+        
+        <p className="text-[11px] text-zinc-400 font-medium mt-2">
+          Rule: Student triggers warning if Attendance &lt; 70% AND average Exam Marks &lt; 40%.
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {!stats?.weakStudents || stats.weakStudents.length === 0 ? (
+            <div className="md:col-span-2 xl:col-span-3 text-center py-6 text-xs text-zinc-400 font-medium">
+              No students are currently flagged as weak. All attendance and academic parameters are within normal ranges.
+            </div>
+          ) : (
+            stats.weakStudents.map((ws: any) => (
+              <div 
+                key={ws.studentId} 
+                className="rounded-xl border border-red-100 bg-red-50/20 p-4 dark:border-red-950/40 dark:bg-red-950/10 hover-lift flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-100">{ws.name}</span>
+                    <span className="text-[9px] font-bold text-zinc-400">{ws.scholarNumber}</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-400 font-medium mt-1">
+                    Class: <span className="text-zinc-650 dark:text-zinc-300 font-bold">{ws.className}</span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <div className="flex-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-2 text-center">
+                      <div className="text-[9px] text-zinc-400 font-bold uppercase">Attendance</div>
+                      <div className="text-sm font-black text-red-650 dark:text-red-400 mt-0.5">{ws.attendanceRate}%</div>
+                    </div>
+                    <div className="flex-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-2 text-center">
+                      <div className="text-[9px] text-zinc-400 font-bold uppercase">Exam Avg</div>
+                      <div className="text-sm font-black text-red-650 dark:text-red-400 mt-0.5">{ws.examAverage}%</div>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    triggerToast(`Drafted parent notification for ${ws.name}. Sending circular...`);
+                    setActiveCategory('comms');
+                  }}
+                  className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 py-2 text-[10px] font-bold text-red-600 dark:text-red-400 transition"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  <span>Notify Parents</span>
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
