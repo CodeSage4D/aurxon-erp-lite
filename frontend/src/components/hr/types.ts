@@ -30,6 +30,10 @@ export interface Staff {
   };
   payrolls?: Payroll[];
   leaves?: LeaveRequest[];
+  degrees?: string[];
+  skills?: string[];
+  certifications?: string[];
+  subjectsExpertise?: string[];
 }
 
 export interface Payroll {
