@@ -76,7 +76,7 @@ export default function DashboardPage() {
   
   // Navigation & Category States
   const [activeCategory, setActiveCategory] = useState('overview');
-  const [feesTab, setFeesTab] = useState<'allocations' | 'history' | 'structures' | 'ledger'>('allocations');
+  const [feesTab, setFeesTab] = useState<'allocations' | 'structures' | 'ledger'>('allocations');
   const [examsTab, setExamsTab] = useState<'list' | 'entry'>('list');
   const [academicTab, setAcademicTab] = useState<'timetable' | 'lessons'>('timetable');
   const [studentTab, setStudentTab] = useState<'list' | 'admission' | 'promotions'>('list');
@@ -128,6 +128,7 @@ export default function DashboardPage() {
   });
   const [examForm, setExamForm] = useState({ name: '', subjectId: '', maxMarks: '100', examDate: '', examType: 'UNIT_TEST' });
   const [feeForm, setFeeForm] = useState({ name: '', amount: '', dueDate: '' });
+  const [expenseForm, setExpenseForm] = useState({ title: '', amount: '', category: 'OPERATIONAL', paymentMethod: 'CASH' });
   const [selectedExamId, setSelectedExamId] = useState('');
   const [examStudents, setExamStudents] = useState<any[]>([]);
   const [subjectsList, setSubjectsList] = useState<any[]>([]);
@@ -642,13 +643,15 @@ export default function DashboardPage() {
               feesTab={feesTab}
               setFeesTab={setFeesTab}
               financeData={financeData}
-              classes={classes}
-              students={students}
-              feeForm={feeForm}
-              setFeeForm={setFeeForm}
+              expenses={expenses}
+              expenseForm={expenseForm}
+              setExpenseForm={setExpenseForm}
+              loadExpenses={loadExpenses}
               loadFinanceOverview={loadFinanceOverview}
               loadDashboardStats={loadDashboardStats}
               triggerToast={triggerToast}
+              feeForm={feeForm}
+              setFeeForm={setFeeForm}
             />
           )}
 
@@ -656,27 +659,23 @@ export default function DashboardPage() {
             <CommsTab 
               staff={staff}
               students={students}
+              loadNotices={loadNotices}
               triggerToast={triggerToast}
             />
           )}
 
           {activeCategory === 'library' && (
             <LibraryTab 
-              students={students}
-              books={books}
-              loadBooks={loadBooks}
-              bookIssues={bookIssues}
-              loadIssues={loadIssues}
               librarySubTab={librarySubTab}
               setLibrarySubTab={setLibrarySubTab}
+              students={students}
               triggerToast={triggerToast}
             />
           )}
 
           {activeCategory === 'gate' && (
             <GateTab 
-              visitors={visitors}
-              loadVisitors={loadVisitors}
+              staff={staff}
               triggerToast={triggerToast}
             />
           )}
@@ -685,6 +684,7 @@ export default function DashboardPage() {
             <CertificatesTab 
               students={students}
               staff={staff}
+              triggerToast={triggerToast}
             />
           )}
 
