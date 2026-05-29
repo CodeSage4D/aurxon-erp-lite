@@ -504,7 +504,7 @@ export default function StudentsTab({
               <button
                 type="button"
                 disabled={admissionWizardStep === 1}
-                onClick={() => setAdmissionWizardStep(prev => Math.max(1, prev - 1))}
+                onClick={() => setAdmissionWizardStep(Math.max(1, admissionWizardStep - 1))}
                 className="rounded-xl border border-zinc-200 px-5 py-2.5 text-xs font-bold text-zinc-500 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850 disabled:opacity-50 transition"
               >
                 Previous Step
@@ -513,7 +513,7 @@ export default function StudentsTab({
               {admissionWizardStep < 6 ? (
                 <button
                   type="button"
-                  onClick={() => setAdmissionWizardStep(prev => Math.min(6, prev + 1))}
+                  onClick={() => setAdmissionWizardStep(Math.min(6, admissionWizardStep + 1))}
                   className="rounded-xl bg-sky-600 hover:bg-sky-500 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition"
                 >
                   Next Step
