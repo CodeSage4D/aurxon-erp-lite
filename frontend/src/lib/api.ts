@@ -19,8 +19,8 @@ const DEFAULT_MOCK_DB = {
   logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
   
   classes: [
-    { id: 'class-1', name: 'Grade 10-A', section: 'A', studentCount: 2, classTeacher: 'Sarah Connor' },
-    { id: 'class-2', name: 'Grade 11-A', section: 'A', studentCount: 1, classTeacher: 'John Keating' }
+    { id: 'class-1', name: 'Grade 10-A', section: 'A', studentCount: 2, classTeacher: 'Sarah Connor', classTeacherId: 'staff-1' },
+    { id: 'class-2', name: 'Grade 11-A', section: 'A', studentCount: 1, classTeacher: 'John Keating', classTeacherId: 'staff-2' }
   ],
   
   subjects: [
@@ -113,7 +113,11 @@ const DEFAULT_MOCK_DB = {
       pfNumber: 'PF-2026-904',
       esiNumber: 'ESI-302-840',
       emergencyContactName: 'John Connor',
-      emergencyContactPhone: '+1 555-0199'
+      emergencyContactPhone: '+1 555-0199',
+      degrees: ['B.Sc. Mathematics', 'M.Sc. Mathematics', 'B.Ed.'],
+      skills: ['Calculus', 'Algebra', 'Geometry'],
+      certifications: ['National Board Certified Teacher'],
+      subjectsExpertise: ['Advanced Mathematics', 'Mathematics']
     },
     {
       id: 'staff-2',
@@ -141,7 +145,11 @@ const DEFAULT_MOCK_DB = {
       pfNumber: 'PF-2026-905',
       esiNumber: 'ESI-302-841',
       emergencyContactName: 'Todd Anderson',
-      emergencyContactPhone: '+1 555-0188'
+      emergencyContactPhone: '+1 555-0188',
+      degrees: ['B.A. English', 'M.A. English Literature'],
+      skills: ['Poetry', 'Creative Writing', 'Public Speaking'],
+      certifications: ['TKT Cambridge'],
+      subjectsExpertise: ['English Literature', 'Introductory Physics']
     },
     {
       id: 'staff-3',
@@ -169,7 +177,11 @@ const DEFAULT_MOCK_DB = {
       pfNumber: 'PF-2026-906',
       esiNumber: 'ESI-302-842',
       emergencyContactName: 'Kim Kiyosaki',
-      emergencyContactPhone: '+1 555-0177'
+      emergencyContactPhone: '+1 555-0177',
+      degrees: ['B.Com', 'Chartered Accountant'],
+      skills: ['Financial Analysis', 'Auditing', 'Excel'],
+      certifications: ['ICAI Fellow'],
+      subjectsExpertise: ['Accountancy']
     }
   ],
 
@@ -262,6 +274,15 @@ const DEFAULT_MOCK_DB = {
       status: 'PAID',
       staff: { id: 'staff-2', employeeId: 'EMP002', firstName: 'John', lastName: 'Keating', designation: 'TEACHER' }
     }
+  ],
+  visitors: [
+    { id: 'vis-1', name: 'Dr. Rajesh Sharma', phone: '9876543210', purpose: 'Parent-Teacher Meeting', hostName: 'Sarah Connor', entryTime: '2026-05-28T09:15:00.000Z', exitTime: '2026-05-28T10:30:00.000Z', passNumber: 'PASS-804928-11' },
+    { id: 'vis-2', name: 'Amit Kumar', phone: '9988776655', purpose: 'Consumables Delivery', hostName: 'Robert Kiyosaki', entryTime: '2026-05-28T11:00:00.000Z', exitTime: null, passNumber: 'PASS-804928-12' }
+  ],
+  inventory: [
+    { id: 'inv-1', name: 'A4 Printing Paper Reams', category: 'STATIONERY', quantity: 25, unit: 'REAMS', status: 'IN_STOCK', vendor: 'Century Papers Ltd.' },
+    { id: 'inv-2', name: 'Wooden Classroom Chairs', category: 'FURNITURE', quantity: 4, unit: 'PCS', status: 'LOW_STOCK', vendor: 'DecoWood Furnishers' },
+    { id: 'inv-3', name: 'Digital Vernier Caliper', category: 'LAB_EQUIPMENT', quantity: 0, unit: 'PCS', status: 'OUT_OF_STOCK', vendor: 'Scientific Instruments Corp.' }
   ]
 };
 
@@ -1128,6 +1149,7 @@ export async function promoteStudentsApi(studentIds: string[], targetClassId: st
     const targetClass = db.classes.find(c => c.id === targetClassId);
     if (!targetClass) throw new Error('Target class not found');
     
+    if (!(db as any).promotions) (db as any).promotions = [];
     let count = 0;
     db.students = db.students.map((student) => {
       if (studentIds.includes(student.id)) {
@@ -1141,6 +1163,16 @@ export async function promoteStudentsApi(studentIds: string[], targetClassId: st
           type: 'PROMOTION',
           description: `Promoted automatically to ${targetClass.name} under Roll No. ${nextRoll}.`,
           eventDate: new Date().toISOString()
+        });
+
+        (db as any).promotions.push({
+          id: `prom-${Date.now()}-${student.id}`,
+          student: { firstName: student.firstName, lastName: student.lastName, scholarNumber: student.scholarNumber || 'SCH' },
+          fromClass: { name: student.class?.name || 'Previous Grade' },
+          toClass: { name: targetClass.name },
+          academicYear: '2026-2027',
+          promotedAt: new Date().toISOString(),
+          promotedBy: { email: 'admin@aurxon.com' }
         });
         
         return {
@@ -1593,6 +1625,10 @@ export async function updateStaffApi(id: string, data: any) {
       ...data,
       salary: data.salary !== undefined ? parseFloat(data.salary) : db.staff[idx].salary,
       experience: data.experience !== undefined ? parseInt(data.experience) : db.staff[idx].experience,
+      degrees: data.degrees !== undefined ? data.degrees : db.staff[idx].degrees || [],
+      skills: data.skills !== undefined ? data.skills : db.staff[idx].skills || [],
+      certifications: data.certifications !== undefined ? data.certifications : db.staff[idx].certifications || [],
+      subjectsExpertise: data.subjectsExpertise !== undefined ? data.subjectsExpertise : db.staff[idx].subjectsExpertise || [],
     };
     saveMockDb(db);
     return db.staff[idx];
@@ -1720,4 +1756,525 @@ export async function updatePayrollStatusApi(id: string, status: string) {
     return db.payrolls[idx];
   }
 }
+
+// 16. Visitor Gate Desk APIs
+export async function getVisitorsApi() {
+  try {
+    const res = await fetch(`${API_URL}/visitors`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.visitors || [];
+  }
+}
+
+export async function createVisitorApi(data: { name: string; phone: string; purpose: string; hostName: string }) {
+  try {
+    const res = await fetch(`${API_URL}/visitors`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.visitors) db.visitors = [];
+    const newVisitor = {
+      id: `vis-${Date.now()}`,
+      name: data.name,
+      phone: data.phone,
+      purpose: data.purpose,
+      hostName: data.hostName,
+      entryTime: new Date().toISOString(),
+      exitTime: null,
+      passNumber: `PASS-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`,
+    };
+    db.visitors.unshift(newVisitor);
+    saveMockDb(db);
+    return newVisitor;
+  }
+}
+
+export async function checkoutVisitorApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/visitors/${id}/checkout`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.visitors) db.visitors = [];
+    const idx = db.visitors.findIndex((v: any) => v.id === id);
+    if (idx !== -1) {
+      db.visitors[idx].exitTime = new Date().toISOString();
+    }
+    saveMockDb(db);
+    return db.visitors[idx];
+  }
+}
+
+// 17. Inventory APIs
+export async function getInventoryApi() {
+  try {
+    const res = await fetch(`${API_URL}/inventory`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.inventory || [];
+  }
+}
+
+export async function createInventoryItemApi(data: { name: string; category: string; quantity: number; unit: string; vendor?: string }) {
+  try {
+    const res = await fetch(`${API_URL}/inventory`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.inventory) db.inventory = [];
+    const qty = parseInt(data.quantity as any) || 0;
+    const status = qty <= 0 ? 'OUT_OF_STOCK' : qty <= 5 ? 'LOW_STOCK' : 'IN_STOCK';
+    const newItem = {
+      id: `inv-${Date.now()}`,
+      name: data.name,
+      category: data.category,
+      quantity: qty,
+      unit: data.unit || 'PCS',
+      status,
+      vendor: data.vendor || null,
+    };
+    db.inventory.unshift(newItem);
+    saveMockDb(db);
+    return newItem;
+  }
+}
+
+export async function updateInventoryItemApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/inventory/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.inventory) db.inventory = [];
+    const idx = db.inventory.findIndex((item: any) => item.id === id);
+    if (idx !== -1) {
+      const item = db.inventory[idx];
+      const qty = data.quantity !== undefined ? parseInt(data.quantity) : item.quantity;
+      const status = qty <= 0 ? 'OUT_OF_STOCK' : qty <= 5 ? 'LOW_STOCK' : 'IN_STOCK';
+      db.inventory[idx] = {
+        ...item,
+        name: data.name !== undefined ? data.name : item.name,
+        category: data.category !== undefined ? data.category : item.category,
+        quantity: qty,
+        unit: data.unit !== undefined ? data.unit : item.unit,
+        status,
+        vendor: data.vendor !== undefined ? data.vendor : item.vendor,
+      };
+    }
+     saveMockDb(db);
+    return db.inventory[idx];
+  }
+}
+
+export async function deleteInventoryItemApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/inventory/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.inventory) {
+      db.inventory = db.inventory.filter((item: any) => item.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// 18. Timetable APIs
+export async function getTimetableApi(classId: string) {
+  try {
+    const res = await fetch(`${API_URL}/timetable/${classId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const entries = (db.timetable || []).filter((e: any) => e.classId === classId);
+    return entries.map((e: any) => {
+      const subject = db.subjects.find((s: any) => s.id === e.subjectId) || { id: e.subjectId, name: 'Subject', code: 'SUB' };
+      const teacher = db.staff.find((t: any) => t.id === e.teacherId) || { id: e.teacherId, firstName: 'Teacher', lastName: '' };
+      return {
+        ...e,
+        subject,
+        teacher
+      };
+    });
+  }
+}
+
+export async function generateTimetableApi(classId: string, periodsPerDay: number, durationMin: number, startTime: string) {
+  try {
+    const res = await fetch(`${API_URL}/timetable/${classId}/generate`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ periodsPerDay, durationMin, startTime }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'API failed');
+    }
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Backend timetable generator offline, using mock client-side scheduler...');
+    const db = getMockDb();
+    const subjects = db.subjects.filter((s: any) => s.classId === classId);
+    if (subjects.length === 0) {
+      throw new Error('This class has no subjects registered. Please add subjects first.');
+    }
+
+    const teachers = db.staff || [];
+    const otherEntries = (db.timetable || []).filter((e: any) => e.classId !== classId);
+
+    const busyMap: { [day: string]: { [period: number]: Set<string> } } = {};
+    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+
+    days.forEach(day => {
+      busyMap[day] = {};
+      for (let p = 1; p <= periodsPerDay; p++) {
+        busyMap[day][p] = new Set<string>();
+      }
+    });
+
+    otherEntries.forEach((entry: any) => {
+      if (busyMap[entry.dayOfWeek] && busyMap[entry.dayOfWeek][entry.periodNumber]) {
+        busyMap[entry.dayOfWeek][entry.periodNumber].add(entry.teacherId);
+      }
+    });
+
+    const addMinutes = (timeStr: string, mins: number) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      const totalMins = h * 60 + m + mins;
+      const newH = Math.floor(totalMins / 60) % 24;
+      const newM = totalMins % 60;
+      return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+    };
+
+    const isExpert = (teacher: any, subjectName: string) => {
+      const expArray = teacher.subjectsExpertise || [];
+      return expArray.some((exp: string) => 
+        exp.toLowerCase().includes(subjectName.toLowerCase()) || 
+        subjectName.toLowerCase().includes(exp.toLowerCase())
+      );
+    };
+
+    const generatedEntries: any[] = [];
+
+    for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+      const day = days[dayIndex];
+
+      for (let p = 1; p <= periodsPerDay; p++) {
+        const pStartTime = addMinutes(startTime, (p - 1) * durationMin);
+        const pEndTime = addMinutes(pStartTime, durationMin);
+
+        const subjectIndex = (dayIndex * periodsPerDay + (p - 1)) % subjects.length;
+        let selectedSubject = subjects[subjectIndex];
+        
+        let teacherMatch = teachers.find(t => 
+          selectedSubject.teacher && 
+          t.firstName === selectedSubject.teacher.firstName && 
+          t.lastName === selectedSubject.teacher.lastName
+        );
+        let assignedTeacherId = teacherMatch ? teacherMatch.id : (teachers[0]?.id || 'staff-1');
+        let assignedTeacher = teachers.find(t => t.id === assignedTeacherId);
+
+        const isBusy = assignedTeacherId ? busyMap[day][p].has(assignedTeacherId) : true;
+
+        if (isBusy || !assignedTeacherId) {
+          let backupTeacher = teachers.find(t => 
+            t.id !== assignedTeacherId && 
+            !busyMap[day][p].has(t.id) && 
+            isExpert(t, selectedSubject.name)
+          );
+
+          if (backupTeacher) {
+            assignedTeacherId = backupTeacher.id;
+            assignedTeacher = backupTeacher;
+          } else {
+            let selfStudySubject = db.subjects.find((s: any) => s.classId === classId && s.name.toLowerCase() === 'self study');
+            if (!selfStudySubject) {
+              selfStudySubject = {
+                id: 'SELF-STUDY-TEMP',
+                name: 'Self Study',
+                code: 'SELF-STUDY',
+                classId,
+                class: { name: 'Self Study' },
+                teacher: { firstName: 'Supervisor', lastName: '' }
+              };
+            }
+            selectedSubject = selfStudySubject;
+
+            const freeTeacher = teachers.find(t => !busyMap[day][p].has(t.id));
+            if (freeTeacher) {
+              assignedTeacherId = freeTeacher.id;
+              assignedTeacher = freeTeacher;
+            } else {
+              assignedTeacher = teachers[0];
+              assignedTeacherId = teachers[0]?.id || 'staff-1';
+            }
+          }
+        }
+
+        if (assignedTeacherId) {
+          busyMap[day][p].add(assignedTeacherId);
+        }
+
+        generatedEntries.push({
+          dayOfWeek: day,
+          periodNumber: p,
+          startTime: pStartTime,
+          endTime: pEndTime,
+          subjectId: selectedSubject.id,
+          subject: {
+            id: selectedSubject.id,
+            name: selectedSubject.name,
+            code: selectedSubject.code,
+          },
+          teacherId: assignedTeacherId,
+          teacher: {
+            id: assignedTeacher?.id || '',
+            firstName: assignedTeacher?.firstName || '',
+            lastName: assignedTeacher?.lastName || '',
+          }
+        });
+      }
+    }
+
+    return generatedEntries;
+  }
+}
+
+export async function saveTimetableApi(classId: string, entries: any[]) {
+  try {
+    const res = await fetch(`${API_URL}/timetable/${classId}/save`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ entries }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'API failed');
+    }
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Backend save timetable offline, falling back to mock storage...');
+    const db = getMockDb();
+    
+    for (const entry of entries) {
+      const conflict = (db.timetable || []).find((e: any) => 
+        e.classId !== classId && 
+        e.dayOfWeek === entry.dayOfWeek && 
+        e.periodNumber === parseInt(entry.periodNumber) && 
+        e.teacherId === entry.teacherId
+      );
+      if (conflict) {
+        const busyTeacher = db.staff.find((t: any) => t.id === entry.teacherId);
+        const conflictClass = db.classes.find((c: any) => c.id === conflict.classId);
+        throw new Error(
+          `Conflict: Teacher ${busyTeacher?.firstName || 'Teacher'} is already assigned to ${conflictClass?.name || 'another class'} on ${entry.dayOfWeek} Period ${entry.periodNumber}`
+        );
+      }
+    }
+
+    if (!db.timetable) db.timetable = [];
+    db.timetable = db.timetable.filter((e: any) => e.classId !== classId);
+    
+    entries.forEach((entry: any) => {
+      let finalSubjectId = entry.subjectId;
+      if (entry.subjectId === 'SELF-STUDY-TEMP') {
+        let selfStudy = db.subjects.find((s: any) => s.classId === classId && s.name === 'Self Study');
+        if (!selfStudy) {
+          selfStudy = {
+            id: `subj-self-study-${Date.now()}`,
+            name: 'Self Study',
+            code: 'SELF-STUDY',
+            classId,
+            class: db.classes.find((c: any) => c.id === classId) || { name: 'Class' },
+            teacher: { firstName: entry.teacher.firstName, lastName: entry.teacher.lastName }
+          };
+          db.subjects.push(selfStudy);
+        }
+        finalSubjectId = selfStudy.id;
+      }
+
+      db.timetable.push({
+        id: `t-entry-${Date.now()}-${Math.random()}`,
+        classId,
+        subjectId: finalSubjectId,
+        teacherId: entry.teacherId,
+        dayOfWeek: entry.dayOfWeek,
+        periodNumber: parseInt(entry.periodNumber),
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+      });
+    });
+    
+    saveMockDb(db);
+    return { success: true };
+  }
+}
+
+// ==========================================
+// NEW MODULES — BRANCHES, SETTINGS, NOTIFICATIONS, PROMOTIONS
+// ==========================================
+
+export async function getBranchesApi() {
+  try {
+    const res = await fetch(`${API_URL}/branches`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).branches) {
+      (db as any).branches = [
+        { id: 'branch-1', name: 'Delhi Public School Dwarka Campus', code: 'DPS-DWK', address: 'Sector 4, Dwarka', city: 'New Delhi', state: 'Delhi', pinCode: '110078', phone: '+91 11 25074472' }
+      ];
+      saveMockDb(db);
+    }
+    return (db as any).branches;
+  }
+}
+
+export async function createBranchApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/branches`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).branches) (db as any).branches = [];
+    const newBranch = {
+      id: `branch-${Date.now()}`,
+      name: data.name,
+      code: data.code || null,
+      address: data.address || null,
+      city: data.city || null,
+      state: data.state || null,
+      pinCode: data.pinCode || null,
+      phone: data.phone || null,
+    };
+    (db as any).branches.push(newBranch);
+    saveMockDb(db);
+    return newBranch;
+  }
+}
+
+export async function getSettingsApi() {
+  try {
+    const res = await fetch(`${API_URL}/settings`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).settings) {
+      (db as any).settings = {
+        academicYear: '2026-2027',
+        gradingSystem: 'CBSE',
+        timezone: 'Asia/Kolkata',
+        currency: 'INR',
+      };
+      saveMockDb(db);
+    }
+    return (db as any).settings;
+  }
+}
+
+export async function updateSettingsApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/settings`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    (db as any).settings = {
+      ...(db as any).settings,
+      ...data,
+    };
+    saveMockDb(db);
+    return (db as any).settings;
+  }
+}
+
+export async function getNotificationsApi() {
+  try {
+    const res = await fetch(`${API_URL}/notifications`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).notifications) {
+      (db as any).notifications = [
+        { id: 'notif-1', title: 'Welcome to AURXON ERP Lite', content: 'Your school management platform is ready. Dwarka main branch registered successfully.', isRead: false, createdAt: new Date().toISOString() }
+      ];
+      saveMockDb(db);
+    }
+    return (db as any).notifications;
+  }
+}
+
+export async function markNotificationsReadApi() {
+  try {
+    const res = await fetch(`${API_URL}/notifications/read-all`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if ((db as any).notifications) {
+      (db as any).notifications = (db as any).notifications.map((n: any) => ({ ...n, isRead: true }));
+      saveMockDb(db);
+    }
+    return { success: true };
+  }
+}
+
+
+export async function getPromotionHistoryApi() {
+  try {
+    const res = await fetch(`${API_URL}/students/promotions/history`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return (db as any).promotions || [];
+  }
+}
+
+
 
