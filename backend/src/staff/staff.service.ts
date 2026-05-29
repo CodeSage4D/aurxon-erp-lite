@@ -66,6 +66,10 @@ export class StaffService {
           esiNumber: data.esiNumber || null,
           emergencyContactName: data.emergencyContactName || null,
           emergencyContactPhone: data.emergencyContactPhone || null,
+          degrees: data.degrees || [],
+          skills: data.skills || [],
+          certifications: data.certifications || [],
+          subjectsExpertise: data.subjectsExpertise || [],
         },
       });
     });
@@ -121,6 +125,10 @@ export class StaffService {
         esiNumber: data.esiNumber !== undefined ? data.esiNumber : staff.esiNumber,
         emergencyContactName: data.emergencyContactName !== undefined ? data.emergencyContactName : staff.emergencyContactName,
         emergencyContactPhone: data.emergencyContactPhone !== undefined ? data.emergencyContactPhone : staff.emergencyContactPhone,
+        degrees: data.degrees !== undefined ? data.degrees : staff.degrees,
+        skills: data.skills !== undefined ? data.skills : staff.skills,
+        certifications: data.certifications !== undefined ? data.certifications : staff.certifications,
+        subjectsExpertise: data.subjectsExpertise !== undefined ? data.subjectsExpertise : staff.subjectsExpertise,
       },
     });
   }
