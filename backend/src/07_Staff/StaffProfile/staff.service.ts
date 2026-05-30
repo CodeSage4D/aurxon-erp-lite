@@ -1,26 +1,50 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../01_Core/prisma/prisma.service';
+import { encrypt, decrypt, maskSensitiveData } from '../../common/helpers/encryption.helper';
 
 @Injectable()
 export class StaffService {
   constructor(private prisma: PrismaService) {}
 
-  async getStaff(institutionId: string, designation?: string) {
+  private processSensitiveFields(staff: any, role?: string) {
+    if (!staff) return null;
+    
+    const decryptedAadhaar = decrypt(staff.aadhaarNumber);
+    const decryptedPan = decrypt(staff.panNumber);
+    const decryptedAcc = decrypt(staff.accNumber);
+    const decryptedIfsc = decrypt(staff.ifscCode);
+    const decryptedAddress = decrypt(staff.permanentAddress);
+
+    const isAdmin = ['SUPER_ADMIN', 'INSTITUTE_ADMIN', 'HR_MANAGER'].includes(role || '');
+
+    return {
+      ...staff,
+      aadhaarNumber: isAdmin ? decryptedAadhaar : (decryptedAadhaar ? maskSensitiveData(decryptedAadhaar, 4) : null),
+      panNumber: isAdmin ? decryptedPan : (decryptedPan ? maskSensitiveData(decryptedPan, 4) : null),
+      accNumber: isAdmin ? decryptedAcc : (decryptedAcc ? maskSensitiveData(decryptedAcc, 4) : null),
+      ifscCode: isAdmin ? decryptedIfsc : (decryptedIfsc ? maskSensitiveData(decryptedIfsc, 4) : null),
+      permanentAddress: isAdmin ? decryptedAddress : (decryptedAddress ? 'Masked for Privacy' : null),
+    };
+  }
+
+  async getStaff(institutionId: string, designation?: string, role?: string) {
     const where: any = { institutionId };
     if (designation) {
       where.designation = designation;
     }
 
-    return this.prisma.staff.findMany({
+    const staffList = await this.prisma.staff.findMany({
       where,
       include: {
         user: { select: { email: true, isActive: true } },
       },
       orderBy: { employeeId: 'asc' },
     });
+
+    return staffList.map(staff => this.processSensitiveFields(staff, role));
   }
 
-  async createStaff(institutionId: string, data: any) {
+  async createStaff(institutionId: string, data: any, role?: string) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: data.email },
     });
@@ -28,7 +52,7 @@ export class StaffService {
       throw new BadRequestException('Email already registered');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const createdStaff = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           email: data.email,
@@ -50,18 +74,18 @@ export class StaffService {
           salary: parseFloat(data.salary || 0),
           institutionId,
           
-          aadhaarNumber: data.aadhaarNumber || null,
-          panNumber: data.panNumber || null,
+          aadhaarNumber: encrypt(data.aadhaarNumber) || null,
+          panNumber: encrypt(data.panNumber) || null,
           qualification: data.qualification || null,
           experience: data.experience !== undefined ? parseInt(data.experience) : null,
           gender: data.gender || null,
           bloodGroup: data.bloodGroup || null,
           fatherSpouseName: data.fatherSpouseName || null,
-          permanentAddress: data.permanentAddress || null,
+          permanentAddress: encrypt(data.permanentAddress) || null,
           bankName: data.bankName || null,
           bankBranch: data.bankBranch || null,
-          accNumber: data.accNumber || null,
-          ifscCode: data.ifscCode || null,
+          accNumber: encrypt(data.accNumber) || null,
+          ifscCode: encrypt(data.ifscCode) || null,
           pfNumber: data.pfNumber || null,
           esiNumber: data.esiNumber || null,
           emergencyContactName: data.emergencyContactName || null,
@@ -73,9 +97,11 @@ export class StaffService {
         },
       });
     });
+
+    return this.processSensitiveFields(createdStaff, role || 'SUPER_ADMIN');
   }
 
-  async getStaffById(institutionId: string, id: string) {
+  async getStaffById(institutionId: string, id: string, role?: string) {
     const staff = await this.prisma.staff.findFirst({
       where: { id, institutionId },
       include: {
@@ -87,10 +113,10 @@ export class StaffService {
     if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
-    return staff;
+    return this.processSensitiveFields(staff, role);
   }
 
-  async updateStaff(institutionId: string, id: string, data: any) {
+  async updateStaff(institutionId: string, id: string, data: any, role?: string) {
     const staff = await this.prisma.staff.findFirst({
       where: { id, institutionId },
     });
@@ -98,7 +124,7 @@ export class StaffService {
       throw new NotFoundException('Staff member not found');
     }
 
-    return this.prisma.staff.update({
+    const updatedStaff = await this.prisma.staff.update({
       where: { id },
       data: {
         firstName: data.firstName !== undefined ? data.firstName : staff.firstName,
@@ -109,18 +135,18 @@ export class StaffService {
         salary: data.salary !== undefined ? parseFloat(data.salary) : staff.salary,
         status: data.status !== undefined ? data.status : staff.status,
         
-        aadhaarNumber: data.aadhaarNumber !== undefined ? data.aadhaarNumber : staff.aadhaarNumber,
-        panNumber: data.panNumber !== undefined ? data.panNumber : staff.panNumber,
+        aadhaarNumber: data.aadhaarNumber !== undefined ? (encrypt(data.aadhaarNumber) || null) : staff.aadhaarNumber,
+        panNumber: data.panNumber !== undefined ? (encrypt(data.panNumber) || null) : staff.panNumber,
         qualification: data.qualification !== undefined ? data.qualification : staff.qualification,
         experience: data.experience !== undefined ? (data.experience ? parseInt(data.experience) : null) : staff.experience,
         gender: data.gender !== undefined ? data.gender : staff.gender,
         bloodGroup: data.bloodGroup !== undefined ? data.bloodGroup : staff.bloodGroup,
         fatherSpouseName: data.fatherSpouseName !== undefined ? data.fatherSpouseName : staff.fatherSpouseName,
-        permanentAddress: data.permanentAddress !== undefined ? data.permanentAddress : staff.permanentAddress,
+        permanentAddress: data.permanentAddress !== undefined ? (encrypt(data.permanentAddress) || null) : staff.permanentAddress,
         bankName: data.bankName !== undefined ? data.bankName : staff.bankName,
         bankBranch: data.bankBranch !== undefined ? data.bankBranch : staff.bankBranch,
-        accNumber: data.accNumber !== undefined ? data.accNumber : staff.accNumber,
-        ifscCode: data.ifscCode !== undefined ? data.ifscCode : staff.ifscCode,
+        accNumber: data.accNumber !== undefined ? (encrypt(data.accNumber) || null) : staff.accNumber,
+        ifscCode: data.ifscCode !== undefined ? (encrypt(data.ifscCode) || null) : staff.ifscCode,
         pfNumber: data.pfNumber !== undefined ? data.pfNumber : staff.pfNumber,
         esiNumber: data.esiNumber !== undefined ? data.esiNumber : staff.esiNumber,
         emergencyContactName: data.emergencyContactName !== undefined ? data.emergencyContactName : staff.emergencyContactName,
@@ -131,6 +157,8 @@ export class StaffService {
         subjectsExpertise: data.subjectsExpertise !== undefined ? data.subjectsExpertise : staff.subjectsExpertise,
       },
     });
+
+    return this.processSensitiveFields(updatedStaff, role || 'SUPER_ADMIN');
   }
 
   async getLeaves(institutionId: string, staffId?: string) {
