@@ -427,19 +427,37 @@ export default function DashboardPage() {
         setActiveCategory={setActiveCategory}
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
+        mobileSidebarOpen={mobileSidebarOpen}
+        setMobileSidebarOpen={setMobileSidebarOpen}
         notifications={notifications}
         setNotificationsOpen={setNotificationsOpen}
         handleLogout={handleLogout}
       />
 
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-20 bg-zinc-950/40 backdrop-blur-sm md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* DYNAMIC CONTENT MAIN AREA */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${
+        sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
+      }`}>
         
         {/* HEADER */}
         <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6 dark:border-zinc-800/80 dark:bg-zinc-900/40 shrink-0">
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  setMobileSidebarOpen(!mobileSidebarOpen);
+                } else {
+                  setSidebarCollapsed(!sidebarCollapsed);
+                }
+              }} 
               className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
             >
               <Menu className="h-5 w-5" />

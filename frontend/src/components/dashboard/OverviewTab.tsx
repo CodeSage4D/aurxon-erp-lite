@@ -293,37 +293,54 @@ export default function OverviewTab({
       
       {/* Header metrics strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 hover-lift">
+        <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50/20 p-5 shadow-sm dark:border-sky-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-sky-950/5 hover-lift transition-all duration-300">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Students</span>
-            <Users className="h-4 w-4 text-sky-500" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Students</span>
+            <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/30">
+              <Users className="h-4 w-4 text-sky-500 dark:text-sky-400" />
+            </div>
           </div>
-          <h3 className="mt-2 text-2xl font-black text-zinc-800 dark:text-zinc-100">{students.length}</h3>
-          <p className="mt-1 text-[10px] font-medium text-emerald-500">+2 new admissions today</p>
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{students.length}</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>+2 new admissions today</span>
+          </p>
         </div>
-        <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 hover-lift">
+
+        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/20 p-5 shadow-sm dark:border-emerald-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-emerald-950/5 hover-lift transition-all duration-300">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Staff Roster</span>
-            <Briefcase className="h-4 w-4 text-emerald-500" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Staff Roster</span>
+            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30">
+              <Briefcase className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+            </div>
           </div>
-          <h3 className="mt-2 text-2xl font-black text-zinc-800 dark:text-zinc-100">{staff.length}</h3>
-          <p className="mt-1 text-[10px] font-medium text-zinc-400">3 designation tiers</p>
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{staff.length}</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-zinc-450 dark:text-zinc-500">3 designation tiers active</p>
         </div>
-        <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 hover-lift">
+
+        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/20 p-5 shadow-sm dark:border-indigo-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-indigo-950/5 hover-lift transition-all duration-300">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Attendance Rate</span>
-            <CalendarCheck className="h-4 w-4 text-indigo-500" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Attendance Rate</span>
+            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
+              <CalendarCheck className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+            </div>
           </div>
-          <h3 className="mt-2 text-2xl font-black text-zinc-800 dark:text-zinc-100">{stats?.attendanceRate || 95.8}%</h3>
-          <p className="mt-1 text-[10px] font-medium text-emerald-500">Live RFID syncing active</p>
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{stats?.attendanceRate || 95.8}%</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Live RFID syncing active</span>
+          </p>
         </div>
-        <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60 hover-lift">
+
+        <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/20 p-5 shadow-sm dark:border-rose-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-rose-950/5 hover-lift transition-all duration-300">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Fee Collections</span>
-            <Percent className="h-4 w-4 text-sky-500" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Fee Collections</span>
+            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/30">
+              <Percent className="h-4 w-4 text-rose-500 dark:text-rose-400" />
+            </div>
           </div>
-          <h3 className="mt-2 text-2xl font-black text-zinc-800 dark:text-zinc-100">{stats?.feeOverview?.collectionRate || 85}%</h3>
-          <p className="mt-1 text-[10px] font-medium text-sky-600 dark:text-sky-400">₹{stats?.feeOverview?.totalPaid || 0} collected</p>
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{stats?.feeOverview?.collectionRate || 85}%</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">₹{stats?.feeOverview?.totalPaid || 0} collected</p>
         </div>
       </div>
 
@@ -331,33 +348,36 @@ export default function OverviewTab({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* RFID Biometric scans stream */}
-        <div className="lg:col-span-2 rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
-          <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+        <div className="lg:col-span-2 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
+          <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-              <h4 className="text-xs font-black uppercase tracking-wider text-zinc-450">Biometric / RFID Scan Logger (Simulated)</h4>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Biometric / RFID Scan Logger (Simulated)</h4>
             </div>
-            <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-600 dark:text-sky-400">Live feed</span>
+            <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[9px] font-extrabold text-sky-600 dark:text-sky-400 tracking-wider uppercase">Live Feed</span>
           </div>
-          <div className="mt-4 space-y-3 max-h-80 overflow-y-auto pr-1">
+          <div className="mt-4 space-y-2.5 max-h-80 overflow-y-auto pr-1">
             {rfidLogs.map((log, idx) => (
-              <div key={idx} className="flex items-start gap-3 rounded-xl bg-zinc-50/60 p-3 text-xs dark:bg-zinc-950/20 border border-zinc-100 dark:border-zinc-800/40 animate-slide-in">
-                <Clock className="mt-0.5 h-3.5 w-3.5 text-zinc-400 shrink-0" />
-                <p className="text-zinc-650 dark:text-zinc-300 font-medium leading-relaxed">{log}</p>
+              <div key={idx} className="flex items-start gap-3 rounded-xl bg-zinc-50/50 p-3.5 text-xs font-mono dark:bg-zinc-950/20 border border-zinc-150/40 dark:border-zinc-800/40 transition hover:bg-zinc-100/30 dark:hover:bg-zinc-950/40">
+                <Clock className="mt-0.5 h-3.5 w-3.5 text-zinc-450 shrink-0" />
+                <p className="text-zinc-650 dark:text-zinc-300 leading-relaxed">{log}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Circular alert board */}
-        <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
-          <h4 className="text-xs font-black uppercase tracking-wider text-zinc-450 border-b border-zinc-100 pb-3 dark:border-zinc-800">Circular Announcements</h4>
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 pb-4 dark:border-zinc-800">Circular Announcements</h4>
           <div className="mt-4 space-y-4 max-h-80 overflow-y-auto">
             {notices.map((notice) => (
-              <div key={notice.id} className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 dark:border-zinc-800/50 dark:bg-zinc-950/25">
-                <h5 className="font-bold text-xs dark:text-white">{notice.title}</h5>
-                <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed">{notice.content}</p>
-                <div className="mt-3 flex justify-between items-center text-[10px] text-zinc-450 font-medium border-t border-zinc-100/50 pt-2 dark:border-zinc-800/50">
+              <div key={notice.id} className="rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 dark:border-zinc-800/50 dark:bg-zinc-950/25 transition hover:bg-zinc-100/20 dark:hover:bg-zinc-950/40">
+                <h5 className="font-bold text-xs dark:text-white leading-snug">{notice.title}</h5>
+                <p className="mt-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed">{notice.content}</p>
+                <div className="mt-3 flex justify-between items-center text-[10px] text-zinc-450 font-semibold border-t border-zinc-100/50 pt-2 dark:border-zinc-800/50">
                   <span>By: {notice.authorName}</span>
                   <span>{new Date(notice.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -368,50 +388,56 @@ export default function OverviewTab({
       </div>
 
       {/* DETERMINISTIC WEAK STUDENT ALERTS */}
-      <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm dark:border-zinc-800/50 dark:bg-zinc-900/60">
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-550 dark:text-red-400 animate-pulse" />
-            <h4 className="text-xs font-black uppercase tracking-wider text-zinc-850 dark:text-zinc-200">
+      <div className="rounded-2xl border border-red-100 bg-gradient-to-b from-white to-red-50/5 p-6 shadow-sm dark:border-red-950/30 dark:from-zinc-900/60 dark:to-red-950/5">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-3.5 w-3.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500 flex items-center justify-center">
+                <AlertTriangle className="h-2 w-2 text-white" />
+              </span>
+            </span>
+            <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
               CBSE Academic & Attendance Alerts (Deterministic Flags)
             </h4>
           </div>
-          <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">
+          <span className="rounded-full bg-red-500/10 px-3 py-1 text-[10px] font-black text-red-650 dark:text-red-400 uppercase tracking-wider">
             {stats?.weakStudents?.length || 0} Flagged
           </span>
         </div>
         
-        <p className="text-[11px] text-zinc-400 font-medium mt-2">
-          Rule: Student triggers warning if Attendance &lt; 70% AND average Exam Marks &lt; 40%.
+        <p className="text-[11px] text-zinc-400 font-semibold mt-2.5 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+          <span>Alert Rule: Scholar attendance drops &lt; 70% AND average exam assessment scores &lt; 40%.</span>
         </p>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {!stats?.weakStudents || stats.weakStudents.length === 0 ? (
-            <div className="md:col-span-2 xl:col-span-3 text-center py-6 text-xs text-zinc-400 font-medium">
+            <div className="md:col-span-2 xl:col-span-3 text-center py-8 text-xs text-zinc-400 font-semibold bg-zinc-50/50 dark:bg-zinc-950/10 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
               No students are currently flagged as weak. All attendance and academic parameters are within normal ranges.
             </div>
           ) : (
             stats.weakStudents.map((ws: any) => (
               <div 
                 key={ws.studentId} 
-                className="rounded-xl border border-red-100 bg-red-50/20 p-4 dark:border-red-950/40 dark:bg-red-950/10 hover-lift flex flex-col justify-between"
+                className="rounded-xl border border-red-100/50 bg-red-50/10 p-4 dark:border-red-950/20 dark:bg-red-950/5 hover-lift flex flex-col justify-between transition-all duration-300 hover:border-red-200 dark:hover:border-red-900"
               >
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-zinc-800 dark:text-zinc-100">{ws.name}</span>
                     <span className="text-[9px] font-bold text-zinc-400">{ws.scholarNumber}</span>
                   </div>
-                  <div className="text-[10px] text-zinc-400 font-medium mt-1">
-                    Class: <span className="text-zinc-650 dark:text-zinc-300 font-bold">{ws.className}</span>
+                  <div className="text-[10px] text-zinc-450 font-semibold mt-1.5">
+                    Class: <span className="text-zinc-650 dark:text-zinc-300 font-extrabold">{ws.className}</span>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <div className="flex-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-2 text-center">
-                      <div className="text-[9px] text-zinc-400 font-bold uppercase">Attendance</div>
-                      <div className="text-sm font-black text-red-650 dark:text-red-400 mt-0.5">{ws.attendanceRate}%</div>
+                  <div className="mt-4 flex gap-2">
+                    <div className="flex-1 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 p-2.5 text-center">
+                      <div className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Attendance</div>
+                      <div className="text-base font-black text-red-650 dark:text-red-400 mt-1">{ws.attendanceRate}%</div>
                     </div>
-                    <div className="flex-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-2 text-center">
-                      <div className="text-[9px] text-zinc-400 font-bold uppercase">Exam Avg</div>
-                      <div className="text-sm font-black text-red-650 dark:text-red-400 mt-0.5">{ws.examAverage}%</div>
+                    <div className="flex-1 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 p-2.5 text-center">
+                      <div className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Exam Avg</div>
+                      <div className="text-base font-black text-red-650 dark:text-red-400 mt-1">{ws.examAverage}%</div>
                     </div>
                   </div>
                 </div>
@@ -421,9 +447,9 @@ export default function OverviewTab({
                     triggerToast(`Drafted parent notification for ${ws.name}. Sending circular...`);
                     setActiveCategory('comms');
                   }}
-                  className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 py-2 text-[10px] font-bold text-red-600 dark:text-red-400 transition"
+                  className="mt-4 flex items-center justify-center gap-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 py-2.5 text-[10px] font-bold text-red-600 dark:text-red-450 transition"
                 >
-                  <MessageSquare className="h-3 w-3" />
+                  <MessageSquare className="h-3.5 w-3.5" />
                   <span>Notify Parents</span>
                 </button>
               </div>
