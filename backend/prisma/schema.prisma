@@ -152,6 +152,8 @@ model Student {
   updatedAt     DateTime    @updatedAt
 
   @@index([scholarNumber])
+  @@index([institutionId, classId])
+  @@index([institutionId, parentId])
 }
 
 model Parent {
@@ -179,6 +181,8 @@ model Parent {
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
 }
 
 model Staff {
@@ -238,6 +242,9 @@ model Staff {
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([institutionId, employeeId])
+  @@index([userId])
 }
 
 model Class {
@@ -294,6 +301,7 @@ model Attendance {
   updatedAt   DateTime @updatedAt
   
   @@unique([studentId, date])
+  @@index([studentId, date])
 }
 
 model FeeStructure {
@@ -326,6 +334,8 @@ model StudentFeeAllocation {
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  @@index([studentId, status])
 }
 
 model Payment {
@@ -373,6 +383,7 @@ model ExamResult {
   updatedAt   DateTime @updatedAt
 
   @@unique([examId, studentId])
+  @@index([studentId, examId])
 }
 
 model Notice {
@@ -419,6 +430,8 @@ model LeaveRequest {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([staffId, status])
 }
 
 model AuditLog {
@@ -429,6 +442,8 @@ model AuditLog {
   details   String
   ipAddress String?
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model LessonPlan {
@@ -793,6 +808,7 @@ model HomeworkSubmission {
   gradedAt     DateTime?
 
   @@unique([assignmentId, studentId])
+  @@index([studentId, assignmentId])
 }
 
 // ─────────────────────────────────────────────
@@ -811,4 +827,29 @@ model IssuedDocument {
   generatedAt      DateTime @default(now())
 
   @@index([targetId, docType])
+}
+
+// ─────────────────────────────────────────────
+// Operations Hardening & Pilot Readiness
+// ─────────────────────────────────────────────
+
+model SystemAlert {
+  id        String   @id @default(uuid())
+  severity  String   // INFO, WARNING, CRITICAL
+  message   String
+  category  String   // INTEGRITY, SECURITY, BACKUP, SYSTEM
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model UatTicket {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  module      String   // e.g. "Admission", "Exams", "Attendance"
+  severity    String   // LOW, MEDIUM, HIGH, BLOCKER
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  createdBy   String   // User role or email
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
