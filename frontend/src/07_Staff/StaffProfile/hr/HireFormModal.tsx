@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Save } from 'lucide-react';
 import { createStaffApi } from '@/lib/api';
-import CountryPhoneInput from '../dashboard/CountryPhoneInput';
+import CountryPhoneInput from '@/01_Core/Dashboard/CountryPhoneInput';
 
 interface HireFormModalProps {
   onClose: () => void;

@@ -42,28 +42,28 @@ import {
 } from '@/lib/api';
 
 // Overlay Modals
-import EmployeeModal from '@/components/hr/EmployeeModal';
-import HireFormModal from '@/components/hr/HireFormModal';
-import PayslipModal from '@/components/hr/PayslipModal';
-import PayslipGeneratorModal from '@/components/hr/PayslipGeneratorModal';
+import EmployeeModal from '@/07_Staff/StaffProfile/hr/EmployeeModal';
+import HireFormModal from '@/07_Staff/StaffProfile/hr/HireFormModal';
+import PayslipModal from '@/07_Staff/StaffProfile/hr/PayslipModal';
+import PayslipGeneratorModal from '@/07_Staff/StaffProfile/hr/PayslipGeneratorModal';
 
 // Sub-components Tab Sheets
-import Sidebar from '@/components/dashboard/Sidebar';
-import CommandPalette from '@/components/dashboard/CommandPalette';
-import AiAssistant from '@/components/dashboard/AiAssistant';
-import OverviewTab from '@/components/dashboard/OverviewTab';
-import AcademicTab from '@/components/dashboard/AcademicTab';
-import StudentsTab from '@/components/dashboard/StudentsTab';
-import ExamsTab from '@/components/dashboard/ExamsTab';
-import AttendanceTab from '@/components/dashboard/AttendanceTab';
-import FeesTab from '@/components/dashboard/FeesTab';
-import CommsTab from '@/components/dashboard/CommsTab';
-import LibraryTab from '@/components/dashboard/LibraryTab';
-import GateTab from '@/components/dashboard/GateTab';
-import CertificatesTab from '@/components/dashboard/CertificatesTab';
-import InventoryTab from '@/components/dashboard/InventoryTab';
-import HrTab from '@/components/dashboard/HrTab';
-import SettingsTab from '@/components/dashboard/SettingsTab';
+import Sidebar from '@/01_Core/Dashboard/Sidebar';
+import CommandPalette from '@/01_Core/Dashboard/CommandPalette';
+import AiAssistant from '@/01_Core/Dashboard/AiAssistant';
+import OverviewTab from '@/01_Core/Dashboard/OverviewTab';
+import AcademicTab from '@/03_Academics/Class/AcademicTab';
+import StudentsTab from '@/02_Admission/StudentProfile/StudentsTab';
+import ExamsTab from '@/06_Exams/ExamSetup/ExamsTab';
+import AttendanceTab from '@/04_Attendance/StudentAttendance/AttendanceTab';
+import FeesTab from '@/05_Fees/FeeStructure/FeesTab';
+import CommsTab from '@/08_Communication/Notices/CommsTab';
+import LibraryTab from '@/14_FutureTrendModules/Library/LibraryTab';
+import GateTab from '@/14_FutureTrendModules/VisitorManagement/GateTab';
+import CertificatesTab from '@/11_Documents/Certificates/CertificatesTab';
+import InventoryTab from '@/14_FutureTrendModules/Inventory/InventoryTab';
+import HrTab from '@/07_Staff/StaffProfile/HrTab';
+import SettingsTab from '@/01_Core/Dashboard/SettingsTab';
 
 export default function DashboardPage() {
   const router = useRouter();

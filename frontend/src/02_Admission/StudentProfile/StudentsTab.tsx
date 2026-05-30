@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Trash2, ShieldCheck, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { deleteStudentApi, getPinCodeDetails } from '@/lib/api';
-import CountryPhoneInput from './CountryPhoneInput';
+import CountryPhoneInput from '@/01_Core/Dashboard/CountryPhoneInput';
 import { INDIAN_STATES_AND_UTS } from '@/lib/indianData';
 
 interface SearchableSelectProps {

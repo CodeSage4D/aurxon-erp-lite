@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { getVisitorsApi, createVisitorApi, checkoutVisitorApi } from '@/lib/api';
-import CountryPhoneInput from './CountryPhoneInput';
+import CountryPhoneInput from '@/01_Core/Dashboard/CountryPhoneInput';
 
 interface GateTabProps {
   staff: any[];
