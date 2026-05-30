@@ -293,54 +293,58 @@ export default function OverviewTab({
       
       {/* Header metrics strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-white to-sky-50/20 p-5 shadow-sm dark:border-sky-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-sky-950/5 hover-lift transition-all duration-300">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Students</span>
-            <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/30">
-              <Users className="h-4 w-4 text-sky-500 dark:text-sky-400" />
+        <div className="rounded-2xl border border-border bg-card/40 p-5 shadow-sm hover-lift transition-all duration-300 glass relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
+          <div className="flex items-center justify-between text-muted-foreground relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Students</span>
+            <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20">
+              <Users className="h-4 w-4 text-sky-500" />
             </div>
           </div>
-          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{students.length}</h3>
-          <p className="mt-1.5 text-[10px] font-bold text-emerald-500 flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-foreground relative z-10">{students.length}</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-sky-500 flex items-center gap-1 relative z-10">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
             <span>+2 new admissions today</span>
           </p>
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/20 p-5 shadow-sm dark:border-emerald-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-emerald-950/5 hover-lift transition-all duration-300">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Staff Roster</span>
-            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30">
-              <Briefcase className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+        <div className="rounded-2xl border border-border bg-card/40 p-5 shadow-sm hover-lift transition-all duration-300 glass relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
+          <div className="flex items-center justify-between text-muted-foreground relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Staff Roster</span>
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <Briefcase className="h-4 w-4 text-emerald-500" />
             </div>
           </div>
-          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{staff.length}</h3>
-          <p className="mt-1.5 text-[10px] font-bold text-zinc-450 dark:text-zinc-500">3 designation tiers active</p>
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-foreground relative z-10">{staff.length}</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-emerald-500/80 relative z-10">3 designation tiers active</p>
         </div>
 
-        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/20 p-5 shadow-sm dark:border-indigo-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-indigo-950/5 hover-lift transition-all duration-300">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Attendance Rate</span>
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
-              <CalendarCheck className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+        <div className="rounded-2xl border border-border bg-card/40 p-5 shadow-sm hover-lift transition-all duration-300 glass relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
+          <div className="flex items-center justify-between text-muted-foreground relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Attendance Rate</span>
+            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+              <CalendarCheck className="h-4 w-4 text-indigo-500" />
             </div>
           </div>
-          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{stats?.attendanceRate || 95.8}%</h3>
-          <p className="mt-1.5 text-[10px] font-bold text-emerald-500 flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-foreground relative z-10">{stats?.attendanceRate || 95.8}%</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-indigo-500 flex items-center gap-1 relative z-10">
+            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
             <span>Live RFID syncing active</span>
           </p>
         </div>
 
-        <div className="rounded-2xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/20 p-5 shadow-sm dark:border-rose-950/20 dark:bg-zinc-900/60 dark:from-zinc-900/60 dark:to-rose-950/5 hover-lift transition-all duration-300">
-          <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-450 dark:text-zinc-500">Fee Collections</span>
-            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/30">
-              <Percent className="h-4 w-4 text-rose-500 dark:text-rose-400" />
+        <div className="rounded-2xl border border-border bg-card/40 p-5 shadow-sm hover-lift transition-all duration-300 glass relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl -mr-10 -mt-10" />
+          <div className="flex items-center justify-between text-muted-foreground relative z-10">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Fee Collections</span>
+            <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+              <Percent className="h-4 w-4 text-rose-500" />
             </div>
           </div>
-          <h3 className="mt-4 text-3xl font-black tracking-tight text-zinc-800 dark:text-zinc-100">{stats?.feeOverview?.collectionRate || 85}%</h3>
-          <p className="mt-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">₹{stats?.feeOverview?.totalPaid || 0} collected</p>
+          <h3 className="mt-4 text-3xl font-black tracking-tight text-foreground relative z-10">{stats?.feeOverview?.collectionRate || 85}%</h3>
+          <p className="mt-1.5 text-[10px] font-bold text-rose-500 relative z-10">₹{stats?.feeOverview?.totalPaid || 0} collected</p>
         </div>
       </div>
 
