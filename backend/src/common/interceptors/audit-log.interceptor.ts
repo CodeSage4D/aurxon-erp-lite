@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../01_Core/prisma/prisma.service';
 import { Request } from 'express';
 
 @Injectable()
