@@ -11,25 +11,25 @@ export class StaffController {
   @Get()
   @Roles('INSTITUTE_ADMIN', 'STAFF', 'HR_MANAGER', 'SUPER_ADMIN')
   async getStaff(@Request() req, @Query('designation') designation?: string) {
-    return this.staffService.getStaff(req.user.institutionId, designation);
+    return this.staffService.getStaff(req.user.institutionId, designation, req.user.role);
   }
 
   @Post()
   @Roles('INSTITUTE_ADMIN', 'HR_MANAGER', 'SUPER_ADMIN')
   async createStaff(@Request() req, @Body() body: any) {
-    return this.staffService.createStaff(req.user.institutionId, body);
+    return this.staffService.createStaff(req.user.institutionId, body, req.user.role);
   }
 
   @Get(':id')
   @Roles('INSTITUTE_ADMIN', 'STAFF', 'HR_MANAGER', 'SUPER_ADMIN', 'TEACHER', 'ACCOUNTANT')
   async getStaffById(@Request() req, @Param('id') id: string) {
-    return this.staffService.getStaffById(req.user.institutionId, id);
+    return this.staffService.getStaffById(req.user.institutionId, id, req.user.role);
   }
 
   @Patch(':id')
   @Roles('INSTITUTE_ADMIN', 'HR_MANAGER', 'SUPER_ADMIN')
   async updateStaff(@Request() req, @Param('id') id: string, @Body() body: any) {
-    return this.staffService.updateStaff(req.user.institutionId, id, body);
+    return this.staffService.updateStaff(req.user.institutionId, id, body, req.user.role);
   }
 
   @Get('leaves')
