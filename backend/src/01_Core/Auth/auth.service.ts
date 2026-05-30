@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
@@ -190,5 +190,40 @@ export class AuthService {
         primaryColor: user.institution.primaryColor,
       },
     };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // Verify current password (BCrypt or Argon2)
+    let isMatch = false;
+    if (user.passwordHash.startsWith('$2a$') || user.passwordHash.startsWith('$2b$')) {
+      isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    } else {
+      try {
+        isMatch = await argon2.verify(user.passwordHash, currentPassword);
+      } catch {
+        isMatch = false;
+      }
+    }
+
+    if (!isMatch) throw new BadRequestException('Current password is incorrect');
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters long');
+    }
+
+    const newHash = await argon2.hash(newPassword);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
+
+    await this.prisma.securityEventLog.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        action: 'PASSWORD_CHANGED',
+        details: 'User successfully changed their password via self-service.',
+      },
+    });
   }
 }
