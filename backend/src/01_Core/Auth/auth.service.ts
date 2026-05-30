@@ -174,6 +174,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       institutionId: user.institutionId,
+      profileId: profileId || null,
     };
 
     return {

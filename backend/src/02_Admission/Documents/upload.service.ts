@@ -91,19 +91,19 @@ export class UploadService {
 
       // Role-based boundaries
       if (user.role === 'PARENT') {
-        const parentProfile = await this.prisma.parent.findUnique({
-          where: { userId: user.sub },
+        const parentId = user.profileId || (await this.prisma.parent.findUnique({
+          where: { userId: user.id },
           select: { id: true },
-        });
-        if (!parentProfile || doc.student.parentId !== parentProfile.id) {
+        }))?.id;
+        if (!parentId || doc.student.parentId !== parentId) {
           throw new ForbiddenException('Access denied. This document does not belong to your child.');
         }
       } else if (user.role === 'STUDENT') {
-        const studentProfile = await this.prisma.student.findUnique({
-          where: { userId: user.sub },
+        const studentId = user.profileId || (await this.prisma.student.findUnique({
+          where: { userId: user.id },
           select: { id: true },
-        });
-        if (!studentProfile || doc.student.id !== studentProfile.id) {
+        }))?.id;
+        if (!studentId || doc.student.id !== studentId) {
           throw new ForbiddenException('Access denied. This document does not belong to you.');
         }
       }

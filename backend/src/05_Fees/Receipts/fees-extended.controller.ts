@@ -1,7 +1,7 @@
 // Fee receipts and concessions controller — IEEE 1012 compliant financial operations
 // Provides receipt retrieval and fee waiver management
 
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../../01_Core/Auth/roles.guard';
 import { PrismaService } from '../../01_Core/prisma/prisma.service';
@@ -22,7 +22,7 @@ export class FeesExtendedController {
             allocation: {
               include: {
                 student: {
-                  select: { firstName: true, lastName: true, scholarNumber: true, class: { select: { name: true } } },
+                  select: { id: true, parentId: true, institutionId: true, firstName: true, lastName: true, scholarNumber: true, class: { select: { name: true } } },
                 },
                 feeStructure: true,
               },
@@ -31,6 +31,26 @@ export class FeesExtendedController {
         },
       },
     });
+
+    if (!receipt) {
+      throw new NotFoundException('Fee receipt not found');
+    }
+
+    const student = receipt.payment?.allocation?.student;
+    if (!student || student.institutionId !== req.user.institutionId) {
+      throw new ForbiddenException('Access denied. Institution mismatch.');
+    }
+
+    // Role-based boundaries
+    if (req.user.role === 'STUDENT') {
+      if (req.user.profileId !== student.id) {
+        throw new ForbiddenException('Access denied. You can only view your own receipts.');
+      }
+    } else if (req.user.role === 'PARENT') {
+      if (req.user.profileId !== student.parentId) {
+        throw new ForbiddenException('Access denied. This receipt does not belong to your child.');
+      }
+    }
 
     return receipt;
   }

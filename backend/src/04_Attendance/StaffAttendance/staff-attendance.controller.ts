@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../../01_Core/Auth/roles.guard';
 import { StaffAttendanceService } from './staff-attendance.service';
@@ -20,6 +20,10 @@ export class StaffAttendanceController {
     @Query('month') month: string,
     @Query('year') year: string,
   ) {
+    const isRestrictedRole = req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'INSTITUTE_ADMIN';
+    if (isRestrictedRole && req.user.profileId !== staffId) {
+      throw new ForbiddenException('You are not authorized to view this staff attendance summary');
+    }
     return this.staffAttendanceService.getMonthlySummary(
       req.user.institutionId,
       staffId,

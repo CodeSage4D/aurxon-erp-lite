@@ -38,7 +38,7 @@ export class ExamController {
 
   @Get('student/:studentId')
   @Roles('INSTITUTE_ADMIN', 'STAFF', 'TEACHER', 'STUDENT', 'PARENT')
-  async getStudentReport(@Param('studentId') studentId: string) {
-    return this.examService.getStudentReport(studentId);
+  async getStudentReport(@Request() req, @Param('studentId') studentId: string) {
+    return this.examService.getStudentReport(req.user.institutionId, studentId, req.user);
   }
 }

@@ -26,8 +26,8 @@ export class AttendanceController {
 
   @Get('student/:studentId')
   @Roles('INSTITUTE_ADMIN', 'STAFF', 'TEACHER', 'STUDENT', 'PARENT')
-  async getStudentSummary(@Param('studentId') studentId: string) {
-    return this.attendanceService.getStudentSummary(studentId);
+  async getStudentSummary(@Request() req, @Param('studentId') studentId: string) {
+    return this.attendanceService.getStudentSummary(req.user.institutionId, studentId, req.user);
   }
 
   @Get('overview')

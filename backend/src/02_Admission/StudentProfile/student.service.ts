@@ -36,7 +36,7 @@ export class StudentService {
     requesterRole?: string,
     requesterProfileId?: string,
   ) {
-    const where: any = { institutionId };
+    const where: any = { institutionId, status: { not: 'ARCHIVED' } };
     
     if (classId) {
       where.classId = classId;
@@ -384,15 +384,28 @@ export class StudentService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.timelineEvent.deleteMany({ where: { studentId: id } });
-      await tx.document.deleteMany({ where: { studentId: id } });
-      await tx.attendance.deleteMany({ where: { studentId: id } });
-      await tx.studentFeeAllocation.deleteMany({ where: { studentId: id } });
-      await tx.examResult.deleteMany({ where: { studentId: id } });
-      
-      const stud = await tx.student.delete({ where: { id } });
-      await tx.user.delete({ where: { id: student.userId } });
-      return stud;
+      // Deactivate associated user login
+      await tx.user.update({
+        where: { id: student.userId },
+        data: { isActive: false },
+      });
+
+      // Update student status to ARCHIVED
+      const archivedStudent = await tx.student.update({
+        where: { id },
+        data: { status: 'ARCHIVED' },
+      });
+
+      // Log timeline event for archiving
+      await tx.timelineEvent.create({
+        data: {
+          studentId: id,
+          type: 'STATUS_CHANGE',
+          description: `Student profile soft-deleted and archived. Associated user login deactivated.`,
+        },
+      });
+
+      return archivedStudent;
     });
   }
 }

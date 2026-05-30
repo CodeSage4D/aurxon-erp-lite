@@ -14,6 +14,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../../01_Core/Auth/roles.guard';
@@ -29,16 +30,31 @@ export class ParentController {
     @Request() req: any,
     @Query('search') search?: string,
   ) {
+    if (req.user.role === 'PARENT' || req.user.role === 'STUDENT') {
+      throw new ForbiddenException('You are not authorized to list parents');
+    }
     return this.parentService.findAll(req.user.institutionId, search, req.user.role);
   }
 
   @Get(':id')
   findOne(@Request() req: any, @Param('id') id: string) {
+    if (req.user.role === 'PARENT' && req.user.profileId !== id) {
+      throw new ForbiddenException('You are not authorized to view this parent profile');
+    }
+    if (req.user.role === 'STUDENT') {
+      throw new ForbiddenException('Students are not authorized to view parent profiles');
+    }
     return this.parentService.findOne(req.user.institutionId, id, req.user.role);
   }
 
   @Get(':id/students')
   getLinkedStudents(@Request() req: any, @Param('id') id: string) {
+    if (req.user.role === 'PARENT' && req.user.profileId !== id) {
+      throw new ForbiddenException('You are not authorized to view these students');
+    }
+    if (req.user.role === 'STUDENT') {
+      throw new ForbiddenException('Students are not authorized to view parent student linkages');
+    }
     return this.parentService.getLinkedStudents(req.user.institutionId, id);
   }
 
