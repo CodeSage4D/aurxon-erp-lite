@@ -17,14 +17,17 @@ export class ParentService {
 
   private processParent(parent: any, requesterRole?: string): any {
     if (!parent) return null;
-    const isAuthorized = requesterRole === 'SUPER_ADMIN' || requesterRole === 'INSTITUTE_ADMIN';
+    const decryptedAadhaar = decrypt(parent.aadhaarNumber);
+    const decryptedPhone = decrypt(parent.phone);
+    const decryptedAddress = decrypt(parent.address);
+
+    const isAuthorized = requesterRole === 'SUPER_ADMIN' || requesterRole === 'INSTITUTE_ADMIN' || requesterRole === 'HR_MANAGER';
+
     return {
       ...parent,
-      aadhaarNumber: parent.aadhaarNumber
-        ? isAuthorized
-          ? decrypt(parent.aadhaarNumber)
-          : maskSensitiveData(decrypt(parent.aadhaarNumber), 4)
-        : null,
+      aadhaarNumber: isAuthorized ? decryptedAadhaar : (decryptedAadhaar ? maskSensitiveData(decryptedAadhaar, 4) : null),
+      phone: isAuthorized ? decryptedPhone : (decryptedPhone ? maskSensitiveData(decryptedPhone, 4) : null),
+      address: isAuthorized ? decryptedAddress : (decryptedAddress ? 'Masked for Privacy' : null),
     };
   }
 
@@ -35,7 +38,6 @@ export class ParentService {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
         { lastName: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -111,9 +113,9 @@ export class ParentService {
           userId: user.id,
           firstName: data.firstName,
           lastName: data.lastName,
-          phone: data.phone,
+          phone: encrypt(data.phone) || '',
           occupation: data.occupation || null,
-          address: data.address || null,
+          address: encrypt(data.address) || null,
           aadhaarNumber: data.aadhaarNumber ? encrypt(data.aadhaarNumber) : null,
         },
       });
@@ -129,7 +131,7 @@ export class ParentService {
         });
       }
 
-      return { ...parent, user: { email: user.email, isActive: user.isActive } };
+      return { ...this.processParent(parent, 'SUPER_ADMIN'), user: { email: user.email, isActive: user.isActive } };
     });
   }
 
@@ -144,19 +146,21 @@ export class ParentService {
       throw new BadRequestException('Aadhaar number must be exactly 12 numeric digits');
     }
 
-    return this.prisma.parent.update({
+    const updatedParent = await this.prisma.parent.update({
       where: { id },
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
+        phone: data.phone !== undefined ? (encrypt(data.phone) || '') : undefined,
         occupation: data.occupation,
-        address: data.address,
+        address: data.address !== undefined ? (encrypt(data.address) || null) : undefined,
         aadhaarNumber: data.aadhaarNumber !== undefined
           ? (data.aadhaarNumber ? encrypt(data.aadhaarNumber) : null)
           : undefined,
       },
     });
+
+    return this.processParent(updatedParent, 'SUPER_ADMIN');
   }
 
   async linkStudent(institutionId: string, parentId: string, studentId: string) {
