@@ -124,7 +124,7 @@ export default function DashboardPage() {
     religion: '', casteCategory: 'GENERAL', nationality: 'Indian', motherTongue: '', fatherName: '', motherName: '',
     fatherOccupation: '', motherOccupation: '', annualIncome: '', houseNo: '', street: '', city: '', district: '',
     state: '', pinCode: '', bankName: '', accHolderName: '', accNumber: '', ifscCode: '', bankBranch: '',
-    prevSchoolName: '', tcNumber: '', migrationCertNo: ''
+    prevSchoolName: '', tcNumber: '', migrationCertNo: '', parentPhone: ''
   });
   const [examForm, setExamForm] = useState({ name: '', subjectId: '', maxMarks: '100', examDate: '', examType: 'UNIT_TEST' });
   const [feeForm, setFeeForm] = useState({ name: '', amount: '', dueDate: '' });
@@ -330,7 +330,7 @@ export default function DashboardPage() {
         religion: '', casteCategory: 'GENERAL', nationality: 'Indian', motherTongue: '', fatherName: '', motherName: '',
         fatherOccupation: '', motherOccupation: '', annualIncome: '', houseNo: '', street: '', city: '', district: '',
         state: '', pinCode: '', bankName: '', accHolderName: '', accNumber: '', ifscCode: '', bankBranch: '',
-        prevSchoolName: '', tcNumber: '', migrationCertNo: ''
+        prevSchoolName: '', tcNumber: '', migrationCertNo: '', parentPhone: ''
       });
       loadStudents();
       setStudentTab('list');

@@ -1,8 +1,107 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Settings, Plus, Database, RefreshCw, Sliders, ShieldCheck, History, Server, Globe, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Plus, Database, RefreshCw, Sliders, ShieldCheck, History, Server, Globe, Check, ChevronDown } from 'lucide-react';
 import { updateSettingsApi, createBranchApi } from '@/lib/api';
+import CountryPhoneInput from './CountryPhoneInput';
+import { INDIAN_STATES_AND_UTS } from '@/lib/indianData';
+
+interface SearchableSelectProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  options: string[];
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+function SearchableSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Select...",
+  disabled = false
+}: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSearch(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch(value || "");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [value]);
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="relative space-y-1.5 flex-1 w-full" ref={containerRef}>
+      <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          disabled={disabled}
+          placeholder={placeholder}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => !disabled && setIsOpen(true)}
+          className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:border-sky-500 dark:focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 disabled:bg-zinc-50 dark:disabled:bg-zinc-900/40 disabled:text-zinc-400"
+        />
+        <ChevronDown 
+          className="absolute right-3 top-4 h-4 w-4 text-zinc-400 cursor-pointer pointer-events-none" 
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+        />
+
+        {isOpen && !disabled && (
+          <div className="absolute left-0 right-0 mt-1.5 z-[90] rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 animate-fade-in max-h-48 overflow-y-auto custom-scrollbar">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setSearch(opt);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition ${
+                    value === opt
+                      ? "bg-sky-500/10 text-sky-600 dark:bg-sky-500/5 dark:text-sky-400"
+                      : "text-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))
+            ) : (
+              <div className="p-3 text-center text-zinc-400 italic text-[11px]">
+                No options match query.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 interface SettingsTabProps {
   settings: any;
@@ -256,16 +355,11 @@ export default function SettingsTab({
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 font-mono uppercase"
                   />
                 </div>
-                <div>
-                  <label className="block text-[9px] font-bold uppercase text-zinc-400">Phone</label>
-                  <input
-                    type="text"
-                    placeholder="+91..."
-                    value={branchForm.phone}
-                    onChange={e => setBranchForm({ ...branchForm, phone: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200"
-                  />
-                </div>
+                <CountryPhoneInput
+                  label="Phone"
+                  value={branchForm.phone}
+                  onChange={val => setBranchForm({ ...branchForm, phone: val })}
+                />
               </div>
 
               <div>
@@ -279,26 +373,40 @@ export default function SettingsTab({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[9px] font-bold uppercase text-zinc-400">City</label>
-                  <input
-                    type="text"
-                    placeholder="New Delhi"
+              <div className="space-y-2">
+                <SearchableSelect
+                  label="State"
+                  value={branchForm.state}
+                  options={INDIAN_STATES_AND_UTS.map(item => item.state)}
+                  placeholder="Select State"
+                  onChange={val => setBranchForm({ ...branchForm, state: val, city: '' })}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <SearchableSelect
+                    label="City"
                     value={branchForm.city}
-                    onChange={e => setBranchForm({ ...branchForm, city: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200"
+                    options={
+                      (() => {
+                        const selectedStateObj = INDIAN_STATES_AND_UTS.find(item => item.state === branchForm.state);
+                        return selectedStateObj 
+                          ? Object.values(selectedStateObj.districts).flat()
+                          : [];
+                      })()
+                    }
+                    placeholder="Select City"
+                    disabled={!branchForm.state}
+                    onChange={val => setBranchForm({ ...branchForm, city: val })}
                   />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-bold uppercase text-zinc-400">PIN Code</label>
-                  <input
-                    type="text"
-                    placeholder="110078"
-                    value={branchForm.pinCode}
-                    onChange={e => setBranchForm({ ...branchForm, pinCode: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 font-mono"
-                  />
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">PIN Code</label>
+                    <input
+                      type="text"
+                      placeholder="110078"
+                      value={branchForm.pinCode}
+                      onChange={e => setBranchForm({ ...branchForm, pinCode: e.target.value })}
+                      className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Save } from 'lucide-react';
 import { createStaffApi } from '@/lib/api';
+import CountryPhoneInput from '../dashboard/CountryPhoneInput';
 
 interface HireFormModalProps {
   onClose: () => void;
@@ -145,10 +146,12 @@ export default function HireFormModal({ onClose, onSaved }: HireFormModalProps) 
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase">Monthly Salary (Base ₹)</label>
                 <input type="number" required placeholder="35000" value={form.salary} onChange={e => handleChange('salary', e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 font-mono font-bold" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase">Phone Number</label>
-                <input required placeholder="e.g. +91 9988776655" value={form.phone} onChange={e => handleChange('phone', e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
-              </div>
+              <CountryPhoneInput
+                label="Phone Number"
+                value={form.phone}
+                onChange={val => handleChange('phone', val)}
+                required
+              />
               <div>
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase">Joining Date</label>
                 <input type="date" required value={form.joiningDate} onChange={e => handleChange('joiningDate', e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
@@ -244,10 +247,11 @@ export default function HireFormModal({ onClose, onSaved }: HireFormModalProps) 
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase">Emergency Contact Name</label>
                 <input placeholder="Relation full name" value={form.emergencyContactName} onChange={e => handleChange('emergencyContactName', e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase">Emergency Phone Number</label>
-                <input placeholder="Emergency phone" value={form.emergencyContactPhone} onChange={e => handleChange('emergencyContactPhone', e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950" />
-              </div>
+              <CountryPhoneInput
+                label="Emergency Phone Number"
+                value={form.emergencyContactPhone}
+                onChange={val => handleChange('emergencyContactPhone', val)}
+              />
             </div>
           </div>
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock } from 'lucide-react';
 import { getVisitorsApi, createVisitorApi, checkoutVisitorApi } from '@/lib/api';
+import CountryPhoneInput from './CountryPhoneInput';
 
 interface GateTabProps {
   staff: any[];
@@ -86,17 +87,12 @@ export default function GateTab({
                 className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-250" 
               />
             </div>
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase">Phone Number</label>
-              <input 
-                required 
-                type="tel" 
-                placeholder="e.g. 9876543210" 
-                value={visitorForm.phone} 
-                onChange={e => setVisitorForm({...visitorForm, phone: e.target.value})} 
-                className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-250 font-mono" 
-              />
-            </div>
+            <CountryPhoneInput
+              label="Phone Number"
+              value={visitorForm.phone}
+              onChange={val => setVisitorForm({ ...visitorForm, phone: val })}
+              required
+            />
             <div>
               <label className="block text-[10px] font-bold text-zinc-400 uppercase">Purpose of Visit</label>
               <select 
