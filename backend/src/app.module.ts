@@ -36,6 +36,7 @@ import { LeaveModule } from './07_Staff/Leave/leave.module';
 import { FeesExtendedModule } from './05_Fees/Receipts/fees-extended.module';
 import { ReportsAnalyticsModule } from './09_Reports/reports-analytics.module';
 import { DocumentsModule } from './11_Documents/documents.module';
+import { OperationsModule } from './01_Core/Operations/operations.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { DocumentsModule } from './11_Documents/documents.module';
     FeesExtendedModule,
     ReportsAnalyticsModule,
     DocumentsModule,
+    OperationsModule,
     ThrottlerModule.forRoot([{
       ttl: 60000, // 1 minute
       limit: 100, // 100 requests per minute
