@@ -14,14 +14,28 @@ export class StudentService {
     const decryptedAadhaar = decrypt(student.aadhaarNumber);
     const decryptedAccNumber = decrypt(student.accNumber);
     const decryptedIfscCode = decrypt(student.ifscCode);
+    const decryptedSamagra = decrypt(student.samagraId);
+    const decryptedFamily = decrypt(student.familyId);
+    const decryptedPen = decrypt(student.penNumber);
+    const decryptedHouseNo = decrypt(student.houseNo);
+    const decryptedStreet = decrypt(student.street);
+    const decryptedFatherName = decrypt(student.fatherName);
+    const decryptedMotherName = decrypt(student.motherName);
 
-    const isAuthorized = requesterRole === 'SUPER_ADMIN' || requesterRole === 'INSTITUTE_ADMIN';
+    const isAuthorized = requesterRole === 'SUPER_ADMIN' || requesterRole === 'INSTITUTE_ADMIN' || requesterRole === 'HR_MANAGER';
 
     return {
       ...student,
-      aadhaarNumber: isAuthorized ? decryptedAadhaar : maskSensitiveData(decryptedAadhaar, 4),
-      accNumber: isAuthorized ? decryptedAccNumber : maskSensitiveData(decryptedAccNumber, 4),
-      ifscCode: isAuthorized ? decryptedIfscCode : maskSensitiveData(decryptedIfscCode, 4),
+      aadhaarNumber: isAuthorized ? decryptedAadhaar : (decryptedAadhaar ? maskSensitiveData(decryptedAadhaar, 4) : null),
+      accNumber: isAuthorized ? decryptedAccNumber : (decryptedAccNumber ? maskSensitiveData(decryptedAccNumber, 4) : null),
+      ifscCode: isAuthorized ? decryptedIfscCode : (decryptedIfscCode ? maskSensitiveData(decryptedIfscCode, 4) : null),
+      samagraId: isAuthorized ? decryptedSamagra : (decryptedSamagra ? maskSensitiveData(decryptedSamagra, 4) : null),
+      familyId: isAuthorized ? decryptedFamily : (decryptedFamily ? maskSensitiveData(decryptedFamily, 4) : null),
+      penNumber: isAuthorized ? decryptedPen : (decryptedPen ? maskSensitiveData(decryptedPen, 4) : null),
+      houseNo: isAuthorized ? decryptedHouseNo : (decryptedHouseNo ? 'Masked' : null),
+      street: isAuthorized ? decryptedStreet : (decryptedStreet ? 'Masked' : null),
+      fatherName: isAuthorized ? decryptedFatherName : (decryptedFatherName ? maskSensitiveData(decryptedFatherName, 4) : null),
+      motherName: isAuthorized ? decryptedMotherName : (decryptedMotherName ? maskSensitiveData(decryptedMotherName, 4) : null),
     };
   }
 
@@ -176,9 +190,9 @@ export class StudentService {
           
           // Indian demographic credentials
           aadhaarNumber: encrypt(data.aadhaarNumber) || null,
-          samagraId: data.samagraId || null,
-          familyId: data.familyId || null,
-          penNumber: data.penNumber || null,
+          samagraId: encrypt(data.samagraId) || null,
+          familyId: encrypt(data.familyId) || null,
+          penNumber: encrypt(data.penNumber) || null,
           birthCertificateNumber: data.birthCertificateNumber || null,
           bloodGroup: data.bloodGroup || null,
           religion: data.religion || null,
@@ -187,8 +201,8 @@ export class StudentService {
           motherTongue: data.motherTongue || null,
 
           // Parents details
-          fatherName: data.fatherName || null,
-          motherName: data.motherName || null,
+          fatherName: encrypt(data.fatherName) || null,
+          motherName: encrypt(data.motherName) || null,
           fatherOccupation: data.fatherOccupation || null,
           motherOccupation: data.motherOccupation || null,
           annualIncome: data.annualIncome ? parseFloat(data.annualIncome) : null,
@@ -202,8 +216,8 @@ export class StudentService {
           upiId: data.upiId || null,
 
           // Structured Address
-          houseNo: data.houseNo || null,
-          street: data.street || null,
+          houseNo: encrypt(data.houseNo) || null,
+          street: encrypt(data.street) || null,
           city: data.city || null,
           district: data.district || null,
           state: data.state || null,
@@ -258,16 +272,16 @@ export class StudentService {
         rollNumber: data.rollNumber,
         
         aadhaarNumber: data.aadhaarNumber !== undefined ? (encrypt(data.aadhaarNumber) || null) : undefined,
-        samagraId: data.samagraId,
-        familyId: data.familyId,
-        penNumber: data.penNumber,
+        samagraId: data.samagraId !== undefined ? (encrypt(data.samagraId) || null) : undefined,
+        familyId: data.familyId !== undefined ? (encrypt(data.familyId) || null) : undefined,
+        penNumber: data.penNumber !== undefined ? (encrypt(data.penNumber) || null) : undefined,
         birthCertificateNumber: data.birthCertificateNumber,
         casteCategory: data.casteCategory,
         religion: data.religion,
         bloodGroup: data.bloodGroup,
 
-        fatherName: data.fatherName,
-        motherName: data.motherName,
+        fatherName: data.fatherName !== undefined ? (encrypt(data.fatherName) || null) : undefined,
+        motherName: data.motherName !== undefined ? (encrypt(data.motherName) || null) : undefined,
         annualIncome: data.annualIncome ? parseFloat(data.annualIncome) : undefined,
         
         bankName: data.bankName,
@@ -276,8 +290,8 @@ export class StudentService {
         ifscCode: data.ifscCode !== undefined ? (data.ifscCode ? encrypt(data.ifscCode.toUpperCase()) : null) : undefined,
         bankBranch: data.bankBranch,
 
-        houseNo: data.houseNo,
-        street: data.street,
+        houseNo: data.houseNo !== undefined ? (encrypt(data.houseNo) || null) : undefined,
+        street: data.street !== undefined ? (encrypt(data.street) || null) : undefined,
         city: data.city,
         district: data.district,
         state: data.state,
