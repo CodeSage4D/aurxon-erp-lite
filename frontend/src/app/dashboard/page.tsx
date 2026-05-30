@@ -66,6 +66,7 @@ import HrTab from '@/07_Staff/StaffProfile/HrTab';
 import ReportsDashboard from '@/09_Reports/ReportsDashboard';
 import AnalyticsDashboard from '@/10_Analytics/AnalyticsDashboard';
 import SettingsTab from '@/01_Core/Dashboard/SettingsTab';
+import OperationsDashboard from '@/01_Core/Dashboard/OperationsDashboard';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -586,6 +587,8 @@ export default function DashboardPage() {
               setPromotionTargetClassId={setPromotionTargetClassId}
               setPromotionSelectedStudents={setPromotionSelectedStudents}
               setStudentForm={setStudentForm}
+              currentRole={currentRole}
+              user={user}
             />
           )}
 
@@ -746,6 +749,10 @@ export default function DashboardPage() {
 
           {activeCategory === 'analytics' && (
             <AnalyticsDashboard />
+          )}
+
+          {activeCategory === 'operations' && (
+            <OperationsDashboard triggerToast={triggerToast} />
           )}
 
           {activeCategory === 'settings' && (
