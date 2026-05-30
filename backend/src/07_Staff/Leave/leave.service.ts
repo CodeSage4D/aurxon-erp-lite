@@ -65,6 +65,7 @@ export class LeaveService {
         startDate: start,
         endDate: end,
         reason: data.reason,
+        leaveType: data.leaveType || 'CL',
         status: 'PENDING',
       },
     });
@@ -77,9 +78,47 @@ export class LeaveService {
     if (!leave) throw new NotFoundException('Leave request not found');
     if (leave.status !== 'PENDING') throw new BadRequestException('Only pending leave requests can be approved');
 
-    return this.prisma.leaveRequest.update({
-      where: { id },
-      data: { status: 'APPROVED', approvedById: approverId },
+    // Calculate number of leave days
+    const start = new Date(leave.startDate);
+    const end = new Date(leave.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Find or initialize balance for this staff, leaveType, and current academic year
+      const currentYear = '2026-2027'; // ERP default academic year
+      const balance = await tx.staffLeaveBalance.findFirst({
+        where: {
+          staffId: leave.staffId,
+          leaveType: leave.leaveType,
+          academicYear: currentYear,
+        },
+      });
+
+      if (balance) {
+        await tx.staffLeaveBalance.update({
+          where: { id: balance.id },
+          data: {
+            consumed: balance.consumed + diffDays,
+          },
+        });
+      } else {
+        // Create initial balance ledger if not exists
+        await tx.staffLeaveBalance.create({
+          data: {
+            staffId: leave.staffId,
+            leaveType: leave.leaveType,
+            entitlement: 15, // default basic entitlement
+            consumed: diffDays,
+            academicYear: currentYear,
+          },
+        });
+      }
+
+      return tx.leaveRequest.update({
+        where: { id },
+        data: { status: 'APPROVED', approvedById: approverId },
+      });
     });
   }
 

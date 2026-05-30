@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus } from 'lucide-react';
-import { submitLeaveApi, approveLeaveApi } from '@/lib/api';
+import { submitLeaveApi, approveLeaveApi, getLeaveBalancesApi } from '@/lib/api';
 import StaffCheckInCard from '../../04_Attendance/StaffAttendance/StaffCheckInCard';
 
 interface HrTabProps {
@@ -41,14 +41,25 @@ export default function HrTab({
   // Local states for inputs and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [payrollSearchQuery, setPayrollSearchQuery] = useState('');
-  const [leaveForm, setLeaveForm] = useState({ startDate: '', endDate: '', reason: '' });
+  const [leaveForm, setLeaveForm] = useState({ startDate: '', endDate: '', reason: '', leaveType: 'CL' });
+  const [balances, setBalances] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (['TEACHER', 'LIBRARIAN', 'STAFF'].includes(currentRole) && user?.profileId) {
+      getLeaveBalancesApi(user.profileId)
+        .then(data => {
+          setBalances(data.balances || []);
+        })
+        .catch(err => console.error(err));
+    }
+  }, [user, currentRole, leaves]);
 
   const handleCreateLeaveLocal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await submitLeaveApi(leaveForm.startDate, leaveForm.endDate, leaveForm.reason);
+      await submitLeaveApi(leaveForm.startDate, leaveForm.endDate, leaveForm.reason, leaveForm.leaveType);
       triggerToast('Leave request submitted to principal desk.');
-      setLeaveForm({ startDate: '', endDate: '', reason: '' });
+      setLeaveForm({ startDate: '', endDate: '', reason: '', leaveType: 'CL' });
       loadLeaves();
     } catch (err) {
       alert('Leave submission error');
@@ -280,9 +291,49 @@ export default function HrTab({
       {/* Sub-Tab 3: Leaves Desk */}
       {hrTab === 'leaves' && (
         <div className="space-y-6">
+          {/* Leaves balance display cards */}
+          {['TEACHER', 'LIBRARIAN', 'STAFF'].includes(currentRole) && (
+            <div className="space-y-3 bg-zinc-50/50 dark:bg-zinc-950/20 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800/80">
+              <h4 className="text-xs font-black text-zinc-500 uppercase tracking-wider">Your Live Leave Balances (Session 2026-2027)</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                {[
+                  { type: 'CL', name: 'Casual Leave' },
+                  { type: 'SL', name: 'Sick Leave' },
+                  { type: 'EL', name: 'Earned Leave' },
+                  { type: 'ML', name: 'Maternity Leave' },
+                  { type: 'ON_DUTY', name: 'On Duty (OD)' },
+                ].map(item => {
+                  const balanceRecord = balances.find(b => b.leaveType === item.type);
+                  const entitlement = balanceRecord ? balanceRecord.entitlement : 15;
+                  const consumed = balanceRecord ? balanceRecord.consumed : 0;
+                  const remaining = entitlement - consumed;
+
+                  return (
+                    <div key={item.type} className="rounded-xl border border-zinc-150/40 bg-card p-3 text-center dark:border-zinc-800 hover-lift">
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-primary/10 text-primary dark:text-blue-400">
+                        {item.type}
+                      </span>
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold mt-1.5">{item.name}</div>
+                      <div className="mt-3 grid grid-cols-2 divide-x divide-zinc-200 dark:divide-zinc-800 border-t border-zinc-100 dark:border-zinc-800/60 pt-2 font-black">
+                        <div>
+                          <div className="text-[9px] text-zinc-400 font-semibold">Used</div>
+                          <div className="text-xs text-foreground mt-0.5">{consumed}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-zinc-400 font-semibold">Left</div>
+                          <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{remaining}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Staff view: Apply form */}
           {['TEACHER', 'LIBRARIAN', 'STAFF'].includes(currentRole) && (
-            <form onSubmit={handleCreateLeaveLocal} className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
+            <form onSubmit={handleCreateLeaveLocal} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-zinc-100 pb-6 dark:border-zinc-800">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Start Date</label>
                 <input
@@ -304,6 +355,20 @@ export default function HrTab({
                 />
               </div>
               <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Leave Category</label>
+                <select
+                  value={leaveForm.leaveType}
+                  onChange={e => setLeaveForm({...leaveForm, leaveType: e.target.value})}
+                  className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-850 dark:text-zinc-200 font-bold"
+                >
+                  <option value="CL">Casual Leave (CL)</option>
+                  <option value="EL">Earned Leave (EL)</option>
+                  <option value="SL">Sick Leave (SL)</option>
+                  <option value="ML">Maternity Leave (ML)</option>
+                  <option value="ON_DUTY">On Duty (OD)</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">Reason / Details</label>
                 <input
                   required
@@ -313,7 +378,7 @@ export default function HrTab({
                   className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs outline-none dark:border-zinc-800 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200"
                 />
               </div>
-              <div className="md:col-span-3 flex justify-end">
+              <div className="md:col-span-4 flex justify-end">
                 <button 
                   type="submit" 
                   className="rounded-xl bg-sky-600 hover:bg-sky-500 px-6 py-2.5 text-xs font-bold text-white shadow-md transition"
@@ -333,6 +398,7 @@ export default function HrTab({
                   <tr className="bg-zinc-50 dark:bg-zinc-950 font-bold border-b border-zinc-100 dark:border-zinc-800 text-zinc-450 uppercase tracking-wider text-[10px]">
                     <th className="p-3">Staff Name</th>
                     <th className="p-3">Designation</th>
+                    <th className="p-3">Type</th>
                     <th className="p-3">Reason</th>
                     <th className="p-3">Interval</th>
                     <th className="p-3">Status</th>
@@ -351,6 +417,11 @@ export default function HrTab({
                         {leave.staff ? `${leave.staff.firstName} ${leave.staff.lastName}` : 'Staff'}
                       </td>
                       <td className="p-3 text-zinc-500 text-[11px]">{leave.staff?.designation || 'Staff'}</td>
+                      <td className="p-3">
+                        <span className="font-bold text-[10px] uppercase bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-650 dark:text-zinc-300">
+                          {leave.leaveType || 'CL'}
+                        </span>
+                      </td>
                       <td className="p-3 text-zinc-650 dark:text-zinc-350">{leave.reason}</td>
                       <td className="p-3 text-zinc-400">
                         {new Date(leave.startDate).toLocaleDateString()} to {new Date(leave.endDate).toLocaleDateString()}

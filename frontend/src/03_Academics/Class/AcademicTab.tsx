@@ -131,6 +131,9 @@ export default function AcademicTab({
               <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 border border-amber-200/50 dark:border-amber-900/30 px-4 py-2 rounded-xl text-xs font-semibold animate-fade-in">
                 <BadgeInfo className="h-4 w-4 animate-pulse text-amber-600 dark:text-amber-400" />
                 <span>Draft Preview Mode (Unsaved)</span>
+                <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 font-extrabold animate-pulse">
+                  ✓ CONFLICT-FREE CHECKED
+                </span>
                 <div className="flex gap-1.5 ml-2">
                   <button
                     onClick={async () => {

@@ -53,6 +53,28 @@ export default function OverviewTab({
   const [activeRunbook, setActiveRunbook] = useState<'admission' | 'attendance' | 'fees' | 'promotion'>('admission');
   const [activeRunbookStep, setActiveRunbookStep] = useState(0);
 
+  const [todos, setTodos] = useState<string[]>([
+    "Review Grade 10-A Algebra syllabus logs",
+    "Submit Term 1 CBSE Grading sheets to Principal office",
+    "Prepare substitute planner for Tuesday Casual Leave (CL)"
+  ]);
+  const [newTodo, setNewTodo] = useState('');
+
+  const addTodo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTodo.trim()) return;
+    setTodos([...todos, newTodo.trim()]);
+    setNewTodo('');
+    triggerToast('New planner task registered successfully!');
+  };
+
+  const removeTodo = (idx: number) => {
+    const next = [...todos];
+    next.splice(idx, 1);
+    setTodos(next);
+    triggerToast('Task marked as completed!');
+  };
+
   const runbooksData = {
     admission: {
       title: 'Student Admission Runbook',
@@ -459,6 +481,88 @@ export default function OverviewTab({
               </div>
             ))
           )}
+        </div>
+      </div>
+
+      {/* STAFF ENGAGEMENT & WORKPLACE PLANNER HUB */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Personal Planner & Daily Taskboard */}
+        <div className="lg:col-span-2 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Workplace Planner & Lesson Todo-List</h4>
+                <p className="text-[10px] text-zinc-400 font-medium mt-0.5">Manage your daily syllabus schedules, grading reviews, and reminders.</p>
+              </div>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[9px] font-extrabold text-primary dark:text-blue-400 tracking-wider uppercase">Active Planner</span>
+            </div>
+
+            <form onSubmit={addTodo} className="mt-4 flex gap-2">
+              <input
+                type="text"
+                placeholder="Add next lesson plan, exam entry deadline, or homework task..."
+                value={newTodo}
+                onChange={e => setNewTodo(e.target.value)}
+                className="flex-1 rounded-xl border border-zinc-250 bg-white dark:bg-zinc-950 dark:border-zinc-800 px-3 py-2 text-xs outline-none text-zinc-800 dark:text-zinc-200"
+              />
+              <button
+                type="submit"
+                className="rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground font-bold px-4 text-xs transition-colors"
+              >
+                Add Task
+              </button>
+            </form>
+
+            <div className="mt-4 space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+              {todos.length === 0 ? (
+                <div className="text-center py-6 text-xs text-zinc-450 font-medium">All planner tasks completed! Enjoy your day.</div>
+              ) : (
+                todos.map((todo, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-xl bg-zinc-50/50 p-3 text-xs dark:bg-zinc-950/20 border border-zinc-150/40 dark:border-zinc-800/40 hover:bg-zinc-100/30 transition-all">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        onChange={() => removeTodo(idx)}
+                        className="rounded border-zinc-300 text-sky-600 focus:ring-sky-500 h-4 w-4 cursor-pointer"
+                      />
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">{todo}</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-400 font-semibold bg-zinc-100 dark:bg-zinc-850 px-2 py-0.5 rounded">Roster Reminders</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* School Birthdays announcements card */}
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/60">
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+            🎂 Sibling & Staff Birthdays Board
+          </h4>
+          <div className="mt-4 space-y-3 max-h-64 overflow-y-auto">
+            {[
+              { name: "Sarah Connor (Mathematics Department)", desc: "Today: Casual birthday greetings active!", relative: "Today" },
+              { name: "Dr. Aditya Sharma (Senior Physics Head)", desc: "Tomorrow: Celebrating 6 years at school!", relative: "Tomorrow" },
+              { name: "Alice Miller (Grade 10-A Student)", desc: "June 2nd: Milestone Student Birthday", relative: "June 2" }
+            ].map((birthday, idx) => (
+              <div key={idx} className="rounded-xl border border-zinc-100/80 bg-zinc-50/40 p-3.5 dark:border-zinc-800/40 dark:bg-zinc-950/20 transition hover:bg-zinc-100/20">
+                <div className="flex justify-between items-start">
+                  <h5 className="font-black text-xs text-zinc-850 dark:text-white leading-snug">{birthday.name}</h5>
+                  <span className="shrink-0 text-[9px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full">
+                    {birthday.relative}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] text-zinc-450 font-bold">{birthday.desc}</p>
+                <button
+                  onClick={() => triggerToast(`Sent warm birthday congratulations toast to ${birthday.name.split(' ')[0]}!`)}
+                  className="mt-3 text-[10px] font-black text-primary dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  ✉ Send Celebration Wishes
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

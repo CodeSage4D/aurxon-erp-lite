@@ -506,14 +506,14 @@ export default function DashboardPage() {
               </button>
               
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 z-50 w-80 rounded-2xl border border-border bg-card p-4 shadow-2xl glass">
-                  <div className="flex items-center justify-between border-b border-border pb-2">
+                <div className="absolute right-0 mt-2 z-50 w-96 rounded-2xl border border-border dark:border-[#222D44] bg-card dark:bg-[#151D30] p-4 shadow-2xl transition-all duration-300">
+                  <div className="flex items-center justify-between border-b border-border dark:border-[#222D44] pb-2">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Real-time Alerts</p>
                     <div className="flex items-center gap-2">
                       {notifications.filter((n: any) => !n.isRead).length > 0 && (
                         <button 
                           onClick={handleMarkAllRead} 
-                          className="text-[10px] font-bold text-primary hover:underline hover:text-primary/80 transition-colors"
+                          className="text-[10px] font-bold text-primary dark:text-blue-400 hover:underline hover:text-primary/80 transition-colors"
                         >
                           Mark all read
                         </button>
@@ -521,7 +521,7 @@ export default function DashboardPage() {
                       <button className="text-[10px] font-bold text-destructive hover:underline transition-colors" onClick={() => setNotificationsOpen(false)}>Close</button>
                     </div>
                   </div>
-                  <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                  <div className="mt-2 space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
                     {notifications.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-6 text-center">
                         <Bell className="h-8 w-8 text-muted-foreground/30 mb-2" />
@@ -529,17 +529,17 @@ export default function DashboardPage() {
                       </div>
                     ) : (
                       notifications.map((n) => (
-                        <div key={n.id} className={`rounded-xl p-3 border text-xs transition-all duration-200 ${
+                        <div key={n.id} className={`rounded-xl p-3 border text-xs transition-all duration-200 break-words leading-relaxed ${
                           n.isRead 
-                            ? 'bg-muted/30 border-border/50 hover:bg-muted/50' 
-                            : 'bg-primary/5 border-primary/20 shadow-sm hover:bg-primary/10'
+                            ? 'bg-muted/10 border-border/40 dark:border-[#222D44]/40 hover:bg-muted/30 text-muted-foreground dark:text-gray-400' 
+                            : 'bg-primary/5 border-primary/20 dark:border-blue-500/20 shadow-sm hover:bg-primary/10 text-foreground'
                         }`}>
                           <div className="flex justify-between items-start gap-2">
-                            <span className={`flex-1 font-bold ${n.isRead ? 'text-foreground/80' : 'text-foreground'}`}>{n.title}</span>
-                            {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1 shrink-0" />}
+                            <span className="flex-1 font-bold">{n.title}</span>
+                            {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-primary dark:bg-blue-500 mt-1 shrink-0 animate-pulse" />}
                           </div>
-                          <p className={`mt-1.5 text-[11px] leading-relaxed ${n.isRead ? 'text-muted-foreground' : 'text-foreground/80'}`}>{n.content}</p>
-                          <p className="mt-2 text-[9px] font-semibold text-muted-foreground/80">
+                          <p className="mt-1.5 text-[11px] font-medium leading-relaxed">{n.content}</p>
+                          <p className="mt-2 text-[9px] font-bold text-muted-foreground/80 dark:text-gray-500">
                             {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>

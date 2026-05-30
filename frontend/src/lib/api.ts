@@ -1006,12 +1006,12 @@ export async function getLeavesApi(staffId?: string, status?: string) {
   }
 }
 
-export async function submitLeaveApi(startDate: string, endDate: string, reason: string) {
+export async function submitLeaveApi(startDate: string, endDate: string, reason: string, leaveType?: string) {
   try {
     const res = await fetch(`${API_URL}/leaves`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ startDate, endDate, reason }),
+      body: JSON.stringify({ startDate, endDate, reason, leaveType: leaveType || 'CL' }),
     });
     if (!res.ok) throw new Error();
     return await res.json();
@@ -1026,6 +1026,7 @@ export async function submitLeaveApi(startDate: string, endDate: string, reason:
       startDate,
       endDate,
       reason,
+      leaveType: leaveType || 'CL',
       status: 'PENDING',
       staff: { firstName: user.profileName.split(' ')[0], lastName: user.profileName.split(' ')[1] || '', designation: user.role },
       createdAt: new Date().toISOString(),

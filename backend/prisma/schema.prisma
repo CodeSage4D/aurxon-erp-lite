@@ -413,6 +413,7 @@ model LeaveRequest {
   startDate   DateTime
   endDate     DateTime
   reason      String
+  leaveType   String   @default("CL")
   status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
   approvedById String?
 

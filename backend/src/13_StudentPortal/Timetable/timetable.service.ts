@@ -219,8 +219,35 @@ export class TimetableService {
       throw new NotFoundException('Class not found');
     }
 
-    // Double-booking check: Ensure none of the teachers are booked for another class at the same day & period
+    // 1. Internal Payload duplicates validation
+    const classSet = new Set<string>();
+    const teacherSet = new Set<string>();
+
     for (const entry of entries) {
+      if (!entry.dayOfWeek || !entry.periodNumber) continue;
+      const periodNum = parseInt(entry.periodNumber);
+      const classKey = `${entry.dayOfWeek}-${periodNum}`;
+      if (classSet.has(classKey)) {
+        throw new BadRequestException(
+          `Payload Conflict: Multiple periods assigned to this class on ${entry.dayOfWeek} Period ${periodNum}`
+        );
+      }
+      classSet.add(classKey);
+
+      if (entry.teacherId) {
+        const teacherKey = `${entry.teacherId}-${entry.dayOfWeek}-${periodNum}`;
+        if (teacherSet.has(teacherKey)) {
+          throw new BadRequestException(
+            `Payload Conflict: The same teacher is allocated to multiple slots in this class on ${entry.dayOfWeek} Period ${periodNum}`
+          );
+        }
+        teacherSet.add(teacherKey);
+      }
+    }
+
+    // 2. Double-booking check: Ensure none of the teachers are booked for another class at the same day & period
+    for (const entry of entries) {
+      if (!entry.teacherId || !entry.dayOfWeek || !entry.periodNumber) continue;
       const conflict = await this.prisma.timetableEntry.findFirst({
         where: {
           institutionId,
