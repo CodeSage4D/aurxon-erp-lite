@@ -989,23 +989,26 @@ export async function createStaffApi(data: any) {
   }
 }
 
-export async function getLeavesApi(staffId?: string) {
+export async function getLeavesApi(staffId?: string, status?: string) {
   try {
-    const query = staffId ? `?staffId=${staffId}` : '';
-    const res = await fetch(`${API_URL}/staff/leaves${query}`, { headers: getHeaders() });
+    const params = new URLSearchParams();
+    if (staffId) params.append('staffId', staffId);
+    if (status) params.append('status', status);
+    const res = await fetch(`${API_URL}/leaves?${params.toString()}`, { headers: getHeaders() });
     if (!res.ok) throw new Error();
     return await res.json();
   } catch (error) {
     const db = getMockDb();
     let list = db.leaves;
     if (staffId) list = list.filter(l => l.staffId === staffId || l.staff?.id === staffId);
+    if (status) list = list.filter(l => l.status === status);
     return list;
   }
 }
 
 export async function submitLeaveApi(startDate: string, endDate: string, reason: string) {
   try {
-    const res = await fetch(`${API_URL}/staff/leaves`, {
+    const res = await fetch(`${API_URL}/leaves`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ startDate, endDate, reason }),
@@ -1014,8 +1017,8 @@ export async function submitLeaveApi(startDate: string, endDate: string, reason:
     return await res.json();
   } catch (error) {
     const db = getMockDb();
-    const userStr = localStorage.getItem('aurxon_user');
-    const user = userStr ? JSON.parse(userStr) : { profileId: 'staff-1', profileName: 'Staff User' };
+    const userCached = localStorage.getItem('aurxon_user');
+    const user = userCached ? JSON.parse(userCached) : { profileId: 'staff-1', profileName: 'Sarah Connor', role: 'TEACHER' };
     
     const newLeave = {
       id: `leave-${Date.now()}`,
@@ -1035,10 +1038,10 @@ export async function submitLeaveApi(startDate: string, endDate: string, reason:
 
 export async function approveLeaveApi(leaveId: string, status: string) {
   try {
-    const res = await fetch(`${API_URL}/staff/leaves/${leaveId}`, {
-      method: 'PATCH',
+    const endpoint = status === 'APPROVED' ? 'approve' : 'reject';
+    const res = await fetch(`${API_URL}/leaves/${leaveId}/${endpoint}`, {
+      method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ status }),
     });
     if (!res.ok) throw new Error();
     return await res.json();
@@ -2275,6 +2278,342 @@ export async function getPromotionHistoryApi() {
     return (db as any).promotions || [];
   }
 }
+
+// ─────────────────────────────────────────────
+// 01_Core & Auth Extensions
+// ─────────────────────────────────────────────
+
+export async function changePasswordApi(currentPassword: string, newPassword: string) {
+  const res = await fetch(`${API_URL}/auth/change-password`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Change password failed');
+  }
+  return await res.json();
+}
+
+export async function getAuditLogsApi() {
+  const res = await fetch(`${API_URL}/audit-logs`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch audit logs');
+  return await res.json();
+}
+
+export async function getInstitutionApi() {
+  const res = await fetch(`${API_URL}/institution`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch institution profile');
+  return await res.json();
+}
+
+export async function updateInstitutionApi(data: any) {
+  const res = await fetch(`${API_URL}/institution`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update institution');
+  return await res.json();
+}
+
+export async function getRbacRolesApi() {
+  const res = await fetch(`${API_URL}/rbac/roles`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch RBAC roles');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 02_Admission - Address Lookup & Parents
+// ─────────────────────────────────────────────
+
+export async function lookupPincodeApi(pin: string) {
+  const res = await fetch(`${API_URL}/admission/address/pincode/${pin}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('PIN code lookup failed');
+  return await res.json();
+}
+
+export async function getParentsApi(search?: string) {
+  const query = search ? `?search=${encodeURIComponent(search)}` : '';
+  const res = await fetch(`${API_URL}/parents${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch parents');
+  return await res.json();
+}
+
+export async function getParentApi(id: string) {
+  const res = await fetch(`${API_URL}/parents/${id}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch parent');
+  return await res.json();
+}
+
+export async function createParentApi(data: any) {
+  const res = await fetch(`${API_URL}/parents`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create parent');
+  return await res.json();
+}
+
+export async function updateParentApi(id: string, data: any) {
+  const res = await fetch(`${API_URL}/parents/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update parent');
+  return await res.json();
+}
+
+export async function linkStudentToParentApi(parentId: string, studentId: string) {
+  const res = await fetch(`${API_URL}/parents/${parentId}/link-student/${studentId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to link student');
+  return await res.json();
+}
+
+export async function unlinkStudentFromParentApi(parentId: string, studentId: string) {
+  const res = await fetch(`${API_URL}/parents/${parentId}/unlink-student/${studentId}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to unlink student');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 03_Academics - Academic Years & Subjects
+// ─────────────────────────────────────────────
+
+export async function getAcademicYearsApi() {
+  const res = await fetch(`${API_URL}/academic-years`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch academic years');
+  return await res.json();
+}
+
+export async function createAcademicYearApi(data: { name: string; startDate: string; endDate: string }) {
+  const res = await fetch(`${API_URL}/academic-years`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create academic year');
+  return await res.json();
+}
+
+export async function activateAcademicYearApi(id: string) {
+  const res = await fetch(`${API_URL}/academic-years/${id}/activate`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to activate academic year');
+  return await res.json();
+}
+
+export async function closeAcademicYearApi(id: string) {
+  const res = await fetch(`${API_URL}/academic-years/${id}/close`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to close academic year');
+  return await res.json();
+}
+
+export async function deleteAcademicYearApi(id: string) {
+  const res = await fetch(`${API_URL}/academic-years/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to delete academic year');
+  return await res.json();
+}
+
+export async function createSubjectApi(data: { name: string; code: string; classId: string; teacherId?: string }) {
+  const res = await fetch(`${API_URL}/subjects`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create subject');
+  return await res.json();
+}
+
+export async function updateSubjectApi(id: string, data: any) {
+  const res = await fetch(`${API_URL}/subjects/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update subject');
+  return await res.json();
+}
+
+export async function deleteSubjectApi(id: string) {
+  const res = await fetch(`${API_URL}/subjects/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to delete subject');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 04_Attendance - Staff Attendance
+// ─────────────────────────────────────────────
+
+export async function getStaffAttendanceByDateApi(date: string) {
+  const res = await fetch(`${API_URL}/staff-attendance/date/${date}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch staff attendance');
+  return await res.json();
+}
+
+export async function getStaffAttendanceSummaryApi(staffId: string, month: number, year: number) {
+  const res = await fetch(`${API_URL}/staff-attendance/summary/${staffId}?month=${month}&year=${year}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch staff attendance summary');
+  return await res.json();
+}
+
+export async function recordStaffAttendanceApi(data: { staffId: string; status: string; clockIn?: string; clockOut?: string; remarks?: string; branchId?: string }) {
+  const res = await fetch(`${API_URL}/staff-attendance/record`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to record staff attendance');
+  return await res.json();
+}
+
+export async function bulkRecordStaffAttendanceApi(date: string, records: any[]) {
+  const res = await fetch(`${API_URL}/staff-attendance/bulk`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ date, records }),
+  });
+  if (!res.ok) throw new Error('Failed to bulk record staff attendance');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 07_Staff - Leaves
+// ─────────────────────────────────────────────
+
+export async function getLeaveBalancesApi(staffId: string) {
+  const res = await fetch(`${API_URL}/leaves/balances/${staffId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch leave balances');
+  return await res.json();
+}
+
+export async function createLeaveRequestApi(data: any) {
+  const res = await fetch(`${API_URL}/leaves`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create leave request');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 05_Fees - Extended (Receipts & Concessions)
+// ─────────────────────────────────────────────
+
+export async function getFeeReceiptApi(paymentId: string) {
+  const res = await fetch(`${API_URL}/fees/receipts/${paymentId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee receipt');
+  return await res.json();
+}
+
+export async function getFeeConcessionsApi() {
+  const res = await fetch(`${API_URL}/fees/concessions`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee concessions');
+  return await res.json();
+}
+
+export async function createFeeConcessionApi(data: { allocationId: string; concessionType: string; amountWaived: number; justification?: string }) {
+  const res = await fetch(`${API_URL}/fees/concessions`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to apply fee concession');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 09_Reports & 10_Analytics
+// ─────────────────────────────────────────────
+
+export async function getStudentRegisterReportApi(classId?: string, status?: string) {
+  const params = new URLSearchParams();
+  if (classId) params.append('classId', classId);
+  if (status) params.append('status', status);
+  const res = await fetch(`${API_URL}/reports/students?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch student register report');
+  return await res.json();
+}
+
+export async function getMonthlyAttendanceReportApi(classId: string, month: number, year: number) {
+  const res = await fetch(`${API_URL}/reports/attendance/monthly?classId=${classId}&month=${month}&year=${year}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch monthly attendance report');
+  return await res.json();
+}
+
+export async function getFeeDefaultersReportApi(classId?: string) {
+  const query = classId ? `?classId=${classId}` : '';
+  const res = await fetch(`${API_URL}/reports/fees/defaulters${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee defaulters report');
+  return await res.json();
+}
+
+export async function getFeeCollectionSummaryReportApi() {
+  const res = await fetch(`${API_URL}/reports/fees/collection-summary`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee collection summary report');
+  return await res.json();
+}
+
+export async function getClassPerformanceReportApi(examId: string) {
+  const res = await fetch(`${API_URL}/reports/exams/class-performance/${examId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch class performance report');
+  return await res.json();
+}
+
+export async function getAtRiskStudentsAnalyticsApi() {
+  const res = await fetch(`${API_URL}/reports/analytics/at-risk`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch at-risk students analytics');
+  return await res.json();
+}
+
+export async function getAnalyticsDashboardApi() {
+  const res = await fetch(`${API_URL}/reports/analytics/dashboard`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch analytics dashboard');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 11_Documents / Certificates
+// ─────────────────────────────────────────────
+
+export async function getIssuedDocumentsApi(targetId?: string) {
+  const query = targetId ? `?targetId=${targetId}` : '';
+  const res = await fetch(`${API_URL}/certificates${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch certificates');
+  return await res.json();
+}
+
+export async function issueCertificateApi(data: { docType: string; targetType: string; targetId: string; documentNumber: string }) {
+  const res = await fetch(`${API_URL}/certificates`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to issue certificate');
+  return await res.json();
+}
+
 
 
 

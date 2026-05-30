@@ -24,6 +24,18 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { UploadModule } from './02_Admission/Documents/upload.module';
+import { RbacModule } from './01_Core/RBAC/rbac.module';
+import { AuditLogsModule } from './01_Core/AuditLogs/audit-log.module';
+import { InstitutionModule } from './01_Core/Institution/institution.module';
+import { AddressLookupModule } from './02_Admission/AddressLookup/address-lookup.module';
+import { ParentModule } from './02_Admission/ParentProfile/parent.module';
+import { AcademicYearModule } from './03_Academics/AcademicYear/academic-year.module';
+import { SubjectModule } from './03_Academics/Subject/subject.module';
+import { StaffAttendanceModule } from './04_Attendance/StaffAttendance/staff-attendance.module';
+import { LeaveModule } from './07_Staff/Leave/leave.module';
+import { FeesExtendedModule } from './05_Fees/Receipts/fees-extended.module';
+import { ReportsAnalyticsModule } from './09_Reports/reports-analytics.module';
+import { DocumentsModule } from './11_Documents/documents.module';
 
 @Module({
   imports: [
@@ -47,6 +59,18 @@ import { UploadModule } from './02_Admission/Documents/upload.module';
     SettingsModule,
     NotificationModule,
     UploadModule,
+    RbacModule,
+    AuditLogsModule,
+    InstitutionModule,
+    AddressLookupModule,
+    ParentModule,
+    AcademicYearModule,
+    SubjectModule,
+    StaffAttendanceModule,
+    LeaveModule,
+    FeesExtendedModule,
+    ReportsAnalyticsModule,
+    DocumentsModule,
     ThrottlerModule.forRoot([{
       ttl: 60000, // 1 minute
       limit: 100, // 100 requests per minute

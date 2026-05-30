@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { submitLeaveApi, approveLeaveApi } from '@/lib/api';
+import StaffCheckInCard from '../../04_Attendance/StaffAttendance/StaffCheckInCard';
 
 interface HrTabProps {
-  hrTab: 'employees' | 'payroll' | 'leaves';
-  setHrTab: (tab: 'employees' | 'payroll' | 'leaves') => void;
+  hrTab: 'employees' | 'payroll' | 'leaves' | 'punch';
+  setHrTab: (tab: 'employees' | 'payroll' | 'leaves' | 'punch') => void;
   currentRole: string;
   user: any;
   staff: any[];
@@ -104,6 +105,18 @@ export default function HrTab({
           >
             Leaves Desk
           </button>
+          {['TEACHER', 'LIBRARIAN', 'STAFF'].includes(currentRole) && (
+            <button 
+              onClick={() => setHrTab('punch')} 
+              className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
+                hrTab === 'punch' 
+                  ? 'bg-sky-600 text-white shadow-sm' 
+                  : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+            >
+              Check In/Out
+            </button>
+          )}
         </div>
       </div>
 
@@ -382,6 +395,11 @@ export default function HrTab({
           </div>
 
         </div>
+      )}
+
+      {/* Sub-Tab 4: Biometric Punch */}
+      {hrTab === 'punch' && (
+        <StaffCheckInCard user={user} />
       )}
 
     </div>

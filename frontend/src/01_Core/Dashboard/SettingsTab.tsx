@@ -5,6 +5,7 @@ import { Settings, Plus, Database, RefreshCw, Sliders, ShieldCheck, History, Ser
 import { updateSettingsApi, createBranchApi } from '@/lib/api';
 import CountryPhoneInput from './CountryPhoneInput';
 import { INDIAN_STATES_AND_UTS } from '@/lib/indianData';
+import AcademicYearManager from '../../03_Academics/AcademicYear/AcademicYearManager';
 
 interface SearchableSelectProps {
   label: string;
@@ -122,8 +123,8 @@ export default function SettingsTab({
   loadPromotionsHistory,
   triggerToast
 }: SettingsTabProps) {
-  // Sub-tabs: config, branches, promotion-logs, backup
-  const [subTab, setSubTab] = useState<'config' | 'branches' | 'promotions' | 'backup'>('config');
+  // Sub-tabs: config, years, branches, promotion-logs, backup
+  const [subTab, setSubTab] = useState<'config' | 'years' | 'branches' | 'promotions' | 'backup'>('config');
 
   // Branch Form
   const [branchForm, setBranchForm] = useState({
@@ -219,6 +220,16 @@ export default function SettingsTab({
             System Parameters
           </button>
           <button 
+            onClick={() => setSubTab('years')} 
+            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
+              subTab === 'years' 
+                ? 'bg-sky-600 text-white shadow-sm' 
+                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            }`}
+          >
+            Academic Years
+          </button>
+          <button 
             onClick={() => setSubTab('branches')} 
             className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
               subTab === 'branches' 
@@ -250,6 +261,11 @@ export default function SettingsTab({
           </button>
         </div>
       </div>
+
+      {/* Sub-Tab: Academic Years */}
+      {subTab === 'years' && (
+        <AcademicYearManager />
+      )}
 
       {/* Sub-Tab 1: System Parameters */}
       {subTab === 'config' && (

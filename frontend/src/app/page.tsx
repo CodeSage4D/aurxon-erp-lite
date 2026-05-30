@@ -34,8 +34,14 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await loginApi(email, password);
-      router.push('/dashboard');
+      const data = await loginApi(email, password);
+      if (data.user.role === 'PARENT') {
+        router.push('/parent');
+      } else if (data.user.role === 'STUDENT') {
+        router.push('/student');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please check credentials.');
     } finally {
@@ -169,6 +175,13 @@ export default function LoginPage() {
               className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
             >
               <span>Student Profile</span>
+              <ArrowRight className="h-3 w-3 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => autofill('parent@aurxon.com')}
+              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80 col-span-2"
+            >
+              <span>Parent Desk</span>
               <ArrowRight className="h-3 w-3 text-muted-foreground" />
             </button>
           </div>

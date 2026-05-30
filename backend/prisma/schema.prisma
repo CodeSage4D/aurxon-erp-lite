@@ -28,20 +28,23 @@ model Institution {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  users     User[]
-  students  Student[]
-  staff     Staff[]
-  classes   Class[]
-  fees      FeeStructure[]
-  notices   Notice[]
-  expenses  Expense[]
-  books     Book[]
-  visitors  Visitor[]
-  inventory InventoryItem[]
-  timetable TimetableEntry[]
-  
-  branches  Branch[]
-  settings  Settings?
+  users         User[]
+  students      Student[]
+  staff         Staff[]
+  classes       Class[]
+  fees          FeeStructure[]
+  notices       Notice[]
+  expenses      Expense[]
+  books         Book[]
+  visitors      Visitor[]
+  inventory     InventoryItem[]
+  timetable     TimetableEntry[]
+  branches      Branch[]
+  settings      Settings?
+  academicYears AcademicYear[]
+  boards        Board[]
+  streams       Stream[]
+  gradeScales   GradeScale[]
 }
 
 model User {
@@ -142,6 +145,8 @@ model Student {
   timeline      TimelineEvent[]
   bookIssues    BookIssue[]
   promotions    PromotionHistory[]
+  reportCards   ReportCardStatus[]
+  homeworkSubs  HomeworkSubmission[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -158,6 +163,18 @@ model Parent {
   phone         String
   occupation    String?
   address       String?
+  
+  // Identity verification (encrypted at rest)
+  aadhaarNumber String?     // Encrypted 12-digit UIDAI ID
+  panNumber     String?     // PAN card for income tax reference
+  annualIncome  Float?
+  
+  // Banking for fee payments
+  bankName      String?
+  bankAccount   String?     // Encrypted
+  bankIfsc      String?
+  upiId         String?
+
   students      Student[]
 
   createdAt     DateTime    @default(now())
@@ -215,6 +232,9 @@ model Staff {
   certifications   String[]
   subjectsExpertise String[]
   timetable        TimetableEntry[]
+  staffAttendance  StaffAttendance[]
+  leaveBalances    StaffLeaveBalance[]
+  homeworkCreated  HomeworkAssignment[] @relation("HomeworkCreatedBy")
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -238,6 +258,7 @@ model Class {
   timetable     TimetableEntry[]
   fromPromotions PromotionHistory[] @relation("FromClassPromotions")
   toPromotions   PromotionHistory[] @relation("ToClassPromotions")
+  homework       HomeworkAssignment[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -254,6 +275,7 @@ model Subject {
   exams         Exam[]
   lessonPlans   LessonPlan[]
   timetable     TimetableEntry[]
+  homework      HomeworkAssignment[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -300,6 +322,7 @@ model StudentFeeAllocation {
   status         String       @default("UNPAID") // UNPAID, PARTIAL, PAID
   
   payments       Payment[]
+  concessions    FeeConcession[]
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -314,6 +337,8 @@ model Payment {
   paymentMethod  String               // CASH, CARD, ONLINE, UPI
   receiptNumber  String               @unique
   remarks        String?
+
+  receipt        FeeReceipt?
 
   createdAt      DateTime             @default(now())
 }
@@ -593,4 +618,196 @@ model SecurityEventLog {
   details   String
   ipAddress String?
   createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// 03_Academics
+// ─────────────────────────────────────────────
+
+model AcademicYear {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String      // e.g. "2026-2027"
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean     @default(false)
+  status        String      @default("PLANNED") // PLANNED, ACTIVE, CLOSED
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([institutionId, name])
+}
+
+model Board {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String      // CBSE, ICSE, STATE_MP, STATE_UP, NIOS, IB...
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([institutionId, name])
+}
+
+model Stream {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String      // General, Science, Commerce, Arts, Vocational
+  description   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([institutionId, name])
+}
+
+// ─────────────────────────────────────────────
+// 04_Attendance
+// ─────────────────────────────────────────────
+
+model StaffAttendance {
+  id         String   @id @default(uuid())
+  staffId    String
+  staff      Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date       DateTime
+  clockIn    String?  // HH:MM format
+  clockOut   String?
+  status     String   @default("PRESENT") // PRESENT, ABSENT, HALF_DAY, ON_LEAVE
+  remarks    String?
+  branchId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([staffId, date])
+}
+
+// ─────────────────────────────────────────────
+// 05_Fees
+// ─────────────────────────────────────────────
+
+model FeeReceipt {
+  id             String   @id @default(uuid())
+  paymentId      String   @unique
+  payment        Payment  @relation(fields: [paymentId], references: [id])
+  receiptNumber  String   @unique
+  generatedAt    DateTime @default(now())
+}
+
+model FeeConcession {
+  id              String               @id @default(uuid())
+  allocationId    String
+  allocation      StudentFeeAllocation @relation(fields: [allocationId], references: [id])
+  concessionType  String               // FULL, PARTIAL, SCHOLARSHIP, SIBLING_DISCOUNT
+  amountWaived    Float
+  justification   String?
+  approvedById    String
+  createdAt       DateTime             @default(now())
+}
+
+// ─────────────────────────────────────────────
+// 06_Exams
+// ─────────────────────────────────────────────
+
+model GradeScale {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  gradeLetter   String      // A1, A2, B1, B2, C1, C2, D, E
+  minPercentage Float
+  maxPercentage Float
+  gradePoints   Float       // CGPA contribution
+  description   String?     // Outstanding, Very Good, etc.
+  createdAt     DateTime    @default(now())
+
+  @@unique([institutionId, gradeLetter])
+}
+
+model ReportCardStatus {
+  id             String   @id @default(uuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear   String
+  term           String   // TERM1, TERM2, ANNUAL
+  status         String   @default("PENDING") // PENDING, GENERATED, PUBLISHED, LOCKED
+  generatedAt    DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, academicYear, term])
+}
+
+// ─────────────────────────────────────────────
+// 07_Staff
+// ─────────────────────────────────────────────
+
+model StaffLeaveBalance {
+  id          String   @id @default(uuid())
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  leaveType   String   // CL, EL, SL, ML, ON_DUTY
+  entitlement Int      @default(0)
+  consumed    Int      @default(0)
+  academicYear String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([staffId, leaveType, academicYear])
+}
+
+// ─────────────────────────────────────────────
+// 13_StudentPortal
+// ─────────────────────────────────────────────
+
+model HomeworkAssignment {
+  id          String   @id @default(uuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime
+  createdById String
+  createdBy   Staff    @relation("HomeworkCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  submissions HomeworkSubmission[]
+}
+
+model HomeworkSubmission {
+  id           String             @id @default(uuid())
+  assignmentId String
+  assignment   HomeworkAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fileUrl      String?
+  remarks      String?
+  status       String             @default("PENDING") // PENDING, SUBMITTED, GRADED, LATE
+  score        Float?
+  submittedAt  DateTime           @default(now())
+  gradedAt     DateTime?
+
+  @@unique([assignmentId, studentId])
+}
+
+// ─────────────────────────────────────────────
+// 11_Documents
+// ─────────────────────────────────────────────
+
+model IssuedDocument {
+  id               String   @id @default(uuid())
+  docType          String   // TC, BONAFIDE, CHARACTER, MIGRATION, ID_CARD, MARKSHEET
+  targetType       String   // STUDENT, STAFF
+  targetId         String
+  documentNumber   String   @unique
+  verificationHash String?  // SHA-256 hash for QR verification
+  pdfUrl           String?
+  generatedById    String
+  generatedAt      DateTime @default(now())
+
+  @@index([targetId, docType])
 }

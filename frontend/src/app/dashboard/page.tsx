@@ -63,6 +63,8 @@ import GateTab from '@/14_FutureTrendModules/VisitorManagement/GateTab';
 import CertificatesTab from '@/11_Documents/Certificates/CertificatesTab';
 import InventoryTab from '@/14_FutureTrendModules/Inventory/InventoryTab';
 import HrTab from '@/07_Staff/StaffProfile/HrTab';
+import ReportsDashboard from '@/09_Reports/ReportsDashboard';
+import AnalyticsDashboard from '@/10_Analytics/AnalyticsDashboard';
 import SettingsTab from '@/01_Core/Dashboard/SettingsTab';
 
 export default function DashboardPage() {
@@ -80,7 +82,7 @@ export default function DashboardPage() {
   const [examsTab, setExamsTab] = useState<'list' | 'entry'>('list');
   const [academicTab, setAcademicTab] = useState<'timetable' | 'lessons'>('timetable');
   const [studentTab, setStudentTab] = useState<'list' | 'admission' | 'promotions'>('list');
-  const [hrTab, setHrTab] = useState<'employees' | 'payroll' | 'leaves'>('employees');
+  const [hrTab, setHrTab] = useState<'employees' | 'payroll' | 'leaves' | 'punch'>('employees');
   const [librarySubTab, setLibrarySubTab] = useState<'inventory' | 'checkout' | 'issues'>('inventory');
 
   // Steppers
@@ -736,6 +738,14 @@ export default function DashboardPage() {
               setSelectedPayroll={setSelectedPayroll}
               triggerToast={triggerToast}
             />
+          )}
+
+          {activeCategory === 'reports' && (
+            <ReportsDashboard />
+          )}
+
+          {activeCategory === 'analytics' && (
+            <AnalyticsDashboard />
           )}
 
           {activeCategory === 'settings' && (

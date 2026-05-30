@@ -4,7 +4,7 @@ import React from 'react';
 import { 
   LayoutDashboard, Users, CalendarCheck, CreditCard, GraduationCap, Briefcase, Megaphone, LogOut,
   Moon, Sun, ShieldCheck, BookOpen, Book, Award, MessageSquare, BarChart2,
-  Settings, Bell, Menu, Sparkles, ShieldAlert, ChevronLeft, ChevronRight
+  Settings, Bell, Menu, Sparkles, ShieldAlert, ChevronLeft, ChevronRight, FileText
 } from 'lucide-react';
 
 const ROLES_LIST = [
@@ -38,6 +38,8 @@ const SIDEBAR_CATEGORIES = [
   { id: 'gate', label: 'Visitor Gate Desk', icon: ShieldAlert, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'STAFF'] },
   { id: 'inventory', label: 'Inventory Desk', icon: BarChart2, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'STAFF'] },
   { id: 'hr', label: 'HR System', icon: Briefcase, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'] },
+  { id: 'reports', label: 'Reports Desk', icon: FileText, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'TEACHER'] },
+  { id: 'analytics', label: 'Analytics Desk', icon: BarChart2, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'TEACHER'] },
   { id: 'settings', label: 'Settings', icon: Settings, roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'] }
 ];
 
