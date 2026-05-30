@@ -2,6 +2,8 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Requ
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
 import { StudentService } from './student.service';
+import { CreateStudentDto } from './dto/create-student.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('students')
@@ -15,28 +17,47 @@ export class StudentController {
     @Query('classId') classId?: string,
     @Query('search') search?: string,
   ) {
-    return this.studentService.findAll(req.user.institutionId, classId, search);
+    return this.studentService.findAll(
+      req.user.institutionId,
+      classId,
+      search,
+      req.user.role,
+      req.user.profileId,
+    );
   }
 
   @Get(':id')
   @Roles('INSTITUTE_ADMIN', 'STAFF', 'TEACHER', 'ACCOUNTANT', 'STUDENT', 'PARENT')
   async findOne(@Request() req, @Param('id') id: string) {
-    // If student/parent role is calling, enforce profile ownership check
+    // If student role is calling, enforce profile ownership check
     if (req.user.role === 'STUDENT' && req.user.profileId !== id) {
       throw new ForbiddenException('You can only access your own profile');
     }
-    return this.studentService.findOne(req.user.institutionId, id);
+    
+    // Fetch and check parent ownership internally inside service or here
+    const student = await this.studentService.findOne(
+      req.user.institutionId,
+      id,
+      req.user.role,
+      req.user.profileId,
+    );
+
+    if (req.user.role === 'PARENT' && student.parentId !== req.user.profileId) {
+      throw new ForbiddenException('You can only access profiles of your linked children');
+    }
+
+    return student;
   }
 
   @Post()
   @Roles('INSTITUTE_ADMIN', 'STAFF')
-  async create(@Request() req, @Body() body: any) {
+  async create(@Request() req, @Body() body: CreateStudentDto) {
     return this.studentService.create(req.user.institutionId, body);
   }
 
   @Put(':id')
   @Roles('INSTITUTE_ADMIN', 'STAFF')
-  async update(@Request() req, @Param('id') id: string, @Body() body: any) {
+  async update(@Request() req, @Param('id') id: string, @Body() body: UpdateStudentDto) {
     return this.studentService.update(req.user.institutionId, id, body);
   }
 

@@ -1,14 +1,41 @@
 // IEEE Standard 1012 compliant software validation and student service operations
 // Deeply structured for Indian academic record keeping standards
 
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { encrypt, decrypt, maskSensitiveData } from '../common/helpers/encryption.helper';
 
 @Injectable()
 export class StudentService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(institutionId: string, classId?: string, search?: string) {
+  private processSensitiveFields(student: any, requesterRole?: string): any {
+    if (!student) return student;
+    const decryptedAadhaar = decrypt(student.aadhaarNumber);
+    const decryptedAccNumber = decrypt(student.accNumber);
+    const decryptedIfscCode = decrypt(student.ifscCode);
+
+    const isAuthorized = requesterRole === 'SUPER_ADMIN' || requesterRole === 'INSTITUTE_ADMIN';
+
+    return {
+      ...student,
+      aadhaarNumber: isAuthorized ? decryptedAadhaar : maskSensitiveData(decryptedAadhaar, 4),
+      accNumber: isAuthorized ? decryptedAccNumber : maskSensitiveData(decryptedAccNumber, 4),
+      ifscCode: isAuthorized ? decryptedIfscCode : maskSensitiveData(decryptedIfscCode, 4),
+    };
+  }
+
+  private processSensitiveFieldsList(students: any[], requesterRole?: string): any[] {
+    return students.map(s => this.processSensitiveFields(s, requesterRole));
+  }
+
+  async findAll(
+    institutionId: string,
+    classId?: string,
+    search?: string,
+    requesterRole?: string,
+    requesterProfileId?: string,
+  ) {
     const where: any = { institutionId };
     
     if (classId) {
@@ -21,11 +48,19 @@ export class StudentService {
         { lastName: { contains: search, mode: 'insensitive' } },
         { rollNumber: { contains: search, mode: 'insensitive' } },
         { scholarNumber: { contains: search, mode: 'insensitive' } },
-        { aadhaarNumber: { contains: search } },
       ];
     }
 
-    return this.prisma.student.findMany({
+    if (requesterRole === 'TEACHER' && requesterProfileId) {
+      where.class = {
+        OR: [
+          { classTeacherId: requesterProfileId },
+          { subjects: { some: { teacherId: requesterProfileId } } }
+        ]
+      };
+    }
+
+    const students = await this.prisma.student.findMany({
       where,
       include: {
         class: { select: { id: true, name: true, board: true, stream: true } },
@@ -33,9 +68,16 @@ export class StudentService {
       },
       orderBy: { rollNumber: 'asc' },
     });
+
+    return this.processSensitiveFieldsList(students, requesterRole);
   }
 
-  async findOne(institutionId: string, id: string) {
+  async findOne(
+    institutionId: string,
+    id: string,
+    requesterRole?: string,
+    requesterProfileId?: string,
+  ) {
     const student = await this.prisma.student.findFirst({
       where: { id, institutionId },
       include: {
@@ -64,7 +106,22 @@ export class StudentService {
       throw new NotFoundException('Student profile not found');
     }
 
-    return student;
+    if (requesterRole === 'TEACHER' && requesterProfileId) {
+      const isAssigned = await this.prisma.class.findFirst({
+        where: {
+          id: student.classId,
+          OR: [
+            { classTeacherId: requesterProfileId },
+            { subjects: { some: { teacherId: requesterProfileId } } }
+          ]
+        }
+      });
+      if (!isAssigned) {
+        throw new ForbiddenException('You can only access students in your assigned classes');
+      }
+    }
+
+    return this.processSensitiveFields(student, requesterRole);
   }
 
   async create(institutionId: string, data: any) {
@@ -87,7 +144,7 @@ export class StudentService {
       throw new BadRequestException('PIN code must be exactly 6 digits');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const createdStudent = await this.prisma.$transaction(async (tx) => {
       // 3. Auto-generate permanent Scholar Number
       const studentCount = await tx.student.count({ where: { institutionId } });
       const currentYear = new Date().getFullYear();
@@ -118,7 +175,7 @@ export class StudentService {
           institutionId,
           
           // Indian demographic credentials
-          aadhaarNumber: data.aadhaarNumber || null,
+          aadhaarNumber: encrypt(data.aadhaarNumber) || null,
           samagraId: data.samagraId || null,
           familyId: data.familyId || null,
           penNumber: data.penNumber || null,
@@ -139,8 +196,8 @@ export class StudentService {
           // Banking credentials
           bankName: data.bankName || null,
           accHolderName: data.accHolderName || null,
-          accNumber: data.accNumber || null,
-          ifscCode: data.ifscCode ? data.ifscCode.toUpperCase() : null,
+          accNumber: encrypt(data.accNumber) || null,
+          ifscCode: data.ifscCode ? encrypt(data.ifscCode.toUpperCase()) : null,
           bankBranch: data.bankBranch || null,
           upiId: data.upiId || null,
 
@@ -170,6 +227,8 @@ export class StudentService {
 
       return student;
     });
+
+    return this.processSensitiveFields(createdStudent, 'SUPER_ADMIN');
   }
 
   async update(institutionId: string, id: string, data: any) {
@@ -188,7 +247,7 @@ export class StudentService {
       throw new BadRequestException('Invalid bank IFSC code format');
     }
 
-    return this.prisma.student.update({
+    const updatedStudent = await this.prisma.student.update({
       where: { id },
       data: {
         firstName: data.firstName,
@@ -198,7 +257,7 @@ export class StudentService {
         classId: data.classId,
         rollNumber: data.rollNumber,
         
-        aadhaarNumber: data.aadhaarNumber,
+        aadhaarNumber: data.aadhaarNumber !== undefined ? (encrypt(data.aadhaarNumber) || null) : undefined,
         samagraId: data.samagraId,
         familyId: data.familyId,
         penNumber: data.penNumber,
@@ -213,8 +272,8 @@ export class StudentService {
         
         bankName: data.bankName,
         accHolderName: data.accHolderName,
-        accNumber: data.accNumber,
-        ifscCode: data.ifscCode ? data.ifscCode.toUpperCase() : undefined,
+        accNumber: data.accNumber !== undefined ? (encrypt(data.accNumber) || null) : undefined,
+        ifscCode: data.ifscCode !== undefined ? (data.ifscCode ? encrypt(data.ifscCode.toUpperCase()) : null) : undefined,
         bankBranch: data.bankBranch,
 
         houseNo: data.houseNo,
@@ -225,6 +284,8 @@ export class StudentService {
         pinCode: data.pinCode,
       },
     });
+
+    return this.processSensitiveFields(updatedStudent, 'SUPER_ADMIN');
   }
 
   async promote(institutionId: string, data: { studentIds: string[]; targetClassId: string }, promotedById?: string) {

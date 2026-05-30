@@ -55,6 +55,10 @@ model User {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  // Lockout parameters
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   // Profile Relations
   studentProfile Student?
   parentProfile  Parent?
@@ -579,4 +583,14 @@ model PromotionHistory {
   promotedById String
   promotedBy   User     @relation(fields: [promotedById], references: [id])
   promotedAt   DateTime @default(now())
+}
+
+model SecurityEventLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  email     String?
+  action    String
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
 }

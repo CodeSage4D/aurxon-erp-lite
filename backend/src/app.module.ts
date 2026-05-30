@@ -20,6 +20,10 @@ import { TimetableModule } from './timetable/timetable.module';
 import { BranchModule } from './branch/branch.module';
 import { SettingsModule } from './settings/settings.module';
 import { NotificationModule } from './notification/notification.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -42,8 +46,23 @@ import { NotificationModule } from './notification/notification.module';
     BranchModule,
     SettingsModule,
     NotificationModule,
+    UploadModule,
+    ThrottlerModule.forRoot([{
+      ttl: 60000, // 1 minute
+      limit: 100, // 100 requests per minute
+    }]),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditLogInterceptor,
+    },
+  ],
 })
 export class AppModule {}
