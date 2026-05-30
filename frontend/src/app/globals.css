@@ -1,66 +1,66 @@
 @import "tailwindcss";
 
 :root {
-  /* Elegant Day: Pearl & Navy */
-  --background: #faf9f6; /* Warm ivory/pearl */
-  --foreground: #0f172a; /* Deep navy/charcoal */
+  /* Light Mode Design System V2 (Ramp, Stripe & Mercury Inspired) */
+  --background: #F8FAFC;
+  --foreground: #0F172A;
   
-  --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
   
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
   
-  --primary: #1e3a8a; /* Rich Navy Blue */
-  --primary-foreground: #ffffff;
+  --primary: #2563EB; /* Premium SaaS Accent */
+  --primary-foreground: #FFFFFF;
   
-  --secondary: #f1f5f9; /* Soft slate */
-  --secondary-foreground: #0f172a;
+  --secondary: #FFFFFF;
+  --secondary-foreground: #475569;
   
-  --muted: #f8fafc;
-  --muted-foreground: #64748b;
+  --muted: #F8FAFC;
+  --muted-foreground: #94A3B8;
   
-  --accent: #e2e8f0;
-  --accent-foreground: #1e3a8a;
+  --accent: #E2E8F0;
+  --accent-foreground: #2563EB;
   
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
   
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #1e3a8a;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #2563EB;
   
   --radius: 0.75rem;
 }
 
 .dark {
-  /* High-contrast ERP Slate & Navy */
-  --background: #090D16; /* Deep obsidian navy */
-  --foreground: #f8fafc; /* Crisp silver-white */
+  /* Dark Mode Design System V2 (Stripe, Linear & Vercel Slate & Navy) */
+  --background: #0B1220;
+  --foreground: #F8FAFC;
   
-  --card: #151D30; /* Solid deep navy panel */
-  --card-foreground: #f8fafc;
+  --card: #121B2D;
+  --card-foreground: #F8FAFC;
   
-  --popover: #151D30;
-  --popover-foreground: #f8fafc;
+  --popover: #121B2D;
+  --popover-foreground: #F8FAFC;
   
-  --primary: #2563EB; /* Premium ERP Blue */
-  --primary-foreground: #ffffff;
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
   
-  --secondary: #1E293B;
-  --secondary-foreground: #e2e8f0;
+  --secondary: #182338;
+  --secondary-foreground: #CBD5E1;
   
-  --muted: #1E293B;
-  --muted-foreground: #94a3b8;
+  --muted: #182338;
+  --muted-foreground: #94A3B8;
   
-  --accent: #3b82f6;
-  --accent-foreground: #ffffff;
+  --accent: #2563EB;
+  --accent-foreground: #FFFFFF;
   
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
   
-  --border: #222D44; /* High-contrast slate-navy border */
-  --input: #1E293B;
+  --border: #263247;
+  --input: #182338;
   --ring: #2563EB;
 }
 
@@ -122,9 +122,9 @@ body {
 }
 
 .dark .glass {
-  background: rgba(21, 29, 48, 0.98) !important;
+  background: #121B2D !important;
   backdrop-filter: none !important;
-  border-color: #222D44 !important;
+  border-color: #263247 !important;
 }
 
 /* Micro-animations */
