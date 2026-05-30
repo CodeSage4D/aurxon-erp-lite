@@ -448,7 +448,7 @@ export default function DashboardPage() {
       }`}>
         
         {/* HEADER */}
-        <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6 dark:border-zinc-800/80 dark:bg-zinc-900/40 shrink-0">
+        <header className="flex h-16 items-center justify-between border-b border-border bg-card/80 backdrop-blur-xl px-6 shrink-0 transition-colors z-20 sticky top-0">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => {
@@ -458,80 +458,86 @@ export default function DashboardPage() {
                   setSidebarCollapsed(!sidebarCollapsed);
                 }
               }} 
-              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="flex items-center gap-1 text-xs text-zinc-400 font-semibold">
-              <span className="uppercase">AURXON</span>
-              <ChevronRight className="h-3 w-3" />
-              <span className="text-sky-600 dark:text-sky-400 capitalize">{activeCategory} desk</span>
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="uppercase text-muted-foreground tracking-wider">AURXON</span>
+              <ChevronRight className="h-3 w-3 text-border" />
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-md">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="text-primary capitalize tracking-wide">{activeCategory} desk</span>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative hidden sm:block">
-              <Search className="absolute top-2.5 left-3 h-4 w-4 text-zinc-400" />
+            <div className="relative hidden sm:block group">
+              <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <input
                 type="text"
                 placeholder="Search commands... (Ctrl+K)"
                 readOnly
                 onClick={() => setCommandPaletteOpen(true)}
-                className="w-56 cursor-pointer rounded-xl border border-zinc-200 bg-zinc-50/50 py-2 pl-9 pr-4 text-xs font-medium text-zinc-800 placeholder-zinc-400 outline-none transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-white"
+                className="w-56 cursor-pointer rounded-xl border border-border bg-input/40 py-2 pl-9 pr-4 text-xs font-medium text-foreground placeholder-muted-foreground outline-none transition-all duration-200 hover:border-primary/50 focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20 glass"
               />
             </div>
 
             <button
               onClick={() => setAiAssistantOpen(!aiAssistantOpen)}
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-500/20 dark:bg-indigo-400/10 dark:text-indigo-400 transition"
+              className="flex items-center gap-1.5 rounded-xl bg-primary/10 border border-primary/20 px-3 py-2 text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300 hover-lift shadow-sm shadow-primary/10"
             >
-              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+              <Sparkles className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Ask AI Assistant</span>
             </button>
 
             <div className="relative">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 transition relative"
+                className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors relative focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <Bell className="h-4.5 w-4.5" />
                 {notifications.filter((n: any) => !n.isRead).length > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse shadow-sm shadow-destructive/50" />
                 )}
               </button>
               
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 z-50 w-80 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="flex items-center justify-between border-b border-zinc-100 pb-2 dark:border-zinc-800">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Real-time Alerts</p>
+                <div className="absolute right-0 mt-2 z-50 w-80 rounded-2xl border border-border bg-card p-4 shadow-2xl glass">
+                  <div className="flex items-center justify-between border-b border-border pb-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Real-time Alerts</p>
                     <div className="flex items-center gap-2">
                       {notifications.filter((n: any) => !n.isRead).length > 0 && (
                         <button 
                           onClick={handleMarkAllRead} 
-                          className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                          className="text-[10px] font-bold text-primary hover:underline hover:text-primary/80 transition-colors"
                         >
                           Mark all read
                         </button>
                       )}
-                      <button className="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline" onClick={() => setNotificationsOpen(false)}>Close</button>
+                      <button className="text-[10px] font-bold text-destructive hover:underline transition-colors" onClick={() => setNotificationsOpen(false)}>Close</button>
                     </div>
                   </div>
-                  <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                  <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
                     {notifications.length === 0 ? (
-                      <p className="text-xs text-zinc-400 text-center py-4 font-medium">No alerts at the moment.</p>
+                      <div className="flex flex-col items-center justify-center py-6 text-center">
+                        <Bell className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                        <p className="text-xs text-muted-foreground font-medium">No new alerts.</p>
+                      </div>
                     ) : (
                       notifications.map((n) => (
-                        <div key={n.id} className={`rounded-lg p-2.5 border text-xs transition ${
+                        <div key={n.id} className={`rounded-xl p-3 border text-xs transition-all duration-200 ${
                           n.isRead 
-                            ? 'bg-zinc-50/50 dark:bg-zinc-950/20 border-zinc-100/50 dark:border-zinc-850' 
-                            : 'bg-indigo-50/20 dark:bg-indigo-950/10 border-indigo-100/40 dark:border-indigo-900/30'
+                            ? 'bg-muted/30 border-border/50 hover:bg-muted/50' 
+                            : 'bg-primary/5 border-primary/20 shadow-sm hover:bg-primary/10'
                         }`}>
-                          <div className="flex justify-between items-start font-bold text-zinc-800 dark:text-zinc-200 gap-2">
-                            <span className="flex-1 font-bold">{n.title}</span>
-                            {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 mt-1" />}
+                          <div className="flex justify-between items-start gap-2">
+                            <span className={`flex-1 font-bold ${n.isRead ? 'text-foreground/80' : 'text-foreground'}`}>{n.title}</span>
+                            {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1 shrink-0" />}
                           </div>
-                          <p className="mt-1 text-[11px] text-zinc-550 dark:text-zinc-400 leading-normal">{n.content}</p>
-                          <p className="mt-1.5 text-[9px] text-zinc-450 font-medium">
+                          <p className={`mt-1.5 text-[11px] leading-relaxed ${n.isRead ? 'text-muted-foreground' : 'text-foreground/80'}`}>{n.content}</p>
+                          <p className="mt-2 text-[9px] font-semibold text-muted-foreground/80">
                             {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
@@ -544,7 +550,7 @@ export default function DashboardPage() {
 
             <button
               onClick={() => document.documentElement.classList.toggle('dark')}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 transition"
+              className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <Sun className="h-4.5 w-4.5 hidden dark:block" />
               <Moon className="h-4.5 w-4.5 dark:hidden" />
