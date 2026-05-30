@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginApi } from '@/lib/api';
-import { Shield, Sparkles, LogIn, ArrowRight, UserCheck } from 'lucide-react';
+import { Shield, Sparkles, LogIn, ArrowRight, UserCheck, Users, CreditCard, GraduationCap } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -142,47 +142,80 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Quick login shortcuts for testing */}
-        <div className="glass rounded-2xl p-6 border border-border">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
-            <UserCheck className="h-4 w-4 text-primary" />
-            <span>Developer Quick Access</span>
+        {/* Premium Onboarding & School Sales Demo Portal */}
+        <div className="glass rounded-3xl p-6 border border-border/80 shadow-lg relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-primary/30 to-accent/30" />
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">
+            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            <span>Explore AURXON Demo School</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
+            Bypass standard login credential pools. Click a role profile below to explore simplified dashboards, live roll-call operations, Stripe fee checkouts, and executive Recharts compliance trends in our simulated campus.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               onClick={() => autofill('admin@aurxon.com')}
-              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
+              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
             >
-              <span>Admin Desk</span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
+              <div className="p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary shrink-0">
+                <Shield className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-black text-foreground group-hover:text-primary transition-colors truncate">Principal Cockpit</div>
+                <div className="text-[10px] text-muted-foreground font-medium truncate">Oversee school analytics</div>
+              </div>
             </button>
+            
             <button
               onClick={() => autofill('teacher1@aurxon.com')}
-              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
+              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
             >
-              <span>Teacher Desk</span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 shrink-0">
+                <Users className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-black text-foreground group-hover:text-emerald-500 transition-colors truncate">Teacher Desk</div>
+                <div className="text-[10px] text-muted-foreground font-medium truncate">Grade tasks & take roll-call</div>
+              </div>
             </button>
-            <button
-              onClick={() => autofill('accountant@aurxon.com')}
-              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
-            >
-              <span>Account Desk</span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => autofill('student@aurxon.com')}
-              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
-            >
-              <span>Student Profile</span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
-            </button>
+
             <button
               onClick={() => autofill('parent@aurxon.com')}
-              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80 col-span-2"
+              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
             >
-              <span>Parent Desk</span>
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
+              <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 shrink-0">
+                <CreditCard className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-black text-foreground group-hover:text-rose-500 transition-colors truncate">Parent Portal</div>
+                <div className="text-[10px] text-muted-foreground font-medium truncate">Track children & pay dues</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => autofill('student@aurxon.com')}
+              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
+            >
+              <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 shrink-0">
+                <GraduationCap className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-black text-foreground group-hover:text-indigo-500 transition-colors truncate">Student Desk</div>
+                <div className="text-[10px] text-muted-foreground font-medium truncate">Check timetables & homework</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => autofill('accountant@aurxon.com')}
+              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group sm:col-span-2"
+            >
+              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 shrink-0">
+                <UserCheck className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-black text-foreground group-hover:text-amber-500 transition-colors truncate">Finance Desk</div>
+                <div className="text-[10px] text-muted-foreground font-medium truncate">Oversee school expense ledgers & statutory audits</div>
+              </div>
             </button>
           </div>
         </div>
