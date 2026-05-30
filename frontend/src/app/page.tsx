@@ -13,7 +13,6 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [theme, setTheme] = useState('dark');
 
-  // Apply default theme to body class
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
@@ -44,50 +43,54 @@ export default function LoginPage() {
     }
   };
 
-  // Helper autofill credentials
   const autofill = (roleEmail: string) => {
     setEmail(roleEmail);
     setPassword('password123');
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 transition-colors duration-300 dark:bg-zinc-950 sm:px-6">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 transition-colors duration-500 sm:px-6 relative overflow-hidden">
+      {/* Decorative background blobs */}
+      <div className="absolute top-[-10%] left-[-10%] h-[40%] w-[40%] rounded-full bg-primary/20 blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] h-[40%] w-[40%] rounded-full bg-accent/20 blur-[100px] pointer-events-none" />
+
       {/* Top right theme toggle */}
-      <div className="absolute top-6 right-6">
+      <div className="absolute top-6 right-6 z-10">
         <button
           onClick={toggleTheme}
-          className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="glass flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-foreground shadow-sm hover-lift transition-all"
         >
-          <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+          <Sparkles className="h-4 w-4 text-primary" />
           <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
       </div>
 
-      <div className="w-full max-w-md space-y-8">
+      <div className="w-full max-w-md space-y-8 z-10 relative">
         {/* Branding header */}
         <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/35 dark:shadow-indigo-500/15">
-            <Shield className="h-6 w-6" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover-lift">
+            <Shield className="h-7 w-7" />
           </div>
-          <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
-            AURXON <span className="text-indigo-600 dark:text-indigo-400">ERP Lite</span>
+          <h2 className="mt-6 text-4xl font-extrabold tracking-tight text-foreground">
+            AURXON <span className="text-primary">ERP Lite</span>
           </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Enterprise power with elegant simplicity
+          <p className="mt-2 text-sm text-muted-foreground font-medium">
+            Next-Generation Educational Management
           </p>
         </div>
 
         {/* Login form Card */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-8 shadow-xl transition-colors duration-300 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:backdrop-blur-md">
+        <div className="glass rounded-3xl p-8 shadow-2xl relative overflow-hidden border border-border">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-accent" />
           <form className="space-y-6" onSubmit={handleLogin}>
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-medium text-destructive backdrop-blur-sm">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
                 Email Address
               </label>
               <input
@@ -96,13 +99,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@aurxon.com"
-                className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-950 placeholder-zinc-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:focus:border-indigo-500 dark:focus:bg-zinc-900"
+                className="w-full rounded-xl border border-border bg-input/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 glass"
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Password
                 </label>
               </div>
@@ -112,20 +115,20 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-950 placeholder-zinc-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white dark:focus:border-indigo-500 dark:focus:bg-zinc-900"
+                className="w-full rounded-xl border border-border bg-input/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 glass"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 dark:shadow-indigo-500/10"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
             >
               {loading ? (
-                <span>Verifying credentials...</span>
+                <span>Authenticating...</span>
               ) : (
                 <>
-                  <span>Sign In</span>
+                  <span>Secure Sign In</span>
                   <LogIn className="h-4 w-4" />
                 </>
               )}
@@ -134,44 +137,41 @@ export default function LoginPage() {
         </div>
 
         {/* Quick login shortcuts for testing */}
-        <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 p-6 dark:border-zinc-800 dark:bg-zinc-900/20">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-            <UserCheck className="h-3.5 w-3.5 text-indigo-500" />
-            <span>Developer Quick Login Profiles</span>
+        <div className="glass rounded-2xl p-6 border border-border">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
+            <UserCheck className="h-4 w-4 text-primary" />
+            <span>Developer Quick Access</span>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => autofill('admin@aurxon.com')}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-xs font-medium text-zinc-700 shadow-sm transition hover:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-indigo-500/50"
+              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
             >
               <span>Admin Desk</span>
-              <ArrowRight className="h-3 w-3 text-zinc-400" />
+              <ArrowRight className="h-3 w-3 text-muted-foreground" />
             </button>
             <button
               onClick={() => autofill('teacher1@aurxon.com')}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-xs font-medium text-zinc-700 shadow-sm transition hover:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-indigo-500/50"
+              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
             >
               <span>Teacher Desk</span>
-              <ArrowRight className="h-3 w-3 text-zinc-400" />
+              <ArrowRight className="h-3 w-3 text-muted-foreground" />
             </button>
             <button
               onClick={() => autofill('accountant@aurxon.com')}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-xs font-medium text-zinc-700 shadow-sm transition hover:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-indigo-500/50"
+              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
             >
-              <span>Accountant Desk</span>
-              <ArrowRight className="h-3 w-3 text-zinc-400" />
+              <span>Account Desk</span>
+              <ArrowRight className="h-3 w-3 text-muted-foreground" />
             </button>
             <button
               onClick={() => autofill('student@aurxon.com')}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-xs font-medium text-zinc-700 shadow-sm transition hover:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-indigo-500/50"
+              className="flex items-center justify-between rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left text-xs font-medium text-foreground shadow-sm transition hover:border-primary hover:bg-card/80"
             >
               <span>Student Profile</span>
-              <ArrowRight className="h-3 w-3 text-zinc-400" />
+              <ArrowRight className="h-3 w-3 text-muted-foreground" />
             </button>
           </div>
-          <p className="mt-3.5 text-center text-[10px] text-zinc-500 dark:text-zinc-400">
-            Password: <code className="rounded bg-zinc-200 px-1 py-0.5 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300">password123</code> for all accounts.
-          </p>
         </div>
       </div>
     </div>
