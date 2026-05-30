@@ -287,18 +287,23 @@ const DEFAULT_MOCK_DB = {
 };
 
 // Access mock database helpers
-function getMockDb() {
+function getMockDb(): any {
   if (typeof window === 'undefined') return DEFAULT_MOCK_DB;
   const stored = localStorage.getItem(MOCK_STORAGE_KEY);
-  if (!stored) {
-    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(DEFAULT_MOCK_DB));
-    return DEFAULT_MOCK_DB;
+  let parsed = DEFAULT_MOCK_DB as any;
+  if (stored) {
+    try {
+      parsed = JSON.parse(stored);
+    } catch (e) {
+      parsed = DEFAULT_MOCK_DB;
+    }
   }
-  try {
-    return JSON.parse(stored);
-  } catch (e) {
-    return DEFAULT_MOCK_DB;
+  // Auto-seed Demo School if missing or old size
+  if (!parsed.students || parsed.students.length < 50) {
+    parsed = initializeDemoSchoolDb(parsed);
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(parsed));
   }
+  return parsed;
 }
 
 function saveMockDb(db: any) {
@@ -428,6 +433,112 @@ export async function getDashboardStatsApi() {
     const presentCount = db.attendance.filter(r => r.status === 'PRESENT').length;
     const attendanceRate = totalAttend > 0 ? (presentCount / totalAttend) * 100 : 96.5;
 
+    // Flagged weak students (attendance < 70% and exam average < 40%)
+    const weakStudents: any[] = [];
+    for (const student of db.students) {
+      const sAttend = db.attendance.filter(r => r.studentId === student.id);
+      const sPresent = sAttend.filter(r => r.status === 'PRESENT').length;
+      const sAttRate = sAttend.length > 0 ? Math.round((sPresent / sAttend.length) * 100) : 95;
+      
+      const sResults = db.examResults.filter(r => r.studentId === student.id);
+      const sMarksAvg = sResults.length > 0 
+        ? Math.round(sResults.reduce((acc, r) => acc + r.marksObtained, 0) / sResults.length) 
+        : 82;
+      
+      if (sAttRate < 70 && sMarksAvg < 40) {
+        weakStudents.push({
+          studentId: student.id,
+          name: `${student.firstName} ${student.lastName}`,
+          scholarNumber: student.scholarNumber || `SCH-2026-${student.id.slice(-4)}`,
+          rollNumber: student.rollNumber,
+          className: db.classes.find(c => c.id === student.classId)?.name || 'Assigned Grade',
+          attendanceRate: sAttRate,
+          examAverage: sMarksAvg
+        });
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // HISTORICAL EXECUTIVE ANALYTICS SEED DATA
+    // ─────────────────────────────────────────────
+    
+    // 30 Days daily attendance rates
+    const attendanceTrend: any[] = [];
+    const todayDate = new Date();
+    for (let day = 29; day >= 0; day--) {
+      const curDate = new Date(todayDate);
+      curDate.setDate(todayDate.getDate() - day);
+      if (curDate.getDay() === 0) continue; // Skip Sundays
+      
+      const dateStr = curDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+      // Calculate attendance rate for this day
+      const dateIso = curDate.toISOString().substring(0, 10);
+      const dayRecords = db.attendance.filter(r => r.date === dateIso);
+      const dayPresent = dayRecords.filter(r => r.status === 'PRESENT').length;
+      const rate = dayRecords.length > 0 ? Math.round((dayPresent / dayRecords.length) * 1000) / 10 : 95 + (day % 3);
+      
+      attendanceTrend.push({ date: dateStr, rate });
+    }
+
+    // Monthly Fee Collections Ledger (6 months)
+    const feeCollectionsTrend = [
+      { month: 'Dec 2025', collected: 8200, outstanding: 1200 },
+      { month: 'Jan 2026', collected: 12400, outstanding: 1800 },
+      { month: 'Feb 2026', collected: 15600, outstanding: 1400 },
+      { month: 'Mar 2026', collected: 10200, outstanding: 2500 },
+      { month: 'Apr 2026', collected: 18100, outstanding: 1900 },
+      { month: 'May 2026', collected: 22000, outstanding: 3500 }
+    ];
+
+    // Student Admissions Growth (3 years)
+    const admissionsGrowth = [
+      { year: '2024', count: 62 },
+      { year: '2025', count: 84 },
+      { year: '2026', count: studentCount }
+    ];
+
+    // Exam Term averages
+    const examPerformanceTrend = [
+      { term: 'CBSE Term 1', average: 68 },
+      { term: 'CBSE Term 2', average: 85 }
+    ];
+
+    // Teacher Attendance Monthly
+    const teacherAttendanceTrend = [
+      { month: 'Jan', rate: 97.2 },
+      { month: 'Feb', rate: 96.5 },
+      { month: 'Mar', rate: 98.1 },
+      { month: 'Apr', rate: 95.8 },
+      { month: 'May', rate: 97.5 }
+    ];
+
+    // Student Performance Distribution ranges
+    const studentPerformanceDistribution = [
+      { grade: 'A1 (91-100)', count: 28 },
+      { grade: 'A2 (81-90)', count: 32 },
+      { grade: 'B1/B2 (71-80)', count: 24 },
+      { grade: 'C1/C2 (51-70)', count: 12 },
+      { grade: 'D (40-50)', count: 2 },
+      { grade: 'F (< 40)', count: weakStudents.length }
+    ];
+
+    // Class wise performance (Grade 6-A to Grade 10-A)
+    const classWisePerformance = [
+      { grade: 'Grade 6-A', average: 78 },
+      { grade: 'Grade 7-A', average: 82 },
+      { grade: 'Grade 8-A', average: 75 },
+      { grade: 'Grade 9-A', average: 84 },
+      { grade: 'Grade 10-A', average: 80 }
+    ];
+
+    // Staff Leaves Analytics
+    const leaveAnalytics = [
+      { type: 'Casual (CL)', count: 8 },
+      { type: 'Earned (EL)', count: 4 },
+      { type: 'Medical (SL)', count: 3 },
+      { type: 'Special Duty', count: 2 }
+    ];
+
     return {
       studentCount,
       staffCount,
@@ -441,6 +552,23 @@ export async function getDashboardStatsApi() {
       attendanceRate: Math.round(attendanceRate * 10) / 10,
       recentNotices: db.notices.slice(0, 3),
       classes: db.classes,
+      weakStudents,
+      analytics: {
+        attendanceTrend,
+        feeCollectionsTrend,
+        admissionsGrowth,
+        examPerformanceTrend,
+        teacherAttendanceTrend,
+        studentPerformanceDistribution,
+        classWisePerformance,
+        leaveAnalytics,
+        genderDistribution: [
+          { name: 'Boys', value: db.students.filter((s: any) => s.gender === 'MALE').length || 54 },
+          { name: 'Girls', value: db.students.filter((s: any) => s.gender === 'FEMALE').length || 46 }
+        ],
+        enrollmentCapacity: { enrolled: studentCount, capacity: 150 },
+        homeworkCompletionTrend: { completed: 92, pending: 8 }
+      }
     };
   }
 }
@@ -2613,6 +2741,341 @@ export async function issueCertificateApi(data: { docType: string; targetType: s
   });
   if (!res.ok) throw new Error('Failed to issue certificate');
   return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// Operations Hardening & Pilot UAT APIs
+// ─────────────────────────────────────────────
+
+export async function getMonitoringMetricsApi() {
+  const res = await fetch(`${API_URL}/operations/monitoring`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch operations monitoring');
+  return await res.json();
+}
+
+export async function getSystemAlertsApi() {
+  const res = await fetch(`${API_URL}/operations/integrity/alerts`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch system alerts');
+  return await res.json();
+}
+
+export async function runBackupApi() {
+  const res = await fetch(`${API_URL}/operations/backups/run`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to trigger S3 backup');
+  return await res.json();
+}
+
+export async function runIntegritySweepApi() {
+  const res = await fetch(`${API_URL}/operations/integrity`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to trigger integrity sweep');
+  return await res.json();
+}
+
+export async function validateImportApi(rows: any[]) {
+  const res = await fetch(`${API_URL}/operations/imports/validate`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ rows }),
+  });
+  if (!res.ok) throw new Error('Failed to validate CSV schema');
+  return await res.json();
+}
+
+export async function createUatTicketApi(data: any) {
+  const res = await fetch(`${API_URL}/operations/uat/tickets`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to submit UAT feedback');
+  return await res.json();
+}
+
+export async function getUatTicketsApi() {
+  const res = await fetch(`${API_URL}/operations/uat/tickets`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch UAT tickets');
+  return await res.json();
+}
+
+export async function updateUatTicketStatusApi(id: string, status: string) {
+  const res = await fetch(`${API_URL}/operations/uat/tickets/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error('Failed to update UAT ticket');
+  return await res.json();
+}
+
+function initializeDemoSchoolDb(baseDb: any): any {
+  // If it's already seeded, return baseDb
+  if (baseDb.students && baseDb.students.length >= 100) return baseDb;
+
+  const db = { ...baseDb };
+  
+  // 1. Institution Details
+  db.institutionName = "AURXON Demo School";
+
+  // 2. Clear out old limited arrays
+  db.classes = [];
+  db.staff = [];
+  db.students = [];
+  db.attendance = [];
+  db.feeStructures = [];
+  db.feeAllocations = [];
+  db.exams = [];
+  db.examResults = [];
+
+  // 3. Define 5 Classes
+  const classNames = [
+    { id: 'class-6a', name: 'Grade 6-A', teacher: 'Sarah Connor', teacherId: 'staff-1' },
+    { id: 'class-7a', name: 'Grade 7-A', teacher: 'John Keating', teacherId: 'staff-2' },
+    { id: 'class-8a', name: 'Grade 8-A', teacher: 'Anjali Desai', teacherId: 'staff-4' },
+    { id: 'class-9a', name: 'Grade 9-A', teacher: 'Rajesh Iyer', teacherId: 'staff-5' },
+    { id: 'class-10a', name: 'Grade 10-A', teacher: 'Vikram Seth', teacherId: 'staff-6' }
+  ];
+  db.classes = classNames.map(c => ({
+    id: c.id,
+    name: c.name,
+    section: 'A',
+    studentCount: 20,
+    classTeacher: c.teacher,
+    classTeacherId: c.teacherId
+  }));
+
+  // 4. Define 15 Teachers & Staff
+  const staffList = [
+    { id: 'staff-1', empId: 'EMP001', first: 'Sarah', last: 'Connor', role: 'TEACHER', qual: 'M.Sc. Mathematics, B.Ed.', exp: 8, sal: 45000 },
+    { id: 'staff-2', empId: 'EMP002', first: 'John', last: 'Keating', role: 'TEACHER', qual: 'M.A. English Literature', exp: 12, sal: 48000 },
+    { id: 'staff-3', empId: 'EMP003', first: 'Robert', last: 'Kiyosaki', role: 'ACCOUNTANT', qual: 'B.Com, Chartered Accountant', exp: 15, sal: 40000 },
+    { id: 'staff-4', empId: 'EMP004', first: 'Anjali', last: 'Desai', role: 'TEACHER', qual: 'B.Sc. Chemistry, M.Ed.', exp: 6, sal: 42000 },
+    { id: 'staff-5', empId: 'EMP005', first: 'Rajesh', last: 'Iyer', role: 'TEACHER', qual: 'M.Sc. Physics', exp: 10, sal: 46000 },
+    { id: 'staff-6', empId: 'EMP006', first: 'Vikram', last: 'Seth', role: 'TEACHER', qual: 'M.A. History, B.Ed.', exp: 14, sal: 49000 },
+    { id: 'staff-7', empId: 'EMP007', first: 'Sunita', last: 'Rao', role: 'TEACHER', qual: 'M.Sc. Biology', exp: 5, sal: 41000 },
+    { id: 'staff-8', empId: 'EMP008', first: 'Devendra', last: 'Joshi', role: 'TEACHER', qual: 'B.Ed. Physical Education', exp: 7, sal: 39000 },
+    { id: 'staff-9', empId: 'EMP009', first: 'Priya', last: 'Pillai', role: 'TEACHER', qual: 'M.C.A. Computer Science', exp: 4, sal: 43000 },
+    { id: 'staff-10', empId: 'EMP010', first: 'Amit', last: 'Verma', role: 'TEACHER', qual: 'M.Sc. Mathematics', exp: 9, sal: 45000 },
+    { id: 'staff-11', empId: 'EMP011', first: 'Neha', last: 'Gupta', role: 'TEACHER', qual: 'B.A. Geography, B.Ed.', exp: 3, sal: 38000 },
+    { id: 'staff-12', empId: 'EMP012', first: 'Sanjay', last: 'Shah', role: 'TEACHER', qual: 'M.Com, Economics', exp: 11, sal: 47000 },
+    { id: 'staff-13', empId: 'EMP013', first: 'Meera', last: 'Nair', role: 'TEACHER', qual: 'M.A. Sociology', exp: 8, sal: 44000 },
+    { id: 'staff-14', empId: 'EMP014', first: 'Deepak', last: 'Roy', role: 'TEACHER', qual: 'B.Tech, Mechanical', exp: 6, sal: 42000 },
+    { id: 'staff-15', empId: 'EMP015', first: 'Kavitha', last: 'Nair', role: 'LIBRARIAN', qual: 'Master of Library Science', exp: 13, sal: 37000 }
+  ];
+  db.staff = staffList.map(s => ({
+    id: s.id,
+    employeeId: s.empId,
+    firstName: s.first,
+    lastName: s.last,
+    phone: `+91 98765 0${s.empId.slice(-3)}`,
+    designation: s.role,
+    joiningDate: '2024-06-15',
+    salary: s.sal,
+    status: 'ACTIVE',
+    user: { email: `${s.first.toLowerCase()}@aurxon.com`, isActive: true },
+    aadhaarNumber: `XXXX-XXXX-9${s.empId.slice(-3)}`,
+    panNumber: `ABCDE${s.empId.slice(-3)}F`,
+    qualification: s.qual,
+    experience: s.exp,
+    permanentAddress: '12 MG Road, Bengaluru, Karnataka - 560001',
+    bankName: 'State Bank of India',
+    bankBranch: 'Indira Nagar',
+    accNumber: `3049581029${s.empId.slice(-3)}`,
+    ifscCode: 'SBIN0000001'
+  }));
+
+  // 5. Define 10 Parents
+  const parentNames = [
+    { first: 'David', last: 'Miller', phone: '+91 99887 76601', occ: 'Software Architect', addr: 'Indira Nagar, Bengaluru' },
+    { first: 'Mark', last: 'Johnson', phone: '+91 99887 76602', occ: 'Civil Engineer', addr: 'Whitefield, Bengaluru' },
+    { first: 'Sally', last: 'Brown', phone: '+91 99887 76603', occ: 'Business Manager', addr: 'Koramangala, Bengaluru' },
+    { first: 'Rajesh', last: 'Patel', phone: '+91 99887 76604', occ: 'Financial Analyst', addr: 'Jayanagar, Bengaluru' },
+    { first: 'Kiran', last: 'Nair', phone: '+91 99887 76605', occ: 'Senior Consultant', addr: 'Malleshwaram, Bengaluru' },
+    { first: 'Arvind', last: 'Sharma', phone: '+91 99887 76606', occ: 'Government Officer', addr: 'Hebbal, Bengaluru' },
+    { first: 'Sanjay', last: 'Verma', phone: '+91 99887 76607', occ: 'Retail Owner', addr: 'Sadashivanagar, Bengaluru' },
+    { first: 'Ramesh', last: 'Gupta', phone: '+91 99887 76608', occ: 'Chartered Accountant', addr: 'Bannerghatta, Bengaluru' },
+    { first: 'Vijay', last: 'Joshi', phone: '+91 99887 76609', occ: 'College Professor', addr: 'Rajajinagar, Bengaluru' },
+    { first: 'Anil', last: 'Shah', phone: '+91 99887 76610', occ: 'Corporate Director', addr: 'HSR Layout, Bengaluru' }
+  ];
+
+  // 6. Generate 100 Students (20 students per class for 5 classes)
+  const indianFirstNames = ["Rohan", "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Kabir", "Sai", "Ishan", "Krishna", "Diya", "Ananya", "Aadhya", "Pihu", "Aaradhya", "Ira", "Sana", "Kiara", "Prisha", "Riya", "Dev", "Shiv", "Om", "Tej", "Prem", "Raj", "Veer", "Yash", "Harsh", "Shlok", "Tanmay", "Atharva", "Samarth", "Shreyas", "Omkar", "Parth", "Chinmay", "Siddhesh", "Gaurav", "Sneha", "Karan", "Nikhil", "Rahul", "Aarti", "Pooja", "Vikram", "Deepak", "Aditi", "Neha", "Meera", "Swati", "Suresh", "Amit", "Priyanshu", "Sandeep", "Sweta", "Pranav", "Divya", "Sujata", "Preeti", "Kalyani", "Nisha", "Sheetal", "Anuj", "Rupesh", "Varun", "Rishabh", "Aman", "Rajat", "Tushar", "Saurabh", "Sameer", "Kartik", "Kunal", "Mehak", "Priti", "Shruti", "Ishika", "Gaurika", "Kanishk", "Pankaj", "Vikas"];
+  const indianLastNames = ["Sharma", "Verma", "Gupta", "Patel", "Nair", "Joshi", "Iyer", "Pillai", "Rao", "Shah", "Desai", "Mehta", "Kulkarni", "Patil", "Shinde", "Yadav", "Mishra", "Pandey", "Trivedi", "Roy", "Dutta", "Singh", "Reddy", "Banerjee", "Bose", "Chatterjee", "Choudhary", "Gowda", "Hegde", "Pai", "Sen", "Bhat", "Mehra", "Kapoor", "Kapila", "Dhar", "Kaul", "Raina", "Saxena", "Srivastava", "Mathur"];
+
+  // Seed 100 students
+  for (let i = 1; i <= 100; i++) {
+    const classIdx = Math.floor((i - 1) / 20); // 0 to 4 (20 students per class)
+    const targetClass = classNames[classIdx];
+    
+    const first = indianFirstNames[i % indianFirstNames.length];
+    const last = indianLastNames[i % indianLastNames.length];
+    const parentIdx = i % 10;
+    const parent = parentNames[parentIdx];
+
+    const scholarNumber = `SCH-2026-${1000 + i}`;
+    const rollNumber = `ROLL-${targetClass.name.replace('Grade ', '').replace('-', '')}-${i - classIdx * 20 < 10 ? '0' + (i - classIdx * 20) : i - classIdx * 20}`;
+
+    db.students.push({
+      id: `stud-${i}`,
+      rollNumber,
+      scholarNumber,
+      firstName: first,
+      lastName: last,
+      email: `scholar.${i}@aurxon.com`,
+      dateOfBirth: `201${classIdx + 1}-05-14`,
+      gender: i % 2 === 0 ? 'FEMALE' : 'MALE',
+      classId: targetClass.id,
+      class: { id: targetClass.id, name: targetClass.name },
+      parent: { 
+        firstName: parent.first, 
+        lastName: parent.last, 
+        phone: parent.phone, 
+        occupation: parent.occ, 
+        address: parent.addr 
+      },
+      status: 'ACTIVE',
+      timeline: [
+        { id: `t-${i}`, type: 'ADMISSION', description: `Admitted to ${targetClass.name} under Board guidelines.`, eventDate: '2026-05-25T10:00:00.000Z' }
+      ],
+      documents: [
+        { id: `d-${i}-1`, name: 'Scholar_Admission_Form.pdf', fileUrl: '#' }
+      ]
+    });
+  }
+
+  // 7. Define Fee Structures
+  db.feeStructures = [
+    { id: 'fee-1', name: 'Statutory Tuition Term 1', amount: 1500, dueDate: '2026-06-15', description: 'Standard tuition fee for Term 1 academics' },
+    { id: 'fee-2', name: 'Syllabus Development Fee', amount: 1800, dueDate: '2026-10-15', description: 'Syllabus development and operations' },
+    { id: 'fee-3', name: 'Final CBSE Evaluation Fee', amount: 250, dueDate: '2026-12-30', description: 'CBSE examination evaluation cost' }
+  ];
+
+  // 8. Generate Fee Allocations (PAID, PARTIAL, UNPAID)
+  for (let i = 1; i <= 100; i++) {
+    // 70 students fully PAID Term 1, 15 PARTIAL, 15 UNPAID
+    let t1Paid = 1500;
+    let t1Status = 'PAID';
+    let t1Payments: any[] = [];
+
+    if (i <= 70) {
+      t1Payments = [{ amount: 1500, paymentDate: '2026-05-27T10:00:00.000Z', paymentMethod: 'ONLINE', receiptNumber: `RCPT-2026-${20000 + i}`, remarks: 'Paid via Stripe Gateway' }];
+    } else if (i <= 85) {
+      t1Paid = 500;
+      t1Status = 'PARTIAL';
+      t1Payments = [{ amount: 500, paymentDate: '2026-05-27T11:00:00.000Z', paymentMethod: 'CASH', receiptNumber: `RCPT-2026-${20000 + i}`, remarks: 'Partial payment reception desk' }];
+    } else {
+      t1Paid = 0;
+      t1Status = 'UNPAID';
+    }
+
+    db.feeAllocations.push({
+      id: `alloc-${i}-1`,
+      studentId: `stud-${i}`,
+      feeStructureId: 'fee-1',
+      amountDue: 1500,
+      amountPaid: t1Paid,
+      status: t1Status,
+      payments: t1Payments
+    });
+
+    // Term 2 Syllabus development fee (unpaid for all since due in Oct)
+    db.feeAllocations.push({
+      id: `alloc-${i}-2`,
+      studentId: `stud-${i}`,
+      feeStructureId: 'fee-2',
+      amountDue: 1800,
+      amountPaid: 0,
+      status: 'UNPAID',
+      payments: []
+    });
+  }
+
+  // 9. Generate Exams (Mid-term Algebra, Final Term Physics)
+  db.exams = [
+    { id: 'exam-1', name: 'CBSE Assessment Term 1', subjectId: 'subj-1', maxMarks: 100, examDate: '2026-04-10', subject: { name: 'Advanced Mathematics', class: { name: 'Grade 10-A' } } },
+    { id: 'exam-2', name: 'Syllabus Assessment Term 2', subjectId: 'subj-2', maxMarks: 100, examDate: '2026-05-25', subject: { name: 'Introductory Physics', class: { name: 'Grade 10-A' } } }
+  ];
+
+  // 10. Generate Exam Results (Mid-term and Term-end results)
+  for (let i = 1; i <= 100; i++) {
+    // Generate marks between 45 and 98
+    let marks1 = 50 + (i * 7) % 49;
+    let marks2 = 55 + (i * 9) % 43;
+
+    // Deliberately flag student 1 (Alice Miller) and student 20 as weak in both attendance and exams
+    if (i === 1) {
+      marks1 = 34; // Fails mathematics
+      marks2 = 32;
+    }
+    if (i === 20) {
+      marks1 = 30; // Fails mathematics
+      marks2 = 28;
+    }
+
+    db.examResults.push({
+      id: `res-${i}-1`,
+      examId: 'exam-1',
+      studentId: `stud-${i}`,
+      marksObtained: marks1,
+      remarks: marks1 > 85 ? 'Outstanding scholar average' : 'Meets standards'
+    });
+
+    db.examResults.push({
+      id: `res-${i}-2`,
+      examId: 'exam-2',
+      studentId: `stud-${i}`,
+      marksObtained: marks2,
+      remarks: marks2 > 85 ? 'Excellent work' : 'Satisfactory progress'
+    });
+  }
+
+  // 11. Generate Attendance (30 Days of History)
+  const todayDate = new Date();
+  for (let day = 0; day < 30; day++) {
+    const curDate = new Date(todayDate);
+    curDate.setDate(todayDate.getDate() - day);
+    const dateStr = curDate.toISOString().substring(0, 10);
+
+    // Skip Sundays
+    if (curDate.getDay() === 0) continue;
+
+    for (let i = 1; i <= 100; i++) {
+      let status = 'PRESENT';
+      let remarks = 'On time';
+
+      // Weak students (student 1 and student 20) have deliberately low attendance rate (approx 65%)
+      if (i === 1 || i === 20) {
+        if (day % 3 === 0) {
+          status = 'ABSENT';
+          remarks = 'Sick leave circular unsubmitted';
+        }
+      } else {
+        // Standard students have 97% attendance rate
+        if ((i * day) % 35 === 0) {
+          status = 'ABSENT';
+          remarks = 'Family emergency';
+        }
+      }
+
+      db.attendance.push({
+        studentId: `stud-${i}`,
+        date: dateStr,
+        status,
+        remarks
+      });
+    }
+  }
+
+  // 12. Seeding notices
+  db.notices = [
+    { id: 'not-1', title: 'Summer Vacation Circular 2026', content: 'The school will remain closed for summer vacation from June 1st, 2026 to July 5th, 2026. Regular classes will resume on July 6th under standard CBSE guidelines.', targetRoles: 'STUDENT,PARENT,TEACHER,STAFF,ACCOUNTANT', authorName: 'Sarah Connor', createdAt: new Date('2026-05-27T08:00:00.000Z').toISOString() },
+    { id: 'not-2', title: 'CBSE Term 2 Tuition Fee Schedule', content: 'Reminder to all parents: The tuition fee collection deadline for Term 2 is June 15th, 2026. Online Stripe/UPI simulator links are active.', targetRoles: 'PARENT,ACCOUNTANT', authorName: 'Robert Kiyosaki', createdAt: new Date('2026-05-27T09:00:00.000Z').toISOString() },
+    { id: 'not-3', title: 'Biometric RFID Access Cards Mandatory', content: 'All students must scan their RFID access cards at the main gate terminal daily for biometric attendance tracking.', targetRoles: 'STUDENT,PARENT,TEACHER', authorName: 'John Keating', createdAt: new Date('2026-05-28T09:00:00.000Z').toISOString() }
+  ];
+
+  return db;
 }
 
 
