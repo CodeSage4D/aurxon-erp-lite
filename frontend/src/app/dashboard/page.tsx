@@ -60,6 +60,7 @@ import FeesTab from '@/05_Fees/FeeStructure/FeesTab';
 import CommsTab from '@/08_Communication/Notices/CommsTab';
 import LibraryTab from '@/14_FutureTrendModules/Library/LibraryTab';
 import GateTab from '@/14_FutureTrendModules/VisitorManagement/GateTab';
+import ProductivityTab from '@/14_FutureTrendModules/Productivity/ProductivityTab';
 import CertificatesTab from '@/11_Documents/Certificates/CertificatesTab';
 import InventoryTab from '@/14_FutureTrendModules/Inventory/InventoryTab';
 import HrTab from '@/07_Staff/StaffProfile/HrTab';
@@ -698,6 +699,16 @@ export default function DashboardPage() {
               librarySubTab={librarySubTab}
               setLibrarySubTab={setLibrarySubTab}
               students={students}
+              staff={staff}
+              triggerToast={triggerToast}
+            />
+          )}
+
+          {activeCategory === 'productivity' && (
+            <ProductivityTab 
+              user={user}
+              currentRole={currentRole}
+              staff={staff}
               triggerToast={triggerToast}
             />
           )}

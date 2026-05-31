@@ -191,6 +191,7 @@ export class TimetableService {
           periodNumber: p,
           startTime: pStartTime,
           endTime: pEndTime,
+          room: classRecord.name,
           subjectId: selectedSubject.id,
           subject: {
             id: selectedSubject.id,
@@ -269,6 +270,29 @@ export class TimetableService {
       }
     }
 
+    // 3. Room Double-booking check: Ensure the room is not booked for another class at the same day & period
+    for (const entry of entries) {
+      if (!entry.room || !entry.dayOfWeek || !entry.periodNumber) continue;
+      const conflict = await this.prisma.timetableEntry.findFirst({
+        where: {
+          institutionId,
+          classId: { not: classId },
+          dayOfWeek: entry.dayOfWeek,
+          periodNumber: parseInt(entry.periodNumber),
+          room: entry.room
+        },
+        include: {
+          class: true
+        }
+      });
+
+      if (conflict) {
+        throw new BadRequestException(
+          `Conflict: Room ${entry.room} is already allocated to ${conflict.class.name} on ${entry.dayOfWeek} Period ${entry.periodNumber}`
+        );
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       // Delete existing entries for this class
       await tx.timetableEntry.deleteMany({
@@ -305,6 +329,7 @@ export class TimetableService {
             periodNumber: parseInt(entry.periodNumber),
             startTime: entry.startTime,
             endTime: entry.endTime,
+            room: entry.room || null,
             institutionId,
           },
           include: {

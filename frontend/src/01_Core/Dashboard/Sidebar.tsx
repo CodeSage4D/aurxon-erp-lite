@@ -4,7 +4,7 @@ import React from 'react';
 import { 
   LayoutDashboard, Users, CalendarCheck, CreditCard, GraduationCap, Briefcase, Megaphone, LogOut,
   Moon, Sun, ShieldCheck, BookOpen, Book, Award, MessageSquare, BarChart2,
-  Settings, Bell, Menu, Sparkles, ShieldAlert, ChevronLeft, ChevronRight, FileText
+  Settings, Bell, Menu, Sparkles, ShieldAlert, ChevronLeft, ChevronRight, FileText, ClipboardList
 } from 'lucide-react';
 
 const ROLES_LIST = [
@@ -35,6 +35,7 @@ const SIDEBAR_CATEGORIES = [
   { id: 'fees', label: 'Fees & Finance', icon: CreditCard, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
   { id: 'comms', label: 'Comms Hub', icon: MessageSquare, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Communication' },
   { id: 'library', label: 'Library Desk', icon: Book, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+  { id: 'productivity', label: 'Productivity Desk', icon: ClipboardList, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'LIBRARIAN', 'STAFF', 'ACCOUNTANT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
   { id: 'gate', label: 'Visitor Gate Desk', icon: ShieldAlert, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'STAFF'], section: 'Staff' },
   { id: 'inventory', label: 'Inventory Desk', icon: BarChart2, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'STAFF'], section: 'Administration' },
   { id: 'hr', label: 'HR System', icon: Briefcase, roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'], section: 'Staff' },

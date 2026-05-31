@@ -70,6 +70,12 @@ model User {
   
   notifications       Notification[]
   promotionsInitiated PromotionHistory[]
+
+  todoTasks           TodoTask[]
+  diaryEntries        DiaryEntry[]
+  plannerActivities   PlannerActivity[]
+  tasksAssigned       AssignedTask[] @relation("AssignedBy")
+  tasksReceived       AssignedTask[] @relation("AssignedTo")
 }
 
 model Student {
@@ -239,6 +245,7 @@ model Staff {
   staffAttendance  StaffAttendance[]
   leaveBalances    StaffLeaveBalance[]
   homeworkCreated  HomeworkAssignment[] @relation("HomeworkCreatedBy")
+  bookIssues       BookIssue[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -490,12 +497,18 @@ model Book {
 
 model BookIssue {
   id         String    @id @default(uuid())
-  studentId  String
-  student    Student   @relation(fields: [studentId], references: [id])
+  studentId  String?
+  student    Student?  @relation(fields: [studentId], references: [id])
+  staffId    String?
+  staff      Staff?    @relation(fields: [staffId], references: [id])
   bookId     String
   book       Book      @relation(fields: [bookId], references: [id])
   issueDate  DateTime  @default(now())
+  dueDate    DateTime
   returnDate DateTime?
+  fineAmount Float     @default(0)
+  finePaid   Float     @default(0)
+  fineStatus String    @default("NONE") // NONE, UNPAID, PAID
   status     String    @default("ISSUED") // ISSUED, RETURNED, OVERDUE
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -562,6 +575,7 @@ model TimetableEntry {
   periodNumber  Int
   startTime     String
   endTime       String
+  room          String?
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
 
@@ -853,3 +867,62 @@ model UatTicket {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model TodoTask {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  category      String      @default("GENERAL") // GENERAL, GRADING, LESSON_PLAN, MEETING, PERSONAL
+  priority      String      @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate       DateTime?
+  completed     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model DiaryEntry {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  content       String
+  category      String      @default("PERSONAL") // PRIVATE_NOTE, OBSERVATION, REMARK, ACADEMIC, PERSONAL
+  isShared      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model PlannerActivity {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  activityDate  DateTime
+  startTime     String      // HH:MM format
+  endTime       String      // HH:MM format
+  category      String      @default("ACTIVITY") // ACTIVITY, SCHEDULE, MEETING, ACADEMIC_WORK
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model AssignedTask {
+  id            String      @id @default(uuid())
+  title         String
+  description   String?
+  assignerId    String
+  assigner      User        @relation("AssignedBy", fields: [assignerId], references: [id])
+  assigneeId    String
+  assignee      User        @relation("AssignedTo", fields: [assigneeId], references: [id])
+  status        String      @default("PENDING") // PENDING, ACCEPTED, IN_PROGRESS, COMPLETED, REJECTED, ESCALATED
+  priority      String      @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate       DateTime?
+  acceptedAt    DateTime?
+  completedAt   DateTime?
+  feedback      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+

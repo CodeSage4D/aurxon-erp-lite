@@ -1624,7 +1624,36 @@ export async function getIssuesApi() {
     return await res.json();
   } catch (error) {
     const db = getMockDb();
-    return db.bookIssues || [];
+    const list = db.bookIssues || [];
+    let updated = false;
+    const computed = list.map((issue: any) => {
+      let fineAmount = issue.fineAmount || 0;
+      let fineStatus = issue.fineStatus || 'NONE';
+      let status = issue.status;
+
+      if ((status === 'ISSUED' || status === 'OVERDUE') && issue.dueDate) {
+        const daysOverdue = Math.max(0, Math.floor((Date.now() - new Date(issue.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+        if (daysOverdue > 0) {
+          fineAmount = daysOverdue * 10;
+          fineStatus = 'UNPAID';
+          status = 'OVERDUE';
+          updated = true;
+        }
+      }
+
+      return {
+        ...issue,
+        fineAmount,
+        fineStatus,
+        status
+      };
+    });
+
+    if (updated) {
+      db.bookIssues = computed;
+      saveMockDb(db);
+    }
+    return computed;
   }
 }
 
@@ -1639,12 +1668,12 @@ export async function getStudentIssuesApi(studentId: string) {
   }
 }
 
-export async function issueBookApi(studentId: string, bookId: string) {
+export async function issueBookApi(studentId: string | null, bookId: string, staffId: string | null = null) {
   try {
     const res = await fetch(`${API_URL}/library/issue`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ studentId, bookId }),
+      body: JSON.stringify({ studentId: studentId || undefined, staffId: staffId || undefined, bookId }),
     });
     if (!res.ok) throw new Error();
     return await res.json();
@@ -1657,28 +1686,60 @@ export async function issueBookApi(studentId: string, bookId: string) {
     if (bookIdx === -1) throw new Error('Book not found');
     if (db.books[bookIdx].availableCopies <= 0) throw new Error('No copies available');
 
-    const student = db.students.find((s: any) => s.id === studentId);
-    if (!student) throw new Error('Student not found');
+    let borrowerName = 'Borrower';
+    let borrowerDetails = {};
 
-    const existingIssue = db.bookIssues.find((i: any) => i.studentId === studentId && i.bookId === bookId && i.status === 'ISSUED');
-    if (existingIssue) throw new Error('This book is already issued to this student');
+    if (studentId) {
+      const student = db.students.find((s: any) => s.id === studentId);
+      if (!student) throw new Error('Student not found');
+      borrowerName = `${student.firstName} ${student.lastName}`;
+      borrowerDetails = {
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          scholarNumber: student.scholarNumber || `SCH-${Date.now().toString().slice(-4)}`,
+          rollNumber: student.rollNumber,
+          class: student.class ? { name: student.class.name } : { name: 'Grade 10-A' }
+        }
+      };
+
+      const existingIssue = db.bookIssues.find((i: any) => i.studentId === studentId && i.bookId === bookId && ['ISSUED', 'OVERDUE'].includes(i.status));
+      if (existingIssue) throw new Error('This book is already issued to this student');
+    } else if (staffId) {
+      const staffMem = db.staff.find((s: any) => s.id === staffId);
+      if (!staffMem) throw new Error('Staff member not found');
+      borrowerName = `${staffMem.firstName} ${staffMem.lastName}`;
+      borrowerDetails = {
+        staff: {
+          id: staffMem.id,
+          employeeId: staffMem.employeeId,
+          firstName: staffMem.firstName,
+          lastName: staffMem.lastName,
+          designation: staffMem.designation
+        }
+      };
+
+      const existingIssue = db.bookIssues.find((i: any) => i.staffId === staffId && i.bookId === bookId && ['ISSUED', 'OVERDUE'].includes(i.status));
+      if (existingIssue) throw new Error('This book is already issued to this staff member');
+    } else {
+      throw new Error('Please select a student or staff member');
+    }
 
     const newIssue = {
       id: `issue-${Date.now()}`,
-      studentId,
+      studentId: studentId || null,
+      staffId: staffId || null,
       bookId,
       issueDate: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days
       returnDate: null,
+      fineAmount: 0,
+      finePaid: 0,
+      fineStatus: 'NONE',
       status: 'ISSUED',
       book: { ...db.books[bookIdx] },
-      student: {
-        id: student.id,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        scholarNumber: student.scholarNumber || `SCH-${Date.now().toString().slice(-4)}`,
-        rollNumber: student.rollNumber,
-        class: student.class ? { name: student.class.name } : { name: 'Grade 10-A' }
-      }
+      ...borrowerDetails
     };
 
     db.books[bookIdx].availableCopies -= 1;
@@ -2193,7 +2254,8 @@ export async function generateTimetableApi(classId: string, periodsPerDay: numbe
             id: assignedTeacher?.id || '',
             firstName: assignedTeacher?.firstName || '',
             lastName: assignedTeacher?.lastName || '',
-          }
+          },
+          room: db.classes.find((c: any) => c.id === classId)?.name || 'Grade 10-A'
         });
       }
     }
@@ -2219,6 +2281,7 @@ export async function saveTimetableApi(classId: string, entries: any[]) {
     const db = getMockDb();
     
     for (const entry of entries) {
+      // 1. Teacher double-booking conflict check
       const conflict = (db.timetable || []).find((e: any) => 
         e.classId !== classId && 
         e.dayOfWeek === entry.dayOfWeek && 
@@ -2230,6 +2293,20 @@ export async function saveTimetableApi(classId: string, entries: any[]) {
         const conflictClass = db.classes.find((c: any) => c.id === conflict.classId);
         throw new Error(
           `Conflict: Teacher ${busyTeacher?.firstName || 'Teacher'} is already assigned to ${conflictClass?.name || 'another class'} on ${entry.dayOfWeek} Period ${entry.periodNumber}`
+        );
+      }
+
+      // 2. Room double-booking conflict check
+      const roomConflict = (db.timetable || []).find((e: any) => 
+        e.classId !== classId && 
+        e.dayOfWeek === entry.dayOfWeek && 
+        e.periodNumber === parseInt(entry.periodNumber) && 
+        entry.room && e.room === entry.room
+      );
+      if (roomConflict) {
+        const conflictClass = db.classes.find((c: any) => c.id === roomConflict.classId);
+        throw new Error(
+          `Conflict: Room "${entry.room}" is already allocated to ${conflictClass?.name || 'another class'} on ${entry.dayOfWeek} Period ${entry.periodNumber}`
         );
       }
     }
@@ -2264,6 +2341,7 @@ export async function saveTimetableApi(classId: string, entries: any[]) {
         periodNumber: parseInt(entry.periodNumber),
         startTime: entry.startTime,
         endTime: entry.endTime,
+        room: entry.room || null
       });
     });
     
@@ -3077,6 +3155,383 @@ function initializeDemoSchoolDb(baseDb: any): any {
 
   return db;
 }
+
+// =========================================================================
+// Library Fines
+// =========================================================================
+export async function payLibraryFineApi(issueId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/pay-fine/${issueId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.bookIssues) db.bookIssues = [];
+    const idx = db.bookIssues.findIndex((i: any) => i.id === issueId);
+    if (idx === -1) throw new Error('Issue record not found');
+    db.bookIssues[idx].finePaid = db.bookIssues[idx].fineAmount;
+    db.bookIssues[idx].fineStatus = 'PAID';
+    saveMockDb(db);
+    return db.bookIssues[idx];
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Personal To-Dos
+// =========================================================================
+export async function getTodoTasksApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    return db.todoTasks;
+  }
+}
+
+export async function createTodoTaskApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    const newTask = {
+      id: `todo-${Date.now()}`,
+      userId: 'mock-user-id',
+      title: data.title,
+      description: data.description || null,
+      category: data.category || 'GENERAL',
+      priority: data.priority || 'MEDIUM',
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    db.todoTasks.push(newTask);
+    saveMockDb(db);
+    return newTask;
+  }
+}
+
+export async function updateTodoTaskApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    const idx = db.todoTasks.findIndex((t: any) => t.id === id);
+    if (idx === -1) throw new Error('To-Do task not found');
+    db.todoTasks[idx] = {
+      ...db.todoTasks[idx],
+      ...data
+    };
+    saveMockDb(db);
+    return db.todoTasks[idx];
+  }
+}
+
+export async function deleteTodoTaskApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    db.todoTasks = db.todoTasks.filter((t: any) => t.id !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Personal & Shared Diary Notes
+// =========================================================================
+export async function getDiaryEntriesApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    return db.diaryEntries;
+  }
+}
+
+export async function getSharedDiaryEntriesApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary/shared`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    return db.diaryEntries.filter((e: any) => e.isShared);
+  }
+}
+
+export async function createDiaryEntryApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    const newEntry = {
+      id: `diary-${Date.now()}`,
+      userId: 'mock-user-id',
+      title: data.title,
+      content: data.content,
+      category: data.category || 'PERSONAL',
+      isShared: data.isShared || false,
+      createdAt: new Date().toISOString(),
+    };
+    db.diaryEntries.push(newEntry);
+    saveMockDb(db);
+    return newEntry;
+  }
+}
+
+export async function updateDiaryEntryApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    const idx = db.diaryEntries.findIndex((e: any) => e.id === id);
+    if (idx === -1) throw new Error('Diary entry not found');
+    db.diaryEntries[idx] = {
+      ...db.diaryEntries[idx],
+      ...data
+    };
+    saveMockDb(db);
+    return db.diaryEntries[idx];
+  }
+}
+
+export async function deleteDiaryEntryApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    db.diaryEntries = db.diaryEntries.filter((e: any) => e.id !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Daily Planner
+// =========================================================================
+export async function getPlannerActivitiesApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    return db.plannerActivities;
+  }
+}
+
+export async function createPlannerActivityApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    const newActivity = {
+      id: `plan-${Date.now()}`,
+      userId: 'mock-user-id',
+      title: data.title,
+      description: data.description || null,
+      activityDate: new Date(data.activityDate).toISOString(),
+      startTime: data.startTime,
+      endTime: data.endTime,
+      category: data.category || 'ACTIVITY',
+      createdAt: new Date().toISOString(),
+    };
+    db.plannerActivities.push(newActivity);
+    saveMockDb(db);
+    return newActivity;
+  }
+}
+
+export async function updatePlannerActivityApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    const idx = db.plannerActivities.findIndex((a: any) => a.id === id);
+    if (idx === -1) throw new Error('Planner activity not found');
+    db.plannerActivities[idx] = {
+      ...db.plannerActivities[idx],
+      ...data
+    };
+    saveMockDb(db);
+    return db.plannerActivities[idx];
+  }
+}
+
+export async function deletePlannerActivityApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    db.plannerActivities = db.plannerActivities.filter((a: any) => a.id !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Assigned Tasks & Workflows
+// =========================================================================
+export async function getAssignedTasksApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    return db.assignedTasks;
+  }
+}
+
+export async function createAssignedTaskApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    const newAssignedTask = {
+      id: `task-${Date.now()}`,
+      title: data.title,
+      description: data.description || null,
+      assignerId: 'mock-user-id',
+      assigneeId: data.assigneeId,
+      priority: data.priority || 'MEDIUM',
+      status: 'PENDING',
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
+      createdAt: new Date().toISOString(),
+      assigner: { email: 'admin@aurxon.com', staffProfile: { firstName: 'Admin', lastName: 'User' } },
+      assignee: { email: 'teacher1@aurxon.com', staffProfile: { firstName: 'Sarah', lastName: 'Connor' } }
+    };
+    db.assignedTasks.push(newAssignedTask);
+    saveMockDb(db);
+    return newAssignedTask;
+  }
+}
+
+export async function updateAssignedTaskApi(id: string, data: { status: string; feedback?: string }) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    const idx = db.assignedTasks.findIndex((t: any) => t.id === id);
+    if (idx === -1) throw new Error('Assigned task not found');
+    db.assignedTasks[idx] = {
+      ...db.assignedTasks[idx],
+      status: data.status,
+      feedback: data.feedback !== undefined ? data.feedback : db.assignedTasks[idx].feedback,
+      acceptedAt: data.status === 'ACCEPTED' ? new Date().toISOString() : db.assignedTasks[idx].acceptedAt,
+      completedAt: data.status === 'COMPLETED' ? new Date().toISOString() : db.assignedTasks[idx].completedAt,
+    };
+    saveMockDb(db);
+    return db.assignedTasks[idx];
+  }
+}
+
+export async function escalateAssignedTaskApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks/${id}/escalate`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    const idx = db.assignedTasks.findIndex((t: any) => t.id === id);
+    if (idx === -1) throw new Error('Assigned task not found');
+    db.assignedTasks[idx].status = 'ESCALATED';
+    saveMockDb(db);
+    return db.assignedTasks[idx];
+  }
+}
+
 
 
 

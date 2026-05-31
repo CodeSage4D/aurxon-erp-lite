@@ -295,7 +295,7 @@ export default function AcademicTab({
 
                         return (
                           <td key={p} className="p-3.5">
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                               <span className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold ${
                                 isSelfStudy
                                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300'
@@ -303,9 +303,38 @@ export default function AcademicTab({
                               }`}>
                                 {entry.subject?.name}
                               </span>
-                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1 font-medium">
-                                <span>👨‍🏫 {entry.teacher?.firstName} {entry.teacher?.lastName}</span>
+                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 space-y-1 font-medium">
+                                <div className="flex items-center gap-1">
+                                  <span>👨‍🏫 {entry.teacher?.firstName} {entry.teacher?.lastName}</span>
+                                </div>
+                                {entry.room && (
+                                  <div className="flex items-center">
+                                    <span className="text-[10px] text-emerald-650 dark:text-emerald-450 font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 px-2 py-0.5 rounded-lg border border-emerald-250 dark:border-emerald-900/30 w-max">
+                                      🏢 Room: {entry.room}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
+                              {isClassIncharge && timetablePreview ? (
+                                <div className="mt-2 pt-1 border-t border-dashed border-zinc-100 dark:border-zinc-800">
+                                  <label className="block text-[9px] uppercase tracking-wider text-zinc-400 font-extrabold">Room Alloc</label>
+                                  <input
+                                    type="text"
+                                    value={entry.room || ''}
+                                    onChange={(e) => {
+                                      const updated = timetablePreview.map((item) => {
+                                        if (item.dayOfWeek === day && item.periodNumber === p) {
+                                          return { ...item, room: e.target.value };
+                                        }
+                                        return item;
+                                      });
+                                      setTimetablePreview(updated);
+                                    }}
+                                    placeholder="e.g. Room 10A"
+                                    className="mt-1 w-full rounded-lg border border-zinc-200 dark:border-zinc-800 px-2 py-1 text-[10px] outline-none dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 font-semibold focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition"
+                                  />
+                                </div>
+                              ) : null}
                             </div>
                           </td>
                         );

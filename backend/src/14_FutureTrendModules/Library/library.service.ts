@@ -80,7 +80,7 @@ export class LibraryService {
   }
 
   async getIssues(institutionId: string) {
-    return this.prisma.bookIssue.findMany({
+    const issues = await this.prisma.bookIssue.findMany({
       where: {
         book: { institutionId },
       },
@@ -96,9 +96,53 @@ export class LibraryService {
             class: { select: { name: true, section: true } },
           },
         },
+        staff: {
+          select: {
+            id: true,
+            employeeId: true,
+            firstName: true,
+            lastName: true,
+            designation: true,
+          },
+        },
       },
       orderBy: { issueDate: 'desc' },
     });
+
+    // Dynamically calculate fines for active issued/overdue books
+    const updatedIssues: any[] = [];
+    for (const issue of issues) {
+      let fineAmount = issue.fineAmount;
+      let fineStatus = issue.fineStatus;
+      let status = issue.status;
+
+      if (status === 'ISSUED' || status === 'OVERDUE') {
+        const daysOverdue = Math.max(
+          0,
+          Math.floor((Date.now() - new Date(issue.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+        );
+        if (daysOverdue > 0) {
+          fineAmount = daysOverdue * 10; // ₹10 per day fine rate
+          fineStatus = 'UNPAID';
+          status = 'OVERDUE';
+
+          // Update database asynchronously
+          await this.prisma.bookIssue.update({
+            where: { id: issue.id },
+            data: { fineAmount, fineStatus, status },
+          });
+        }
+      }
+
+      updatedIssues.push({
+        ...issue,
+        fineAmount,
+        fineStatus,
+        status,
+      });
+    }
+
+    return updatedIssues;
   }
 
   async getStudentIssues(studentId: string) {
@@ -111,7 +155,7 @@ export class LibraryService {
     });
   }
 
-  async issueBook(institutionId: string, data: { studentId: string; bookId: string }) {
+  async issueBook(institutionId: string, data: { studentId?: string; staffId?: string; bookId: string }) {
     const book = await this.prisma.book.findFirst({
       where: { id: data.bookId, institutionId },
     });
@@ -124,38 +168,63 @@ export class LibraryService {
       throw new BadRequestException('No copies of this book are currently available');
     }
 
-    const student = await this.prisma.student.findFirst({
-      where: { id: data.studentId, institutionId },
-    });
+    if (data.studentId) {
+      const student = await this.prisma.student.findFirst({
+        where: { id: data.studentId, institutionId },
+      });
+      if (!student) {
+        throw new NotFoundException('Student not found');
+      }
 
-    if (!student) {
-      throw new NotFoundException('Student not found');
+      const existingIssue = await this.prisma.bookIssue.findFirst({
+        where: {
+          studentId: data.studentId,
+          bookId: data.bookId,
+          status: { in: ['ISSUED', 'OVERDUE'] },
+        },
+      });
+      if (existingIssue) {
+        throw new BadRequestException('This book is already issued to this student');
+      }
+    } else if (data.staffId) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { id: data.staffId, institutionId },
+      });
+      if (!staff) {
+        throw new NotFoundException('Staff member not found');
+      }
+
+      const existingIssue = await this.prisma.bookIssue.findFirst({
+        where: {
+          staffId: data.staffId,
+          bookId: data.bookId,
+          status: { in: ['ISSUED', 'OVERDUE'] },
+        },
+      });
+      if (existingIssue) {
+        throw new BadRequestException('This book is already issued to this staff member');
+      }
+    } else {
+      throw new BadRequestException('Please select a student or staff member to issue the book to');
     }
 
-    // Check if the student already has this book issued and not returned
-    const existingIssue = await this.prisma.bookIssue.findFirst({
-      where: {
-        studentId: data.studentId,
-        bookId: data.bookId,
-        status: 'ISSUED',
-      },
-    });
+    // Default borrow duration: 14 days
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14);
 
-    if (existingIssue) {
-      throw new BadRequestException('This book is already issued to this student');
-    }
-
-    // Start a transaction
     return this.prisma.$transaction(async (tx) => {
       const issue = await tx.bookIssue.create({
         data: {
-          studentId: data.studentId,
+          studentId: data.studentId || null,
+          staffId: data.staffId || null,
           bookId: data.bookId,
+          dueDate,
           status: 'ISSUED',
         },
         include: {
           book: true,
           student: true,
+          staff: true,
         },
       });
 
@@ -186,16 +255,31 @@ export class LibraryService {
       throw new BadRequestException('Book has already been returned');
     }
 
+    // Finalize dynamic fines at return time
+    let finalFine = issue.fineAmount;
+    let fineStatus = issue.fineStatus;
+    const daysOverdue = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(issue.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+    );
+    if (daysOverdue > 0 && (issue.status === 'ISSUED' || issue.status === 'OVERDUE')) {
+      finalFine = daysOverdue * 10;
+      fineStatus = 'UNPAID';
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updatedIssue = await tx.bookIssue.update({
         where: { id: issueId },
         data: {
           status: 'RETURNED',
           returnDate: new Date(),
+          fineAmount: finalFine,
+          fineStatus,
         },
         include: {
           book: true,
           student: true,
+          staff: true,
         },
       });
 
@@ -209,6 +293,34 @@ export class LibraryService {
       });
 
       return updatedIssue;
+    });
+  }
+
+  async payFine(institutionId: string, issueId: string) {
+    const issue = await this.prisma.bookIssue.findUnique({
+      where: { id: issueId },
+      include: { book: true },
+    });
+
+    if (!issue || issue.book.institutionId !== institutionId) {
+      throw new NotFoundException('Book issue record not found');
+    }
+
+    if (issue.fineAmount <= 0) {
+      throw new BadRequestException('This book checkout has no outstanding fines');
+    }
+
+    return this.prisma.bookIssue.update({
+      where: { id: issueId },
+      data: {
+        finePaid: issue.fineAmount,
+        fineStatus: 'PAID',
+      },
+      include: {
+        book: true,
+        student: true,
+        staff: true,
+      },
     });
   }
 }

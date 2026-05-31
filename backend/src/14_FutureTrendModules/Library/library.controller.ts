@@ -49,7 +49,7 @@ export class LibraryController {
 
   @Post('issue')
   @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN', 'STAFF')
-  async issueBook(@Request() req, @Body() body: { studentId: string; bookId: string }) {
+  async issueBook(@Request() req, @Body() body: { studentId?: string; staffId?: string; bookId: string }) {
     return this.libraryService.issueBook(req.user.institutionId, body);
   }
 
@@ -57,5 +57,11 @@ export class LibraryController {
   @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN', 'STAFF')
   async returnBook(@Request() req, @Param('issueId') issueId: string) {
     return this.libraryService.returnBook(req.user.institutionId, issueId);
+  }
+
+  @Post('pay-fine/:issueId')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN', 'STAFF', 'ACCOUNTANT')
+  async payFine(@Request() req, @Param('issueId') issueId: string) {
+    return this.libraryService.payFine(req.user.institutionId, issueId);
   }
 }
