@@ -169,11 +169,45 @@ export class AuthService {
       profileId = user.staffProfile.id;
     }
 
+    // Fetch memberships
+    const userMemberships = await this.prisma.organizationMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'ACTIVE',
+      },
+      include: {
+        institution: {
+          select: {
+            name: true,
+            logoUrl: true,
+            primaryColor: true,
+          },
+        },
+        role: {
+          select: {
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    const formattedMemberships = userMemberships.map((m) => ({
+      id: m.id,
+      organizationId: m.institutionId,
+      organizationName: m.institution.name,
+      logoUrl: m.institution.logoUrl || '',
+      primaryColor: m.institution.primaryColor || '#0284c7',
+      role: m.role.code,
+      roleName: m.role.name,
+      schoolId: m.schoolId || null,
+      campusId: m.campusId || null,
+      isPrimary: m.isPrimary,
+    }));
+
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
-      institutionId: user.institutionId,
       profileId: profileId || null,
     };
 
@@ -182,14 +216,10 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
         profileName,
-        profileId,
-        institutionId: user.institutionId,
-        institutionName: user.institution.name,
-        logoUrl: user.institution.logoUrl,
-        primaryColor: user.institution.primaryColor,
+        profileId: profileId || null,
       },
+      memberships: formattedMemberships,
     };
   }
 
@@ -225,6 +255,144 @@ export class AuthService {
         action: 'PASSWORD_CHANGED',
         details: 'User successfully changed their password via self-service.',
       },
+    });
+  }
+
+  async switchContext(
+    userId: string,
+    organizationId: string,
+    schoolId?: string,
+    campusId?: string,
+  ) {
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId,
+        institutionId: organizationId,
+        schoolId: schoolId || null,
+        campusId: campusId || null,
+        status: 'ACTIVE',
+      },
+      include: {
+        institution: {
+          select: {
+            name: true,
+            logoUrl: true,
+            primaryColor: true,
+          },
+        },
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new UnauthorizedException('Access denied to this organization context.');
+    }
+
+    const orgModules = await this.prisma.organizationModule.findMany({
+      where: {
+        organizationId: membership.institutionId,
+        isEnabled: true,
+      },
+      select: {
+        moduleCode: true,
+      },
+    });
+    const enabledModules = orgModules.map(m => m.moduleCode);
+
+    const orgFeatures = await this.prisma.organizationFeature.findMany({
+      where: {
+        organizationId: membership.institutionId,
+        isEnabled: true,
+      },
+      select: {
+        featureCode: true,
+      },
+    });
+    const enabledFeatures = orgFeatures.map(f => f.featureCode);
+
+    const permissions = membership.role.permissions.map(
+      p => `${p.resource}:${p.action.toLowerCase()}`,
+    );
+
+    const branding = await this.prisma.organizationBranding.findFirst({
+      where: { organizationId: membership.institutionId },
+    });
+
+    const primaryColor = branding?.primaryColor || membership.institution.primaryColor || '#0284c7';
+    const logoUrl = branding?.logoUrl || membership.institution.logoUrl || '';
+
+    const payload = {
+      sub: userId,
+      email: (await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } }))?.email,
+      organizationId: membership.institutionId,
+      schoolId: membership.schoolId || null,
+      campusId: membership.campusId || null,
+      roleIds: [membership.roleId],
+      role: membership.role.code, // Active role code for guard checks
+      permissions,
+      enabledModules,
+      enabledFeatures,
+    };
+
+    const token = this.jwtService.sign(payload);
+
+    return {
+      token,
+      context: {
+        organizationId: membership.institutionId,
+        organizationName: membership.institution.name,
+        schoolId: membership.schoolId || null,
+        campusId: membership.campusId || null,
+        role: membership.role.code,
+        roleName: membership.role.name,
+        permissions,
+        enabledModules,
+        enabledFeatures,
+        branding: {
+          primaryColor,
+          logoUrl,
+        },
+      },
+    };
+  }
+
+  async getNavigation(userContext: any) {
+    const allCategories = [
+      { id: 'overview', label: 'Dashboard', icon: 'LayoutDashboard', roles: ['*'], section: 'Daily Use' },
+      { id: 'academic', label: 'Academic Desk', icon: 'BookOpen', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'COACHING_DIRECTOR', 'REGISTRAR', 'EXAM_CONTROLLER', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
+      { id: 'students', label: 'Student Desk', icon: 'Users', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'REGISTRAR', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
+      { id: 'exams', label: 'Exams & Grades', icon: 'Award', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'EXAM_CONTROLLER', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'], moduleCode: 'EXAMINATION', section: 'Daily Use' },
+      { id: 'attendance', label: 'Attendance', icon: 'CalendarCheck', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'ATTENDANCE_OFFICER', 'INSTITUTE_ADMIN'], moduleCode: 'ATTENDANCE', section: 'Daily Use' },
+      { id: 'fees', label: 'Fees & Finance', icon: 'CreditCard', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'], moduleCode: 'FINANCE', section: 'Daily Use' },
+      { id: 'comms', label: 'Comms Hub', icon: 'MessageSquare', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Communication' },
+      { id: 'library', label: 'Library Desk', icon: 'Book', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+      { id: 'productivity', label: 'Productivity Desk', icon: 'ClipboardList', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'LIBRARIAN', 'STAFF', 'ACCOUNTANT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+      { id: 'gate', label: 'Visitor Gate Desk', icon: 'ShieldAlert', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'STAFF'], section: 'Staff' },
+      { id: 'inventory', label: 'Inventory Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'STAFF'], section: 'Administration' },
+      { id: 'hr', label: 'HR System', icon: 'Briefcase', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'], section: 'Staff' },
+      { id: 'reports', label: 'Reports Desk', icon: 'FileText', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'TEACHER'], section: 'Insights' },
+      { id: 'analytics', label: 'Analytics Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'TEACHER'], section: 'Insights' },
+      { id: 'operations', label: 'Operations Desk', icon: 'ShieldCheck', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' },
+      { id: 'settings', label: 'Settings', icon: 'Settings', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' }
+    ];
+
+    const userRole = userContext.role || '';
+    const enabledModules = userContext.enabledModules || [];
+
+    return allCategories.filter(cat => {
+      // Check role restriction
+      if (!cat.roles.includes('*') && !cat.roles.includes(userRole)) {
+        return false;
+      }
+      // Check module activation if mapped
+      if (cat.moduleCode && !enabledModules.includes(cat.moduleCode)) {
+        return false;
+      }
+      return true;
     });
   }
 }
