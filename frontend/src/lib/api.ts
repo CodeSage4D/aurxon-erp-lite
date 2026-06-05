@@ -4292,6 +4292,198 @@ export async function getNavigationApi() {
   }
 }
 
+export async function registerOrganizationApi(data: any) {
+  const res = await fetch(`${API_URL}/registrations/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to submit registration');
+  }
+  return await res.json();
+}
+
+export async function getRegistrationsApi(status?: string) {
+  const url = status
+    ? `${API_URL}/registrations?status=${encodeURIComponent(status)}`
+    : `${API_URL}/registrations`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch registrations');
+  return await res.json();
+}
+
+export async function reviewRegistrationApi(id: string, status: 'APPROVED' | 'REJECTED', notes?: string) {
+  const res = await fetch(`${API_URL}/registrations/${id}/review`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify({ status, notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to review registration');
+  }
+  return await res.json();
+}
+
+export async function validateActivationTokenApi(token: string) {
+  const res = await fetch(`${API_URL}/auth/activate/validate/${encodeURIComponent(token)}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Activation token is invalid or expired');
+  }
+  return await res.json();
+}
+
+export async function activateOrganizationApi(token: string, pass: string) {
+  const res = await fetch(`${API_URL}/auth/activate/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pass }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to activate organization');
+  }
+  return await res.json();
+}
+
+export async function getRbacMatrixApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/matrix`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch RBAC Matrix');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getRbacMatrix offline, simulating...');
+    return {
+      roles: [
+        { id: 'role-admin', name: 'Institute Admin', code: 'INSTITUTE_ADMIN', isSystem: true },
+        { id: 'role-teacher', name: 'Teacher', code: 'TEACHER', isSystem: true },
+        { id: 'role-student', name: 'Student', code: 'STUDENT', isSystem: true },
+      ],
+      groups: [
+        {
+          id: 'group-student',
+          code: 'STUDENT_CORE',
+          label: 'Student Records',
+          permissions: [
+            { resource: 'student:profile', action: 'READ', label: 'View Student Profiles', description: 'Allows viewing student rosters and directories', roles: { 'role-admin': true, 'role-teacher': true, 'role-student': true } },
+            { resource: 'student:profile', action: 'CREATE', label: 'Admit Student', description: 'Allows admitting new students', roles: { 'role-admin': true, 'role-teacher': false, 'role-student': false } },
+            { resource: 'student:profile', action: 'UPDATE', label: 'Update Student Profile', description: 'Allows modifying student demographics', roles: { 'role-admin': true, 'role-teacher': true, 'role-student': false } },
+          ],
+        },
+      ],
+    };
+  }
+}
+
+export async function bulkUpdatePermissionsApi(roleId: string, assignments: any[]) {
+  const res = await fetch(`${API_URL}/rbac/matrix/bulk`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ roleId, assignments }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to bulk update permissions');
+  }
+  return await res.json();
+}
+
+export async function getFounderMetricsCurrentApi() {
+  const res = await fetch(`${API_URL}/founder/metrics/current`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch platform metrics');
+  return await res.json();
+}
+
+export async function getFounderMetricsHistoryApi(limit?: number) {
+  const url = limit
+    ? `${API_URL}/founder/metrics/history?limit=${limit}`
+    : `${API_URL}/founder/metrics/history`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch metrics history');
+  return await res.json();
+}
+
+export async function getFounderStorageStatsApi() {
+  const res = await fetch(`${API_URL}/founder/metrics/storage`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch storage stats');
+  return await res.json();
+}
+
+export async function getSecurityThreatsApi() {
+  const res = await fetch(`${API_URL}/founder/security/threats`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch security threats');
+  return await res.json();
+}
+
+export async function resolveSecurityThreatApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/security/threats/${id}/resolve`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to resolve security threat');
+  return await res.json();
+}
+
+export async function getBackupRecordsApi() {
+  const res = await fetch(`${API_URL}/founder/backup/records`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch backup records');
+  return await res.json();
+}
+
+export async function triggerBackupApi(notes?: string) {
+  const res = await fetch(`${API_URL}/founder/backup/trigger`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ notes }),
+  });
+  if (!res.ok) throw new Error('Failed to trigger manual backup');
+  return await res.json();
+}
+
+export async function founderGlobalSearchApi(q: string) {
+  const res = await fetch(`${API_URL}/founder/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to run global search');
+  return await res.json();
+}
+
+export async function impersonateOrganizationApi(institutionId: string, reason: string, supportTicketRef?: string) {
+  const res = await fetch(`${API_URL}/founder/impersonate/${institutionId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ reason, supportTicketRef }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to initialize impersonation session');
+  }
+  return await res.json();
+}
+
+export async function getBillingStatsApi() {
+  const res = await fetch(`${API_URL}/billing/stats`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch billing stats');
+  return await res.json();
+}
+
+export async function getPlanDefinitionsApi() {
+  const res = await fetch(`${API_URL}/founder/plans`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch plans');
+  return await res.json();
+}
+
+export async function createPlanDefinitionApi(data: any) {
+  const res = await fetch(`${API_URL}/founder/plans`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create plan definition');
+  return await res.json();
+}
+
 
 
 

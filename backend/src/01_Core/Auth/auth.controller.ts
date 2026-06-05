@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, HttpCode, HttpStatus, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -59,5 +59,32 @@ export class AuthController {
       req.user.schoolId,
       req.user.campusId,
     );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh-license')
+  async refreshLicense(@Request() req: any) {
+    if (!req.user.organizationId) {
+      throw new UnauthorizedException('No active organization context to refresh.');
+    }
+    return this.authService.switchContext(
+      req.user.id,
+      req.user.organizationId,
+      req.user.schoolId,
+      req.user.campusId,
+    );
+  }
+
+  @Get('activate/validate/:token')
+  async validateToken(@Param('token') token: string) {
+    return this.authService.validateActivationToken(token);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('activate/:token')
+  async activate(@Param('token') token: string, @Body() body: { pass?: string; password?: string }) {
+    const password = body.password || body.pass || '';
+    return this.authService.activateOrganization(token, password);
   }
 }

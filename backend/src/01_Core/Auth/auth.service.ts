@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import * as argon2 from 'argon2';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -405,6 +406,126 @@ export class AuthService {
         return false;
       }
       return true;
+    });
+  }
+
+  async validateActivationToken(token: string) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const tokenRecord = await this.prisma.activationToken.findUnique({
+      where: { token: tokenHash },
+      include: {
+        registration: true,
+      },
+    });
+
+    if (!tokenRecord) {
+      throw new BadRequestException('Activation token is invalid or has expired');
+    }
+
+    if (tokenRecord.usedAt) {
+      throw new BadRequestException('Activation token has already been used');
+    }
+
+    if (tokenRecord.revokedAt) {
+      throw new BadRequestException('Activation token has been revoked');
+    }
+
+    if (new Date() > tokenRecord.expiresAt) {
+      throw new BadRequestException('Activation token has expired');
+    }
+
+    return {
+      orgName: tokenRecord.registration.orgName,
+      orgType: tokenRecord.registration.orgType,
+      email: tokenRecord.registration.email,
+    };
+  }
+
+  async activateOrganization(token: string, pass: string) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const tokenRecord = await this.prisma.activationToken.findUnique({
+      where: { token: tokenHash },
+      include: {
+        registration: true,
+      },
+    });
+
+    if (!tokenRecord || tokenRecord.usedAt || tokenRecord.revokedAt || new Date() > tokenRecord.expiresAt) {
+      throw new BadRequestException('Activation token is invalid, used, or expired');
+    }
+
+    const reg = tokenRecord.registration;
+    if (!reg.institutionId) {
+      throw new BadRequestException('No provisioned organization associated with this registration');
+    }
+
+    if (pass.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters long');
+    }
+
+    const passwordHash = await argon2.hash(pass);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Create admin user
+      const user = await tx.user.create({
+        data: {
+          email: reg.email,
+          passwordHash,
+          role: 'INSTITUTE_ADMIN',
+          institutionId: reg.institutionId!,
+          mustChangePassword: true, // Force change on first login
+        },
+      });
+
+      // Find the INSTITUTE_ADMIN role for this institution
+      const adminRole = await tx.role.findFirst({
+        where: {
+          institutionId: reg.institutionId!,
+          code: 'INSTITUTE_ADMIN',
+        },
+      });
+
+      if (!adminRole) {
+        throw new BadRequestException('Default admin role not found for provisioned organization');
+      }
+
+      // Create membership
+      await tx.organizationMembership.create({
+        data: {
+          userId: user.id,
+          institutionId: reg.institutionId!,
+          roleId: adminRole.id,
+          status: 'ACTIVE',
+          isPrimary: true,
+        },
+      });
+
+      // Update institution status
+      await tx.institution.update({
+        where: { id: reg.institutionId! },
+        data: { status: 'ACTIVE' },
+      });
+
+      // Mark token as used
+      await tx.activationToken.update({
+        where: { id: tokenRecord.id },
+        data: { usedAt: new Date() },
+      });
+
+      // Create audit log
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'ORG_ACTIVATION',
+          details: `Organization ${reg.orgName} activated successfully. Admin user created.`,
+        },
+      });
+
+      return {
+        email: user.email,
+        orgName: reg.orgName,
+        status: 'ACTIVATED',
+      };
     });
   }
 }

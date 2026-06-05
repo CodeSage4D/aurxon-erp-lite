@@ -106,4 +106,42 @@ export class ModuleService {
 
     return { success: true };
   }
+
+  async createModule(data: { name: string; code: string; description?: string }) {
+    return this.prisma.module.create({
+      data: {
+        name: data.name,
+        code: data.code.toUpperCase(),
+        description: data.description,
+      },
+    });
+  }
+
+  async toggleGlobalModule(code: string, isActive: boolean) {
+    const module = await this.prisma.module.findUnique({ where: { code } });
+    if (!module) {
+      throw new NotFoundException(`Module with code ${code} not found`);
+    }
+    return this.prisma.module.update({
+      where: { code },
+      data: { isActive },
+    });
+  }
+
+  async getModuleUsage() {
+    const modules = await this.prisma.module.findMany();
+    const usageList: any[] = [];
+    for (const m of modules) {
+      const count = await this.prisma.organizationModule.count({
+        where: { moduleCode: m.code, isEnabled: true },
+      });
+      usageList.push({
+        code: m.code,
+        name: m.name,
+        isActive: m.isActive,
+        organizationCount: count,
+      });
+    }
+    return usageList;
+  }
 }

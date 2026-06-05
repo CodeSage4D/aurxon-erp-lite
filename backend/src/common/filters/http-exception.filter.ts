@@ -1,6 +1,7 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PrismaService } from '../../01_Core/prisma/prisma.service';
+import * as Sentry from '@sentry/node';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -22,8 +23,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? exceptionResponse.message 
         : exception.message || 'Internal server error';
     } else {
-      // Log unhandled backend exceptions to server console, but do not leak details to client
+      // Log unhandled backend exceptions to server console and capture in Sentry
       console.error('Unhandled system exception intercepted:', exception);
+      Sentry.captureException(exception);
     }
 
     // Determine IP Address

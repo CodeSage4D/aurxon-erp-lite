@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../Auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../Auth/roles.guard';
 import { ModuleService } from './module.service';
@@ -58,5 +58,26 @@ export class ModuleController {
       body.featureCode,
       body.isEnabled,
     );
+  }
+
+  @Post()
+  @Roles('SUPER_ADMIN')
+  async createModule(@Body() body: { name: string; code: string; description?: string }) {
+    return this.moduleService.createModule(body);
+  }
+
+  @Patch(':code/toggle')
+  @Roles('SUPER_ADMIN')
+  async toggleGlobalModule(
+    @Param('code') code: string,
+    @Body() body: { isActive: boolean },
+  ) {
+    return this.moduleService.toggleGlobalModule(code, body.isActive);
+  }
+
+  @Get('usage')
+  @Roles('SUPER_ADMIN')
+  async getModuleUsage() {
+    return this.moduleService.getModuleUsage();
   }
 }

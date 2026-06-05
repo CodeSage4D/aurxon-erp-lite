@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './01_Core/prisma/prisma.module';
+import { TenantStatusMiddleware } from './01_Core/Auth/tenant-status.middleware';
 import { AuthModule } from './01_Core/Auth/auth.module';
 import { MarketplaceModule } from './01_Core/Module/module.module';
 import { SetupModule } from './01_Core/Setup/setup.module';
@@ -25,6 +26,7 @@ import { NotificationModule } from './08_Communication/InAppAlerts/notification.
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { PerformanceInterceptor } from './common/interceptors/performance.interceptor';
 import { UploadModule } from './02_Admission/Documents/upload.module';
 import { RbacModule } from './01_Core/RBAC/rbac.module';
 import { AuditLogsModule } from './01_Core/AuditLogs/audit-log.module';
@@ -40,6 +42,10 @@ import { ReportsAnalyticsModule } from './09_Reports/reports-analytics.module';
 import { DocumentsModule } from './11_Documents/documents.module';
 import { OperationsModule } from './01_Core/Operations/operations.module';
 import { ProductivityModule } from './15_Productivity/productivity.module';
+import { RegistrationModule } from './01_Core/Registration/registration.module';
+import { ProvisioningModule } from './01_Core/Provisioning/provisioning.module';
+import { BillingModule } from './01_Core/Billing/billing.module';
+import { FounderModule } from './01_Core/Founder/founder.module';
 
 @Module({
   imports: [
@@ -79,6 +85,10 @@ import { ProductivityModule } from './15_Productivity/productivity.module';
     DocumentsModule,
     OperationsModule,
     ProductivityModule,
+    RegistrationModule,
+    ProvisioningModule,
+    BillingModule,
+    FounderModule,
     ThrottlerModule.forRoot([{
       ttl: 60000, // 1 minute
       limit: 100, // 100 requests per minute
@@ -95,6 +105,14 @@ import { ProductivityModule } from './15_Productivity/productivity.module';
       provide: APP_INTERCEPTOR,
       useClass: AuditLogInterceptor,
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PerformanceInterceptor,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TenantStatusMiddleware).forRoutes('*');
+  }
+}

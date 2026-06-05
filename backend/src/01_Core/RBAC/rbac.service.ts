@@ -256,4 +256,142 @@ export class RbacService {
 
     return newMembership;
   }
+
+  async getMatrix(institutionId: string) {
+    let groups = await this.prisma.permissionGroup.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    if (groups.length === 0) {
+      const defaultGroups = [
+        { code: 'STUDENT_CORE', label: 'Student Records', moduleCode: 'STUDENT_MANAGEMENT', sortOrder: 1 },
+        { code: 'ATTENDANCE_CORE', label: 'Attendance Tracking', moduleCode: 'ATTENDANCE', sortOrder: 2 },
+        { code: 'EXAMS_CORE', label: 'Examinations & Grades', moduleCode: 'EXAMINATION', sortOrder: 3 },
+        { code: 'FINANCE_CORE', label: 'Fees & Payroll', moduleCode: 'FINANCE', sortOrder: 4 },
+        { code: 'ORG_SETTINGS', label: 'Organization Settings', moduleCode: 'STUDENT_MANAGEMENT', sortOrder: 5 },
+      ];
+
+      for (const dg of defaultGroups) {
+        await this.prisma.permissionGroup.create({ data: dg });
+      }
+
+      groups = await this.prisma.permissionGroup.findMany({
+        orderBy: { sortOrder: 'asc' },
+      });
+    }
+
+    const roles = await this.prisma.role.findMany({
+      where: { institutionId },
+      include: { permissions: true },
+    });
+
+    const systemPermissions = [
+      { resource: 'student:profile', action: 'READ', groupCode: 'STUDENT_CORE', label: 'View Student Profiles', description: 'Allows viewing student rosters and directories' },
+      { resource: 'student:profile', action: 'CREATE', groupCode: 'STUDENT_CORE', label: 'Admit Student', description: 'Allows admitting new students via admission desk' },
+      { resource: 'student:profile', action: 'UPDATE', groupCode: 'STUDENT_CORE', label: 'Update Student Profile', description: 'Allows modifying student demographics' },
+      { resource: 'student:profile', action: 'DELETE', groupCode: 'STUDENT_CORE', label: 'Archive Student', description: 'Allows archiving student records' },
+
+      { resource: 'attendance:records', action: 'READ', groupCode: 'ATTENDANCE_CORE', label: 'View Attendance Logs', description: 'Allows viewing daily attendance sheets' },
+      { resource: 'attendance:records', action: 'CREATE', groupCode: 'ATTENDANCE_CORE', label: 'Record Attendance', description: 'Allows submitting daily attendance' },
+      { resource: 'attendance:records', action: 'UPDATE', groupCode: 'ATTENDANCE_CORE', label: 'Edit Attendance', description: 'Allows updating past attendance entries' },
+      { resource: 'attendance:records', action: 'DELETE', groupCode: 'ATTENDANCE_CORE', label: 'Delete Attendance', description: 'Allows wiping attendance entries' },
+
+      { resource: 'exams:setup', action: 'READ', groupCode: 'EXAMS_CORE', label: 'View Exams', description: 'Allows viewing exam schedules and grading schemas' },
+      { resource: 'exams:setup', action: 'CREATE', groupCode: 'EXAMS_CORE', label: 'Create Exams', description: 'Allows scheduling new exams' },
+      { resource: 'exams:setup', action: 'UPDATE', groupCode: 'EXAMS_CORE', label: 'Record Grades', description: 'Allows entering student marks' },
+      { resource: 'exams:setup', action: 'DELETE', groupCode: 'EXAMS_CORE', label: 'Delete Exams', description: 'Allows deleting scheduled exams' },
+
+      { resource: 'finance:ledger', action: 'READ', groupCode: 'FINANCE_CORE', label: 'View Financial Records', description: 'Allows viewing fee receipts and payrolls' },
+      { resource: 'finance:ledger', action: 'CREATE', groupCode: 'FINANCE_CORE', label: 'Receive Fees', description: 'Allows registering student fee payments' },
+      { resource: 'finance:ledger', action: 'UPDATE', groupCode: 'FINANCE_CORE', label: 'Update Salaries', description: 'Allows running staff payroll systems' },
+      { resource: 'finance:ledger', action: 'DELETE', groupCode: 'FINANCE_CORE', label: 'Refund Fees', description: 'Allows voiding fee transactions' },
+
+      { resource: 'organization:settings', action: 'READ', groupCode: 'ORG_SETTINGS', label: 'View Settings', description: 'Allows viewing institution configurations' },
+      { resource: 'organization:settings', action: 'CREATE', groupCode: 'ORG_SETTINGS', label: 'Setup Rules', description: 'Allows initializing setup steps' },
+      { resource: 'organization:settings', action: 'UPDATE', groupCode: 'ORG_SETTINGS', label: 'Update Settings', description: 'Allows modifying logo, colors, and branding' },
+      { resource: 'organization:settings', action: 'DELETE', groupCode: 'ORG_SETTINGS', label: 'Reset Rules', description: 'Allows wiping configurations' },
+    ];
+
+    const groupMap = new Map<string, any>();
+    for (const g of groups) {
+      groupMap.set(g.code, {
+        id: g.id,
+        code: g.code,
+        label: g.label,
+        moduleCode: g.moduleCode,
+        permissions: [],
+      });
+    }
+
+    for (const sysPerm of systemPermissions) {
+      const g = groupMap.get(sysPerm.groupCode);
+      if (g) {
+        const roleStates: Record<string, boolean> = {};
+        for (const r of roles) {
+          const hasPerm = r.permissions.some(
+            p => p.resource === sysPerm.resource && p.action === sysPerm.action,
+          );
+          roleStates[r.id] = hasPerm;
+        }
+
+        g.permissions.push({
+          resource: sysPerm.resource,
+          action: sysPerm.action,
+          label: sysPerm.label,
+          description: sysPerm.description,
+          roles: roleStates,
+        });
+      }
+    }
+
+    return {
+      roles: roles.map(r => ({ id: r.id, name: r.name, code: r.code, isSystem: r.isSystem })),
+      groups: Array.from(groupMap.values()),
+    };
+  }
+
+  async bulkAssignPermissions(
+    institutionId: string,
+    executorId: string,
+    roleId: string,
+    assignments: { resource: string; action: string; isAllowed: boolean }[],
+  ) {
+    const role = await this.prisma.role.findFirst({
+      where: { id: roleId, institutionId },
+    });
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const a of assignments) {
+        const actionUpper = a.action.toUpperCase();
+        const existing = await tx.permission.findFirst({
+          where: { roleId, resource: a.resource, action: actionUpper },
+        });
+
+        if (a.isAllowed) {
+          if (!existing) {
+            await tx.permission.create({
+              data: { roleId, resource: a.resource, action: actionUpper },
+            });
+          }
+        } else {
+          if (existing) {
+            await tx.permission.delete({
+              where: { id: existing.id },
+            });
+          }
+        }
+      }
+    });
+
+    await this.auditLogService.logAction(
+      executorId,
+      'BULK_ASSIGN_PERMISSIONS',
+      `Updated bulk permissions matrix for role ${role.name}`,
+    );
+
+    return { success: true };
+  }
 }

@@ -45,6 +45,17 @@ model Institution {
   modules       OrganizationModule[]
   features      OrganizationFeature[]
   orgSettings   OrganizationSetting[]
+
+  tenantId               String?
+  tenant                 Tenant?                     @relation(fields: [tenantId], references: [id])
+  orgType                String                      @default("SCHOOL")
+  status                 String                      @default("ACTIVE")
+  registrations          OrganizationRegistration[]
+  storageSnapshots       StorageSnapshot[]
+  securityThreatLogs     SecurityThreatLog[]         @relation("ThreatInstitution")
+  invoices               Invoice[]
+  backupRecords          BackupRecord[]
+  impersonationSessions  ImpersonationSession[]
 }
 
 model User {
@@ -80,6 +91,13 @@ model User {
   plannerActivities   PlannerActivity[]
   tasksAssigned       AssignedTask[] @relation("AssignedBy")
   tasksReceived       AssignedTask[] @relation("AssignedTo")
+
+  reviewedRegistrations   OrganizationRegistration[] @relation("ReviewedRegistrations")
+  revokedTokens           ActivationToken[] @relation("RevokedTokens")
+  performedLicenseEvents  LicenseEvent[] @relation("PerformedLicenseEvents")
+  securityThreatLogs      SecurityThreatLog[] @relation("ThreatUser")
+  triggeredBackups        BackupRecord[] @relation("TriggeredBackups")
+  founderImpersonations   ImpersonationSession[] @relation("FounderImpersonations")
 }
 
 model Student {
@@ -975,6 +993,10 @@ model Permission {
   action      String   // e.g. "CREATE", "READ", "UPDATE", "DELETE", "APPROVE"
   roleId      String
   role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  groupId     String?
+  group       PermissionGroup? @relation(fields: [groupId], references: [id])
+  label       String?
+  description String?
   createdAt   DateTime @default(now())
 
   @@unique([roleId, resource, action])
@@ -1030,9 +1052,13 @@ model License {
   licenseType    String       @default("TRIAL") // TRIAL, SUBSCRIPTION, ENTERPRISE_CONTRACT
   status         String       @default("ACTIVE") // ACTIVE, EXPIRED, REVOKED
   expiresAt      DateTime
+  gracePeriodDays Int          @default(14)
+  lastValidatedAt DateTime?
   activatedAt    DateTime     @default(now())
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  events         LicenseEvent[]
 }
 
 model Module {
@@ -1123,4 +1149,193 @@ model StudentStatusHistory {
 
   @@index([studentId])
 }
+
+// ─────────────────────────────────────────────
+// Sprint A Models (Tenant Layer & Org Registration)
+// ─────────────────────────────────────────────
+
+model Tenant {
+  id           String        @id @default(uuid())
+  name         String
+  slug         String        @unique
+  status       String        @default("ACTIVE") // ACTIVE, SUSPENDED
+  plan         String        @default("TRIAL") // TRIAL, PROFESSIONAL, ENTERPRISE
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  institutions Institution[]
+}
+
+model OrganizationRegistration {
+  id               String           @id @default(uuid())
+  orgName          String
+  orgType          String           @default("SCHOOL") // SCHOOL, HOSPITAL, UNIVERSITY, COMPANY, NGO
+  email            String           @unique
+  phone            String
+  address          String?
+  city             String?
+  state            String?
+  expectedUsers    Int              @default(50)
+  requestedModules String[]         // array of module codes
+  status           String           @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED
+  reviewNotes      String?
+  reviewedById     String?
+  reviewedBy       User?            @relation("ReviewedRegistrations", fields: [reviewedById], references: [id])
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  activationTokenId String?
+  activationToken  ActivationToken?
+  institutionId    String?
+  institution      Institution?     @relation(fields: [institutionId], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model ActivationToken {
+  id             String                   @id @default(uuid())
+  token          String                   @unique // SHA-256 stored hash
+  registrationId String                   @unique
+  registration   OrganizationRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  usedAt         DateTime?
+  revokedAt      DateTime?
+  revokedById    String?
+  revokedBy      User?                    @relation("RevokedTokens", fields: [revokedById], references: [id])
+  auditNote      String?
+  createdAt      DateTime                 @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Sprint B Models (Licensing Engine)
+// ─────────────────────────────────────────────
+
+model LicenseEvent {
+  id            String   @id @default(uuid())
+  licenseId     String
+  license       License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  eventType     String   // CREATED, EXPIRED, EXTENDED, SUSPENDED, REVOKED
+  performedById String?
+  performedBy   User?    @relation("PerformedLicenseEvents", fields: [performedById], references: [id])
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model PlanDefinition {
+  id             String   @id @default(uuid())
+  code           String   @unique // e.g. "STARTER", "PROFESSIONAL", "ENTERPRISE"
+  name           String
+  monthlyPrice   Float
+  studentLimit   Int
+  storageLimitGb Float
+  moduleAccess   String[] // module codes accessible under this plan
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Sprint C Models (RBAC Matrix)
+// ─────────────────────────────────────────────
+
+model PermissionGroup {
+  id          String       @id @default(uuid())
+  code        String       @unique // e.g. "STUDENT_CORE"
+  label       String       // e.g. "Student Records"
+  moduleCode  String       // e.g. "STUDENT_MANAGEMENT"
+  sortOrder   Int          @default(0)
+  permissions Permission[]
+  createdAt   DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Sprint D Models (Platform Observability)
+// ─────────────────────────────────────────────
+
+model PlatformMetricSnapshot {
+  id                String   @id @default(uuid())
+  capturedAt        DateTime @default(now())
+  activeUsers       Int      @default(0)
+  requestsPerMin    Float    @default(0)
+  avgResponseMs     Float    @default(0)
+  p95ResponseMs     Float    @default(0)
+  apiSuccessRate    Float    @default(100.0)
+  cpuUsagePercent   Float    @default(0)
+  memUsagePercent   Float    @default(0)
+  dbSizeGb          Float    @default(0)
+  dbConnections     Int      @default(0)
+  createdAt         DateTime @default(now())
+}
+
+model StorageSnapshot {
+  id             String      @id @default(uuid())
+  institutionId  String
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  capturedAt     DateTime    @default(now())
+  usedGb         Float       @default(0)
+  quotaGb        Float       @default(0)
+  breakdown      Json        // breakdown details
+  createdAt      DateTime    @default(now())
+}
+
+model SecurityThreatLog {
+  id            String       @id @default(uuid())
+  threatType    String       // BRUTE_FORCE, SUSPICIOUS_IP, PERMISSION_ESCALATION
+  severity      String       // LOW, MEDIUM, HIGH, CRITICAL
+  ipAddress     String?
+  userId        String?
+  user          User?        @relation("ThreatUser", fields: [userId], references: [id])
+  institutionId String?
+  institution   Institution? @relation("ThreatInstitution", fields: [institutionId], references: [id])
+  details       String
+  resolved      Boolean      @default(false)
+  resolvedAt    DateTime?
+  createdAt     DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────
+// Sprint E Models (Billing & Backup)
+// ─────────────────────────────────────────────
+
+model Invoice {
+  id             String      @id @default(uuid())
+  institutionId  String
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  invoiceNumber  String      @unique // e.g. INV-2026-0001
+  amount         Float
+  currency       String      @default("INR")
+  status         String      @default("UNPAID") // PAID, UNPAID, OVERDUE, VOID
+  dueDate        DateTime
+  paidAt         DateTime?
+  lineItems      Json        // details of charges
+  createdAt      DateTime    @default(now())
+}
+
+model BackupRecord {
+  id             String      @id @default(uuid())
+  backupType     String      // SYSTEM, TENANT
+  status         String      @default("INITIATED") // INITIATED, IN_PROGRESS, COMPLETED, FAILED
+  sizeGb         Float       @default(0)
+  storedAt       String
+  expiresAt      DateTime
+  institutionId  String?
+  institution    Institution? @relation(fields: [institutionId], references: [id])
+  triggeredById  String?
+  triggeredBy    User?       @relation("TriggeredBackups", fields: [triggeredById], references: [id])
+  notes          String?
+  createdAt      DateTime    @default(now())
+}
+
+model ImpersonationSession {
+  id                 String      @id @default(uuid())
+  founderId          String
+  founder            User        @relation("FounderImpersonations", fields: [founderId], references: [id])
+  targetInstitutionId String
+  targetInstitution  Institution @relation(fields: [targetInstitutionId], references: [id])
+  reason             String
+  supportTicketRef   String?
+  startedAt          DateTime    @default(now())
+  endedAt            DateTime?
+  actions            Json[]      // log of actions during impersonation
+  tokenHash          String
+  createdAt          DateTime    @default(now())
+}
+
 

@@ -92,4 +92,24 @@ export class RbacController {
       body.roleId,
     );
   }
+
+  @Get('matrix')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async getMatrix(@Request() req: any) {
+    return this.rbacService.getMatrix(req.user.organizationId);
+  }
+
+  @Post('matrix/bulk')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async bulkAssign(
+    @Request() req: any,
+    @Body() body: { roleId: string; assignments: { resource: string; action: string; isAllowed: boolean }[] },
+  ) {
+    return this.rbacService.bulkAssignPermissions(
+      req.user.organizationId,
+      req.user.id,
+      body.roleId,
+      body.assignments,
+    );
+  }
 }

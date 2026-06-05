@@ -4,6 +4,8 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { PrismaService } from './01_Core/prisma/prisma.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { WinstonLogger } from './common/logger/winston.logger';
+import * as Sentry from '@sentry/node';
 
 async function bootstrap() {
   // Validate Encryption Key at application startup
@@ -18,7 +20,16 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  const app = await NestFactory.create(AppModule);
+  // Initialize Sentry SDK
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN || '',
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 1.0,
+  });
+
+  const app = await NestFactory.create(AppModule, {
+    logger: new WinstonLogger(),
+  });
 
   // Enable Security Headers via Helmet
   app.use(helmet());

@@ -78,6 +78,24 @@ export default function DashboardPage() {
   // Auth & Roles States
   const [user, setUser] = useState<any>(null);
   const [currentRole, setCurrentRole] = useState('STUDENT');
+  const [isImpersonating, setIsImpersonating] = useState(false);
+
+  useEffect(() => {
+    setIsImpersonating(localStorage.getItem('aurxon_impersonating') === 'true');
+  }, []);
+
+  const handleEndImpersonation = () => {
+    const originalToken = localStorage.getItem('aurxon_founder_token');
+    if (originalToken) {
+      localStorage.setItem('aurxon_token', originalToken);
+      localStorage.removeItem('aurxon_founder_token');
+      localStorage.removeItem('aurxon_impersonating');
+      router.push('/founder');
+    } else {
+      localStorage.removeItem('aurxon_impersonating');
+      router.push('/');
+    }
+  };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   
@@ -449,7 +467,22 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-zinc-50 font-sans text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-50 overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden bg-zinc-50 font-sans text-zinc-900 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-50">
+      {isImpersonating && (
+        <div className="w-full bg-amber-500 text-slate-950 px-6 py-2 flex justify-between items-center text-xs font-black tracking-wider shadow-md shrink-0 uppercase z-[60]">
+          <div className="flex items-center gap-2">
+            <span className="animate-pulse">⚠️ IMPERSONATION MODE ACTIVE</span>
+            <span className="text-[10px] bg-slate-900/10 px-2 py-0.5 rounded font-mono font-bold">READ-ONLY SECURITY MATRIX</span>
+          </div>
+          <button 
+            onClick={handleEndImpersonation} 
+            className="bg-slate-950 text-white font-black px-3.5 py-1 rounded hover:bg-slate-900 transition-all text-[10px] cursor-pointer"
+          >
+            End Support Session
+          </button>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
       
       {/* Toast Alert */}
       {toastMessage && (
@@ -1040,6 +1073,7 @@ export default function DashboardPage() {
         />
       )}
 
+      </div>
     </div>
   );
 }
