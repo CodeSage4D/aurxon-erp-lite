@@ -60,6 +60,29 @@ interface SidebarProps {
   handleLogout: () => void;
 }
 
+import { getNavigationApi } from '@/lib/api';
+
+const IconMap: Record<string, React.ComponentType<any>> = {
+  LayoutDashboard, Users, CalendarCheck, CreditCard, GraduationCap, Briefcase, Megaphone, LogOut,
+  Moon, Sun, ShieldCheck, BookOpen, Book, Award, MessageSquare, BarChart2,
+  Settings, Bell, Menu, Sparkles, ShieldAlert, ChevronLeft, ChevronRight, FileText, ClipboardList
+};
+
+interface SidebarProps {
+  user: any;
+  currentRole: string;
+  onRoleChange: (role: string) => void;
+  activeCategory: string;
+  setActiveCategory: (cat: string) => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (val: boolean) => void;
+  mobileSidebarOpen: boolean;
+  setMobileSidebarOpen: (val: boolean) => void;
+  notifications: any[];
+  setNotificationsOpen: (val: boolean) => void;
+  handleLogout: () => void;
+}
+
 export default function Sidebar({
   user,
   currentRole,
@@ -75,11 +98,19 @@ export default function Sidebar({
   handleLogout
 }: SidebarProps) {
   const unreadCount = notifications.length;
+  const [navItems, setNavItems] = React.useState<any[]>([]);
 
-  const filteredCategories = SIDEBAR_CATEGORIES.filter(cat => {
-    if (cat.roles.includes('*')) return true;
-    return cat.roles.includes(currentRole);
-  });
+  React.useEffect(() => {
+    async function fetchNav() {
+      try {
+        const items = await getNavigationApi();
+        setNavItems(items);
+      } catch (err) {
+        console.error('Failed to load navigation', err);
+      }
+    }
+    fetchNav();
+  }, [currentRole]);
 
   return (
     <aside 
@@ -147,7 +178,7 @@ export default function Sidebar({
       {/* Navigation List */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar">
         {['Daily Use', 'Staff', 'Communication', 'Insights', 'Administration'].map((secName) => {
-          const secCategories = filteredCategories.filter(cat => cat.section === secName);
+          const secCategories = navItems.filter(cat => cat.section === secName);
           if (secCategories.length === 0) return null;
           return (
             <div key={secName} className="space-y-1">
@@ -157,7 +188,7 @@ export default function Sidebar({
                 </div>
               )}
               {secCategories.map((cat) => {
-                const Icon = cat.icon;
+                const Icon = IconMap[cat.icon] || Settings;
                 const isActive = activeCategory === cat.id;
                 return (
                   <button
