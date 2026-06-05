@@ -327,58 +327,143 @@ export async function loginApi(email: string, pass: string) {
     const data = await res.json();
     localStorage.setItem('aurxon_token', data.token);
     localStorage.setItem('aurxon_user', JSON.stringify(data.user));
+    if (data.memberships) {
+      localStorage.setItem('aurxon_memberships', JSON.stringify(data.memberships));
+    }
     return data;
   } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.includes('network')) {
+      throw error;
+    }
     console.warn('Backend offline, using fallback client-side validation...');
-    // Fallback Mock Validation
     const db = getMockDb();
     
-    // Check roles
-    let role = '';
-    let profileName = 'Administrator';
-    let profileId = '';
+    let role = 'TEACHER';
+    let profileName = 'Consultant User';
+    let profileId = 'staff-c1';
+    let memberships: any[] = [];
 
-    if (email === 'superadmin@aurxon.com') {
+    if (email === 'founder@aurxon.com') {
       role = 'SUPER_ADMIN';
+      profileName = 'Founder User';
+      profileId = 'staff-f1';
+      memberships = [
+        {
+          id: 'mb-f1',
+          organizationId: 'inst-dps',
+          organizationName: 'Delhi Public School, Sector 4',
+          logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#0284c7',
+          role: 'SUPER_ADMIN',
+          roleName: 'Super Admin',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
     } else if (email === 'admin@aurxon.com') {
       role = 'INSTITUTE_ADMIN';
-    } else if (email === 'teacher1@aurxon.com') {
+      profileName = 'DPS Admin';
+      profileId = 'staff-a1';
+      memberships = [
+        {
+          id: 'mb-a1',
+          organizationId: 'inst-dps',
+          organizationName: 'Delhi Public School, Sector 4',
+          logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#0284c7',
+          role: 'INSTITUTE_ADMIN',
+          roleName: 'Institute Admin',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    } else if (email === 'principal@rkmvp.edu') {
+      role = 'PRINCIPAL';
+      profileName = 'RKMVP Principal';
+      profileId = 'staff-p1';
+      memberships = [
+        {
+          id: 'mb-p1',
+          organizationId: 'inst-rkmvp',
+          organizationName: 'Ramakrishna Mission Vidyapith',
+          logoUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4ee24f880?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#ea580c',
+          role: 'PRINCIPAL',
+          roleName: 'Principal',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    } else if (email === 'teacher@rkmvp.edu') {
       role = 'TEACHER';
       profileName = 'Sarah Connor';
       profileId = 'staff-1';
-    } else if (email === 'teacher2@aurxon.com') {
-      role = 'TEACHER';
-      profileName = 'John Keating';
-      profileId = 'staff-2';
-    } else if (email === 'accountant@aurxon.com') {
-      role = 'ACCOUNTANT';
-      profileName = 'Robert Kiyosaki';
-      profileId = 'staff-3';
-    } else if (email === 'student@aurxon.com') {
-      role = 'STUDENT';
-      profileName = 'Alice Miller';
-      profileId = 'stud-1';
-    } else if (email === 'parent@aurxon.com') {
-      role = 'PARENT';
-      profileName = 'David Miller';
-      profileId = 'parent-1';
-    } else {
-      // General check inside database
-      const foundStudent = db.students.find((s) => s.email === email);
-      if (foundStudent) {
-        role = 'STUDENT';
-        profileName = `${foundStudent.firstName} ${foundStudent.lastName}`;
-        profileId = foundStudent.id;
-      } else {
-        const foundStaff = db.staff.find((s) => s.user.email === email);
-        if (foundStaff) {
-          role = foundStaff.designation;
-          profileName = `${foundStaff.firstName} ${foundStaff.lastName}`;
-          profileId = foundStaff.id;
-        } else {
-          throw new Error('Invalid email or password (offline validation)');
+      memberships = [
+        {
+          id: 'mb-t1',
+          organizationId: 'inst-rkmvp',
+          organizationName: 'Ramakrishna Mission Vidyapith',
+          logoUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4ee24f880?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#ea580c',
+          role: 'TEACHER',
+          roleName: 'Teacher',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
         }
-      }
+      ];
+    } else if (email === 'consultant@aurxon.com') {
+      role = 'CONSULTANT';
+      profileName = 'Principal Consultant';
+      profileId = 'staff-c1';
+      memberships = [
+        {
+          id: 'mb-c1',
+          organizationId: 'inst-rkmvp',
+          organizationName: 'Ramakrishna Mission Vidyapith',
+          logoUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4ee24f880?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#ea580c',
+          role: 'CONSULTANT',
+          roleName: 'Consultant',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        },
+        {
+          id: 'mb-c2',
+          organizationId: 'inst-kpphs',
+          organizationName: 'Kalyani Priyanath High School',
+          logoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#16a34a',
+          role: 'CONSULTANT',
+          roleName: 'Consultant',
+          schoolId: null,
+          campusId: null,
+          isPrimary: false
+        }
+      ];
+    } else {
+      // Fallback
+      role = 'TEACHER';
+      profileName = 'Demo Teacher';
+      profileId = 'staff-1';
+      memberships = [
+        {
+          id: 'mb-d1',
+          organizationId: 'inst-1',
+          organizationName: db.institutionName,
+          logoUrl: db.logoUrl,
+          primaryColor: db.primaryColor,
+          role: 'TEACHER',
+          roleName: 'Teacher',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
     }
 
     if (pass !== 'password123') {
@@ -388,21 +473,126 @@ export async function loginApi(email: string, pass: string) {
     const payload = {
       token: 'mock-jwt-token-aurxon-2026',
       user: {
-        id: 'mock-user-id',
+        id: profileId,
         email,
-        role,
         profileName,
         profileId,
-        institutionId: 'inst-1',
-        institutionName: db.institutionName,
-        logoUrl: db.logoUrl,
-        primaryColor: db.primaryColor,
       },
+      memberships
     };
 
     localStorage.setItem('aurxon_token', payload.token);
     localStorage.setItem('aurxon_user', JSON.stringify(payload.user));
+    localStorage.setItem('aurxon_memberships', JSON.stringify(payload.memberships));
     return payload;
+  }
+}
+
+export async function switchContextApi(organizationId: string, schoolId?: string | null, campusId?: string | null) {
+  try {
+    const res = await fetch(`${API_URL}/auth/switch-context`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ organizationId, schoolId, campusId }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to switch context');
+    }
+    const data = await res.json();
+    localStorage.setItem('aurxon_token', data.token);
+    localStorage.setItem('aurxon_context', JSON.stringify(data.context));
+    
+    // Update local user record
+    const userStr = localStorage.getItem('aurxon_user');
+    if (userStr) {
+      const userObj = JSON.parse(userStr);
+      userObj.role = data.context.role;
+      userObj.institutionId = data.context.organizationId;
+      userObj.institutionName = data.context.organizationName;
+      userObj.logoUrl = data.context.branding.logoUrl;
+      userObj.primaryColor = data.context.branding.primaryColor;
+      localStorage.setItem('aurxon_user', JSON.stringify(userObj));
+    }
+    return data;
+  } catch (error) {
+    console.warn('Backend switch-context offline, simulating fallback...');
+    // Simulated Switch Context Fallback
+    const membershipsStr = localStorage.getItem('aurxon_memberships');
+    let membership: any = null;
+    if (membershipsStr) {
+      const list = JSON.parse(membershipsStr);
+      membership = list.find((m: any) => m.organizationId === organizationId);
+    }
+    if (!membership) {
+      throw new Error('Access denied to this organization context.');
+    }
+    
+    const context = {
+      organizationId: membership.organizationId,
+      organizationName: membership.organizationName,
+      schoolId: membership.schoolId || null,
+      campusId: membership.campusId || null,
+      role: membership.role,
+      roleName: membership.roleName,
+      permissions: ['student:profile:crud', 'student:profile:read'],
+      enabledModules: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'],
+      enabledFeatures: ['BIOMETRIC_ATTENDANCE', 'EXAM_FORMULA_CALCULATOR'],
+      branding: {
+        primaryColor: membership.primaryColor,
+        logoUrl: membership.logoUrl,
+      }
+    };
+
+    localStorage.setItem('aurxon_token', 'mock-jwt-token-context-bound');
+    localStorage.setItem('aurxon_context', JSON.stringify(context));
+
+    const userStr = localStorage.getItem('aurxon_user');
+    if (userStr) {
+      const userObj = JSON.parse(userStr);
+      userObj.role = context.role;
+      userObj.institutionId = context.organizationId;
+      userObj.institutionName = context.organizationName;
+      userObj.logoUrl = context.branding.logoUrl;
+      userObj.primaryColor = context.branding.primaryColor;
+      localStorage.setItem('aurxon_user', JSON.stringify(userObj));
+    }
+
+    return { token: 'mock-jwt-token-context-bound', context };
+  }
+}
+
+export async function getFounderStatsApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/founder-stats`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load founder stats');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend offline, using fallback founder dashboard stats...');
+    return {
+      totalOrganizations: 3,
+      totalUsers: 5,
+      totalMemberships: 6,
+      activeSubscriptions: 3,
+      totalStorageLimit: 150,
+      totalStudentLimit: 3000,
+      activeLicenses: 3,
+      planBreakdown: {
+        ENTERPRISE: 1,
+        PROFESSIONAL: 2
+      },
+      recentOrganizations: [
+        { id: 'inst-dps', name: 'Delhi Public School, Sector 4', primaryColor: '#0284c7', createdAt: new Date().toISOString() },
+        { id: 'inst-rkmvp', name: 'Ramakrishna Mission Vidyapith', primaryColor: '#ea580c', createdAt: new Date().toISOString() },
+        { id: 'inst-kpphs', name: 'Kalyani Priyanath High School', primaryColor: '#16a34a', createdAt: new Date().toISOString() }
+      ],
+      moduleUsage: [
+        { code: 'STUDENT_MANAGEMENT', name: 'Student Management', activeCount: 2 },
+        { code: 'ATTENDANCE', name: 'Attendance Management', activeCount: 2 },
+        { code: 'EXAMINATION', name: 'Examinations', activeCount: 2 },
+        { code: 'FINANCE', name: 'Finance & Accounts', activeCount: 1 }
+      ]
+    };
   }
 }
 
@@ -3529,6 +3719,429 @@ export async function escalateAssignedTaskApi(id: string) {
     db.assignedTasks[idx].status = 'ESCALATED';
     saveMockDb(db);
     return db.assignedTasks[idx];
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: Setup Onboarding Wizard
+// =========================================================================
+export async function getSetupStatusApi() {
+  try {
+    const res = await fetch(`${API_URL}/setup/status`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch setup status');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend setup-status offline, returning fallback...');
+    return {
+      setupCompleted: false,
+      steps: {
+        academicConfig: false,
+        branchConfig: false,
+      },
+      details: {
+        academicYear: null,
+        gradingSystem: null,
+        timezone: null,
+        currency: null,
+        branchesCount: 0,
+      },
+    };
+  }
+}
+
+export async function submitSetupApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/setup/submit`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to submit setup wizard');
+    }
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Backend submit-setup offline, simulating locally...');
+    return { success: true };
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: Custom Organization Configurations
+// =========================================================================
+export async function getOrgConfigsApi() {
+  try {
+    const res = await fetch(`${API_URL}/settings/config`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to get org settings');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getOrgConfigs offline, simulating locally...');
+    return [
+      {
+        groupCode: 'ACADEMIC_RULES',
+        items: [
+          { key: 'board_affiliation', value: 'CBSE' },
+          { key: 'grading_system', value: 'CCE_100_MARK_PERCENT' }
+        ]
+      }
+    ];
+  }
+}
+
+export async function upsertOrgConfigApi(groupCode: string, items: Record<string, string>) {
+  try {
+    const res = await fetch(`${API_URL}/settings/config`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ groupCode, items }),
+    });
+    if (!res.ok) throw new Error('Failed to save configs');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend upsertOrgConfig offline, simulating locally...');
+    return {
+      groupCode,
+      items: Object.entries(items).map(([key, value]) => ({ key, value }))
+    };
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: Module & Feature Marketplace
+// =========================================================================
+export async function getModulesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketplace modules');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getModules offline, returning fallback...');
+    return [
+      { id: 'm-stud', name: 'Student Management', code: 'STUDENT_MANAGEMENT', description: 'Core admissions, parent relations, scholar cards', isActive: true },
+      { id: 'm-attn', name: 'Attendance Management', code: 'ATTENDANCE', description: 'Biometric, daily register, and staff attendance logs', isActive: true },
+      { id: 'm-exam', name: 'Examinations Desk', code: 'EXAMINATION', description: 'Report cards, grade letters, CBSE board formulas', isActive: true },
+      { id: 'm-fin', name: 'Finance & Fee Ledgers', code: 'FINANCE', description: 'Fee structures, UPI online payment receipts, expense logs', isActive: true }
+    ];
+  }
+}
+
+export async function getOrgModulesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules/org`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load active org modules');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getOrgModules offline, returning active session values...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const enabled = contextStr ? JSON.parse(contextStr).enabledModules : ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'];
+    return enabled.map((code: string) => ({ moduleCode: code, isEnabled: true }));
+  }
+}
+
+export async function toggleModuleApi(moduleCode: string, isEnabled: boolean) {
+  try {
+    const res = await fetch(`${API_URL}/modules/toggle`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ moduleCode, isEnabled }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend toggleModule offline, simulating fallback...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    if (contextStr) {
+      const ctx = JSON.parse(contextStr);
+      if (isEnabled) {
+        if (!ctx.enabledModules.includes(moduleCode)) ctx.enabledModules.push(moduleCode);
+      } else {
+        ctx.enabledModules = ctx.enabledModules.filter((m: string) => m !== moduleCode);
+      }
+      localStorage.setItem('aurxon_context', JSON.stringify(ctx));
+    }
+    return { success: true };
+  }
+}
+
+export async function getFeaturesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules/features`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketplace features');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getFeatures offline, returning fallback...');
+    return [
+      { id: 'f-bio', name: 'Biometric Attendance Integration', code: 'BIOMETRIC_ATTENDANCE', moduleId: 'm-attn', description: 'Enable hardware syncing for RFID/fingerprint scanners' },
+      { id: 'f-calc', name: 'Automated Board GPA Calculator', code: 'EXAM_FORMULA_CALCULATOR', moduleId: 'm-exam', description: 'Generate custom CGPA weights and rounding rules' }
+    ];
+  }
+}
+
+export async function getOrgFeaturesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules/features/org`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load active features');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getOrgFeatures offline, returning active session values...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const enabled = contextStr ? JSON.parse(contextStr).enabledFeatures : ['BIOMETRIC_ATTENDANCE', 'EXAM_FORMULA_CALCULATOR'];
+    return enabled.map((code: string) => ({ featureCode: code, isEnabled: true }));
+  }
+}
+
+export async function toggleFeatureApi(featureCode: string, isEnabled: boolean) {
+  try {
+    const res = await fetch(`${API_URL}/modules/features/toggle`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ featureCode, isEnabled }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend toggleFeature offline, simulating fallback...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    if (contextStr) {
+      const ctx = JSON.parse(contextStr);
+      if (isEnabled) {
+        if (!ctx.enabledFeatures.includes(featureCode)) ctx.enabledFeatures.push(featureCode);
+      } else {
+        ctx.enabledFeatures = ctx.enabledFeatures.filter((f: string) => f !== featureCode);
+      }
+      localStorage.setItem('aurxon_context', JSON.stringify(ctx));
+    }
+    return { success: true };
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: RBAC Engine (Roles & Matrix & Memberships)
+// =========================================================================
+export async function getRolesListApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/roles`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to get roles list');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getRolesList offline, returning fallback...');
+    return [
+      { id: 'r-admin', name: 'Institute Administrator', code: 'INSTITUTE_ADMIN', isSystem: true, description: 'Full school group manager credentials' },
+      { id: 'r-teach', name: 'Teacher', code: 'TEACHER', isSystem: true, description: 'Academics, attendance and grade descriptors creator' },
+      { id: 'r-acct', name: 'Accountant', code: 'ACCOUNTANT', isSystem: true, description: 'Ledgers, fees and payroll controller' },
+      { id: 'r-stud', name: 'Student', code: 'STUDENT', isSystem: true, description: 'Access to homework and own profile' }
+    ];
+  }
+}
+
+export async function createRoleApi(name: string, code: string, description?: string) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/roles`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ name, code, description }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend createRole offline, simulating locally...');
+    return { id: `role-${Date.now()}`, name, code: code.toUpperCase(), description, isSystem: false };
+  }
+}
+
+export async function deleteRoleApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/roles/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend deleteRole offline, simulating locally...');
+    return { id };
+  }
+}
+
+export async function getPermissionsApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/permissions`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load permissions matrix');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getPermissions offline, returning fallback...');
+    return [
+      {
+        id: 'r-admin',
+        name: 'Institute Administrator',
+        code: 'INSTITUTE_ADMIN',
+        permissions: [
+          { resource: 'student:profile', action: 'CREATE' },
+          { resource: 'student:profile', action: 'READ' },
+          { resource: 'student:profile', action: 'UPDATE' },
+          { resource: 'student:profile', action: 'DELETE' }
+        ]
+      },
+      {
+        id: 'r-teach',
+        name: 'Teacher',
+        code: 'TEACHER',
+        permissions: [
+          { resource: 'student:profile', action: 'READ' }
+        ]
+      }
+    ];
+  }
+}
+
+export async function togglePermissionApi(roleId: string, resource: string, action: string, isAllowed: boolean) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/permissions/matrix`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ roleId, resource, action, isAllowed }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend togglePermission offline, simulating fallback...');
+    return { success: true };
+  }
+}
+
+export async function getMembershipsApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/memberships`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to get memberships');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getMemberships offline, returning fallback...');
+    return [
+      {
+        id: 'mb-m1',
+        joinedAt: new Date().toISOString(),
+        role: { name: 'Principal', code: 'PRINCIPAL' },
+        user: {
+          id: 'usr-p1',
+          email: 'principal@rkmvp.edu',
+          isActive: true,
+          staffProfile: { firstName: 'Swami', lastName: 'Vedananda', designation: 'Principal' }
+        }
+      },
+      {
+        id: 'mb-m2',
+        joinedAt: new Date().toISOString(),
+        role: { name: 'Teacher', code: 'TEACHER' },
+        user: {
+          id: 'usr-t1',
+          email: 'teacher@rkmvp.edu',
+          isActive: true,
+          staffProfile: { firstName: 'Sarah', lastName: 'Connor', designation: 'Teacher' }
+        }
+      }
+    ];
+  }
+}
+
+export async function updateMembershipApi(membershipId: string, data: { roleId?: string; status?: string }) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/memberships/${membershipId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend updateMembership offline, simulating locally...');
+    return { id: membershipId, ...data };
+  }
+}
+
+export async function inviteMemberApi(email: string, roleId: string) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/memberships/invite`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ email, roleId }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend inviteMember offline, simulating locally...');
+    return {
+      id: `mb-${Date.now()}`,
+      joinedAt: new Date().toISOString(),
+      role: { name: 'Teacher', code: 'TEACHER' },
+      user: {
+        id: `usr-${Date.now()}`,
+        email,
+        isActive: true,
+        staffProfile: null
+      }
+    };
+  }
+}
+
+export async function refreshContextApi() {
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh-context`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to refresh context');
+    const data = await res.json();
+    localStorage.setItem('aurxon_token', data.token);
+    localStorage.setItem('aurxon_context', JSON.stringify(data.context));
+    return data;
+  } catch (error) {
+    console.warn('Backend refreshContext offline, returning local context...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const token = localStorage.getItem('aurxon_token') || 'mock-jwt';
+    return { token, context: contextStr ? JSON.parse(contextStr) : null };
+  }
+}
+
+export async function getNavigationApi() {
+  try {
+    const res = await fetch(`${API_URL}/auth/navigation`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch navigation items');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend navigation offline, computing local navigation categories...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const userRole = contextStr ? JSON.parse(contextStr).role : 'TEACHER';
+    const enabledModules = contextStr ? JSON.parse(contextStr).enabledModules : ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'];
+    
+    const allCategories = [
+      { id: 'overview', label: 'Dashboard', icon: 'LayoutDashboard', roles: ['*'], section: 'Daily Use' },
+      { id: 'academic', label: 'Academic Desk', icon: 'BookOpen', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'COACHING_DIRECTOR', 'REGISTRAR', 'EXAM_CONTROLLER', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
+      { id: 'students', label: 'Student Desk', icon: 'Users', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'REGISTRAR', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
+      { id: 'exams', label: 'Exams & Grades', icon: 'Award', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'EXAM_CONTROLLER', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'], moduleCode: 'EXAMINATION', section: 'Daily Use' },
+      { id: 'attendance', label: 'Attendance', icon: 'CalendarCheck', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'ATTENDANCE_OFFICER', 'INSTITUTE_ADMIN'], moduleCode: 'ATTENDANCE', section: 'Daily Use' },
+      { id: 'fees', label: 'Fees & Finance', icon: 'CreditCard', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'], moduleCode: 'FINANCE', section: 'Daily Use' },
+      { id: 'comms', label: 'Comms Hub', icon: 'MessageSquare', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Communication' },
+      { id: 'library', label: 'Library Desk', icon: 'Book', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+      { id: 'productivity', label: 'Productivity Desk', icon: 'ClipboardList', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'LIBRARIAN', 'STAFF', 'ACCOUNTANT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+      { id: 'gate', label: 'Visitor Gate Desk', icon: 'ShieldAlert', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'STAFF'], section: 'Staff' },
+      { id: 'inventory', label: 'Inventory Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'STAFF'], section: 'Administration' },
+      { id: 'hr', label: 'HR System', icon: 'Briefcase', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'], section: 'Staff' },
+      { id: 'reports', label: 'Reports Desk', icon: 'FileText', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'TEACHER'], section: 'Insights' },
+      { id: 'analytics', label: 'Analytics Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'TEACHER'], section: 'Insights' },
+      { id: 'operations', label: 'Operations Desk', icon: 'ShieldCheck', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' },
+      { id: 'settings', label: 'Settings', icon: 'Settings', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' }
+    ];
+
+    return allCategories.filter(cat => {
+      if (!cat.roles.includes('*') && !cat.roles.includes(userRole)) {
+        return false;
+      }
+      if (cat.moduleCode && !enabledModules.includes(cat.moduleCode)) {
+        return false;
+      }
+      return true;
+    });
   }
 }
 
