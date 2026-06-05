@@ -6,6 +6,9 @@ import { updateSettingsApi, createBranchApi } from '@/lib/api';
 import CountryPhoneInput from './CountryPhoneInput';
 import { INDIAN_STATES_AND_UTS } from '@/lib/indianData';
 import AcademicYearManager from '../../03_Academics/AcademicYear/AcademicYearManager';
+import PermissionMatrix from './PermissionMatrix';
+import MembershipManager from './MembershipManager';
+import MarketplaceTab from './MarketplaceTab';
 
 interface SearchableSelectProps {
   label: string;
@@ -123,8 +126,8 @@ export default function SettingsTab({
   loadPromotionsHistory,
   triggerToast
 }: SettingsTabProps) {
-  // Sub-tabs: config, years, branches, promotion-logs, backup
-  const [subTab, setSubTab] = useState<'config' | 'years' | 'branches' | 'promotions' | 'backup'>('config');
+  // Sub-tabs: config, years, branches, promotion-logs, backup, rbac, memberships, marketplace
+  const [subTab, setSubTab] = useState<'config' | 'years' | 'branches' | 'promotions' | 'backup' | 'rbac' | 'memberships' | 'marketplace'>('config');
 
   // Branch Form
   const [branchForm, setBranchForm] = useState({
@@ -220,6 +223,36 @@ export default function SettingsTab({
             System Parameters
           </button>
           <button 
+            onClick={() => setSubTab('rbac')} 
+            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
+              subTab === 'rbac' 
+                ? 'bg-sky-600 text-white shadow-sm' 
+                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            }`}
+          >
+            RBAC Matrix
+          </button>
+          <button 
+            onClick={() => setSubTab('memberships')} 
+            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
+              subTab === 'memberships' 
+                ? 'bg-sky-600 text-white shadow-sm' 
+                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            }`}
+          >
+            Memberships
+          </button>
+          <button 
+            onClick={() => setSubTab('marketplace')} 
+            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
+              subTab === 'marketplace' 
+                ? 'bg-sky-600 text-white shadow-sm' 
+                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            }`}
+          >
+            Marketplace
+          </button>
+          <button 
             onClick={() => setSubTab('years')} 
             className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
               subTab === 'years' 
@@ -265,6 +298,21 @@ export default function SettingsTab({
       {/* Sub-Tab: Academic Years */}
       {subTab === 'years' && (
         <AcademicYearManager />
+      )}
+
+      {/* Sub-Tab: RBAC Matrix */}
+      {subTab === 'rbac' && (
+        <PermissionMatrix triggerToast={triggerToast} />
+      )}
+
+      {/* Sub-Tab: Memberships Directory */}
+      {subTab === 'memberships' && (
+        <MembershipManager triggerToast={triggerToast} />
+      )}
+
+      {/* Sub-Tab: Marketplace & Features */}
+      {subTab === 'marketplace' && (
+        <MarketplaceTab triggerToast={triggerToast} />
       )}
 
       {/* Sub-Tab 1: System Parameters */}
