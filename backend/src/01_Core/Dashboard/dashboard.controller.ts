@@ -13,4 +13,10 @@ export class DashboardController {
   async getStats(@Request() req) {
     return this.dashboardService.getAdminStats(req.user.institutionId);
   }
+
+  @Get('founder-stats')
+  @Roles('SUPER_ADMIN')
+  async getFounderStats() {
+    return this.dashboardService.getFounderStats();
+  }
 }
