@@ -13,14 +13,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string; role: string; institutionId: string; profileId?: string | null }) {
+  async validate(payload: {
+    sub: string;
+    email: string;
+    organizationId?: string | null;
+    schoolId?: string | null;
+    campusId?: string | null;
+    roleIds?: string[];
+    role?: string | null;
+    permissions?: string[];
+    enabledModules?: string[];
+    enabledFeatures?: string[];
+    profileId?: string | null;
+  }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
         id: true,
         email: true,
-        role: true,
-        institutionId: true,
         isActive: true,
       },
     });
@@ -30,7 +40,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return {
-      ...user,
+      id: user.id, // compatibility
+      userId: user.id,
+      email: user.email,
+      organizationId: payload.organizationId || null,
+      institutionId: payload.organizationId || null, // compatibility with legacy endpoints
+      schoolId: payload.schoolId || null,
+      campusId: payload.campusId || null,
+      roleIds: payload.roleIds || [],
+      role: payload.role || null, // active role code
+      permissions: payload.permissions || [],
+      enabledModules: payload.enabledModules || [],
+      enabledFeatures: payload.enabledFeatures || [],
       profileId: payload.profileId || null,
     };
   }
