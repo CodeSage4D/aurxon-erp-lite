@@ -1,92 +1,95 @@
-// IEEE 1471 compliant role-based access descriptor endpoint
-// Provides role catalogue for AURXON ERP Lite institutional administrators
-
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../Auth/jwt-auth.guard';
-import { Roles } from '../Auth/roles.guard';
-import { RolesGuard } from '../Auth/roles.guard';
+import { RolesGuard, Roles } from '../Auth/roles.guard';
+import { RbacService } from './rbac.service';
 
-export const SYSTEM_ROLES = [
-  {
-    name: 'SUPER_ADMIN',
-    label: 'Super Administrator',
-    description: 'Full system access across all institutions and branches.',
-    permissions: ['*'],
-  },
-  {
-    name: 'INSTITUTE_ADMIN',
-    label: 'Institute Administrator',
-    description: 'Full access within their own institution and branches.',
-    permissions: [
-      'students:read', 'students:write', 'students:delete',
-      'staff:read', 'staff:write', 'staff:delete',
-      'classes:read', 'classes:write',
-      'fees:read', 'fees:write',
-      'exams:read', 'exams:write',
-      'attendance:read', 'attendance:write',
-      'reports:read', 'analytics:read',
-      'settings:read', 'settings:write',
-      'notices:read', 'notices:write',
-      'audit-logs:read',
-    ],
-  },
-  {
-    name: 'TEACHER',
-    label: 'Teacher / Faculty',
-    description: 'Access to assigned classes, subjects, attendance, and exam entry.',
-    permissions: [
-      'students:read',
-      'classes:read',
-      'attendance:read', 'attendance:write',
-      'exams:read', 'exams:write',
-      'lesson-plans:read', 'lesson-plans:write',
-      'notices:read',
-    ],
-  },
-  {
-    name: 'ACCOUNTANT',
-    label: 'Accountant',
-    description: 'Full access to fees, payments, payroll, and financial reports.',
-    permissions: [
-      'fees:read', 'fees:write',
-      'payments:read', 'payments:write',
-      'payroll:read', 'payroll:write',
-      'reports:read',
-    ],
-  },
-  {
-    name: 'STUDENT',
-    label: 'Student',
-    description: 'Access to own profile, timetable, attendance, results, and homework.',
-    permissions: [
-      'profile:read',
-      'timetable:read',
-      'attendance:read',
-      'exams:read',
-      'homework:read', 'homework:write',
-      'notices:read',
-    ],
-  },
-  {
-    name: 'PARENT',
-    label: 'Parent / Guardian',
-    description: 'Read-only access to linked children\'s data: attendance, fees, results, notices.',
-    permissions: [
-      'children:read',
-      'attendance:read',
-      'fees:read', 'payments:write',
-      'exams:read',
-      'notices:read',
-    ],
-  },
-];
-
-@Controller('rbac')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('rbac')
 export class RbacController {
+  constructor(private readonly rbacService: RbacService) {}
+
   @Get('roles')
   @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
-  getRoles() {
-    return { roles: SYSTEM_ROLES };
+  async getRoles(@Request() req: any) {
+    return this.rbacService.getRoles(req.user.organizationId);
+  }
+
+  @Post('roles')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async createRole(
+    @Request() req: any,
+    @Body() body: { name: string; code: string; description?: string },
+  ) {
+    return this.rbacService.createRole(
+      req.user.organizationId,
+      req.user.id,
+      body.name,
+      body.code,
+      body.description,
+    );
+  }
+
+  @Delete('roles/:id')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async deleteRole(@Request() req: any, @Param('id') roleId: string) {
+    return this.rbacService.deleteRole(req.user.organizationId, req.user.id, roleId);
+  }
+
+  @Get('permissions')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async getPermissions(@Request() req: any) {
+    return this.rbacService.getPermissionsByInstitution(req.user.organizationId);
+  }
+
+  @Post('permissions/matrix')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async togglePermission(
+    @Request() req: any,
+    @Body() body: { roleId: string; resource: string; action: string; isAllowed: boolean },
+  ) {
+    return this.rbacService.togglePermission(
+      req.user.organizationId,
+      req.user.id,
+      body.roleId,
+      body.resource,
+      body.action,
+      body.isAllowed,
+    );
+  }
+
+  @Get('memberships')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async getMemberships(@Request() req: any) {
+    return this.rbacService.getMemberships(req.user.organizationId);
+  }
+
+  @Put('memberships/:id')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async updateMembership(
+    @Request() req: any,
+    @Param('id') membershipId: string,
+    @Body() body: { roleId?: string; status?: string },
+  ) {
+    return this.rbacService.updateMembership(
+      req.user.organizationId,
+      req.user.id,
+      membershipId,
+      body.roleId,
+      body.status,
+    );
+  }
+
+  @Post('memberships/invite')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async inviteMember(
+    @Request() req: any,
+    @Body() body: { email: string; roleId: string },
+  ) {
+    return this.rbacService.inviteMember(
+      req.user.organizationId,
+      req.user.id,
+      body.email,
+      body.roleId,
+    );
   }
 }
