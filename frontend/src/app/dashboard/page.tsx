@@ -6,6 +6,7 @@ import { Menu, Search, Sparkles, Bell, Sun, Moon, ChevronRight, Building2, Shiel
 
 import {
   getDashboardStatsApi,
+  getSetupStatusApi,
   getFounderStatsApi,
   switchContextApi,
   getStudentsApi,
