@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -22,5 +22,42 @@ export class AuthController {
   ) {
     await this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
     return { message: 'Password changed successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('switch-context')
+  async switchContext(
+    @Request() req: any,
+    @Body() body: { organizationId: string; schoolId?: string; campusId?: string },
+  ) {
+    return this.authService.switchContext(
+      req.user.id,
+      body.organizationId,
+      body.schoolId,
+      body.campusId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get('navigation')
+  async getNavigation(@Request() req: any) {
+    return this.authService.getNavigation(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh-context')
+  async refreshContext(@Request() req: any) {
+    if (!req.user.organizationId) {
+      throw new UnauthorizedException('No active organization context to refresh.');
+    }
+    return this.authService.switchContext(
+      req.user.id,
+      req.user.organizationId,
+      req.user.schoolId,
+      req.user.campusId,
+    );
   }
 }
