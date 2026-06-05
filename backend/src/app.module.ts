@@ -3,6 +3,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './01_Core/prisma/prisma.module';
 import { AuthModule } from './01_Core/Auth/auth.module';
+import { MarketplaceModule } from './01_Core/Module/module.module';
+import { SetupModule } from './01_Core/Setup/setup.module';
 import { StudentModule } from './02_Admission/StudentProfile/student.module';
 import { AttendanceModule } from './04_Attendance/StudentAttendance/attendance.module';
 import { FeeModule } from './05_Fees/FeeStructure/fee.module';
@@ -43,6 +45,8 @@ import { ProductivityModule } from './15_Productivity/productivity.module';
   imports: [
     PrismaModule,
     AuthModule,
+    MarketplaceModule,
+    SetupModule,
     StudentModule,
     AttendanceModule,
     FeeModule,
