@@ -4,12 +4,13 @@
 import { Module } from '@nestjs/common';
 import { OperationsController } from './operations.controller';
 import { OperationsService } from './operations.service';
+import { SubscriptionLimitService } from './subscription-limit.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
   controllers: [OperationsController],
-  providers: [OperationsService],
-  exports: [OperationsService],
+  providers: [OperationsService, SubscriptionLimitService],
+  exports: [OperationsService, SubscriptionLimitService],
 })
 export class OperationsModule {}
