@@ -19,4 +19,23 @@ export class SettingsController {
   async update(@Request() req, @Body() body: any) {
     return this.settingsService.update(req.user.institutionId, body);
   }
+
+  @Get('config')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async getOrgConfigs(@Request() req) {
+    return this.settingsService.getOrgConfigs(req.user.organizationId);
+  }
+
+  @Put('config')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async upsertOrgConfig(
+    @Request() req,
+    @Body() body: { groupCode: string; items: Record<string, string> },
+  ) {
+    return this.settingsService.upsertOrgConfig(
+      req.user.organizationId,
+      body.groupCode,
+      body.items,
+    );
+  }
 }
