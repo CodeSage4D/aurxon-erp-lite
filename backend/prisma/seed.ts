@@ -171,6 +171,7 @@ async function main() {
       passwordHash,
       role: 'SUPER_ADMIN',
       institutionId: dps.id, // Legacy default mapping
+      mustChangePassword: false,
     },
   });
   await prisma.organizationMembership.create({
@@ -189,6 +190,7 @@ async function main() {
       passwordHash,
       role: 'INSTITUTE_ADMIN',
       institutionId: dps.id,
+      mustChangePassword: false,
     },
   });
   await prisma.organizationMembership.create({
@@ -207,6 +209,7 @@ async function main() {
       passwordHash,
       role: 'TEACHER',
       institutionId: rkmvp.id,
+      mustChangePassword: false,
     },
   });
   await prisma.organizationMembership.create({
@@ -225,6 +228,7 @@ async function main() {
       passwordHash,
       role: 'TEACHER',
       institutionId: rkmvp.id,
+      mustChangePassword: false,
     },
   });
   await prisma.organizationMembership.create({
@@ -243,6 +247,7 @@ async function main() {
       passwordHash,
       role: 'TEACHER',
       institutionId: rkmvp.id,
+      mustChangePassword: false,
     },
   });
   // Membership in RKMVP (Primary)

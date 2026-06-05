@@ -36,6 +36,11 @@ export default function LoginPage() {
     try {
       const data = await loginApi(email, password);
       
+      if (data.user && data.user.mustChangePassword) {
+        router.push('/change-password');
+        return;
+      }
+
       if (data.memberships && data.memberships.length > 1) {
         router.push('/organization-select');
       } else if (data.memberships && data.memberships.length === 1) {

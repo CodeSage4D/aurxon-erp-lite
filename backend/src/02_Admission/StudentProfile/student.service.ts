@@ -4,10 +4,44 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../01_Core/prisma/prisma.service';
 import { encrypt, decrypt, maskSensitiveData } from '../../common/helpers/encryption.helper';
+import { SubscriptionLimitService } from '../../01_Core/Operations/subscription-limit.service';
+import { AuditLogService } from '../../01_Core/AuditLogs/audit-log.service';
+import * as argon2 from 'argon2';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class StudentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private subscriptionLimitService: SubscriptionLimitService,
+    private auditLogService: AuditLogService,
+  ) {}
+
+  async verifyStudentOwnership(userId: string, studentId: string): Promise<void> {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, userId },
+    });
+    if (!student) {
+      throw new ForbiddenException('You can only access your own profile');
+    }
+  }
+
+  async verifyParentOwnership(userId: string, studentId: string): Promise<void> {
+    const parent = await this.prisma.parent.findFirst({
+      where: { userId },
+    });
+    if (!parent) {
+      throw new ForbiddenException('Parent profile not found');
+    }
+
+    const linkedStudent = await this.prisma.student.findFirst({
+      where: { id: studentId, parentId: parent.id },
+    });
+    if (!linkedStudent) {
+      throw new ForbiddenException('You can only access profiles of your linked children');
+    }
+  }
 
   private processSensitiveFields(student: any, requesterRole?: string): any {
     if (!student) return student;
@@ -49,8 +83,20 @@ export class StudentService {
     search?: string,
     requesterRole?: string,
     requesterProfileId?: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 20,
+    sortBy: string = 'rollNumber',
+    sortOrder: 'asc' | 'desc' = 'asc',
   ) {
-    const where: any = { institutionId, status: { not: 'ARCHIVED' } };
+    const where: any = { institutionId };
+
+    // Default: exclude archived unless explicitly filtered
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = { not: 'ARCHIVED' };
+    }
     
     if (classId) {
       where.classId = classId;
@@ -74,16 +120,36 @@ export class StudentService {
       };
     }
 
-    const students = await this.prisma.student.findMany({
-      where,
-      include: {
-        class: { select: { id: true, name: true, board: true, stream: true } },
-        parent: { select: { id: true, firstName: true, lastName: true, phone: true } },
-      },
-      orderBy: { rollNumber: 'asc' },
-    });
+    const validSortFields = ['rollNumber', 'firstName', 'lastName', 'scholarNumber', 'admissionDate', 'createdAt'];
+    const orderByField = validSortFields.includes(sortBy) ? sortBy : 'rollNumber';
 
-    return this.processSensitiveFieldsList(students, requesterRole);
+    const limitNum = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [students, total] = await this.prisma.$transaction([
+      this.prisma.student.findMany({
+        where,
+        include: {
+          class: { select: { id: true, name: true, board: true, stream: true } },
+          parent: { select: { id: true, firstName: true, lastName: true, phone: true } },
+        },
+        orderBy: { [orderByField]: sortOrder },
+        take: limitNum,
+        skip,
+      }),
+      this.prisma.student.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limitNum);
+
+    return {
+      students: this.processSensitiveFieldsList(students, requesterRole),
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+    };
   }
 
   async findOne(
@@ -113,6 +179,12 @@ export class StudentService {
         feeAllocations: {
           include: { feeStructure: true },
         },
+        statusHistory: {
+          orderBy: { changedAt: 'desc' },
+          include: {
+            changedBy: { select: { email: true } },
+          },
+        },
       },
     });
 
@@ -138,7 +210,10 @@ export class StudentService {
     return this.processSensitiveFields(student, requesterRole);
   }
 
-  async create(institutionId: string, data: any) {
+  async create(institutionId: string, data: any, creatorUserId?: string) {
+    // 0. Check subscription limits (Requirement 6)
+    await this.subscriptionLimitService.checkLimits(institutionId, 'STUDENTS');
+
     // 1. Email Check
     const existingUser = await this.prisma.user.findUnique({
       where: { email: data.email },
@@ -158,34 +233,70 @@ export class StudentService {
       throw new BadRequestException('PIN code must be exactly 6 digits');
     }
 
-    const createdStudent = await this.prisma.$transaction(async (tx) => {
-      // 3. Auto-generate permanent Scholar Number
-      const studentCount = await tx.student.count({ where: { institutionId } });
-      const currentYear = new Date().getFullYear();
-      const scholarNumber = `SCH-${currentYear}-${String(studentCount + 1).padStart(4, '0')}`;
+    // 3. Dynamic Scholar Number Generation from settings (Requirement 6)
+    const settingGroup = await this.prisma.organizationSetting.findUnique({
+      where: {
+        organizationId_groupCode: {
+          organizationId: institutionId,
+          groupCode: 'ACADEMIC_RULES',
+        },
+      },
+      include: { items: true },
+    });
 
-      // 4. Create User Identity
+    const prefixItem = settingGroup?.items.find((item) => item.key === 'scholar_number_prefix');
+    const digitsItem = settingGroup?.items.find((item) => item.key === 'scholar_number_digits');
+
+    const prefix = prefixItem?.value || 'SCH';
+    const digitsCount = digitsItem ? parseInt(digitsItem.value, 10) : 4;
+
+    const studentCount = await this.prisma.student.count({ where: { institutionId } });
+    const currentYear = new Date().getFullYear();
+    const scholarNumber = `${prefix}-${currentYear}-${String(studentCount + 1).padStart(digitsCount, '0')}`;
+
+    // 4. Generate temporary password + force change (Requirement 1)
+    const tempPassword = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const passwordHash = await argon2.hash(tempPassword);
+
+    const createdStudent = await this.prisma.$transaction(async (tx) => {
+      // 5. Create User Identity
       const user = await tx.user.create({
         data: {
-          email: data.email,
-          passwordHash: data.passwordHash || '$2a$10$tMh4r7K/9V87Vb6L.vF2e.0.eP4fM3z7rWq1c7tE/s2F6C1l3j9l2', // default 'password123'
+          email: data.email.trim().toLowerCase(),
+          passwordHash,
           role: 'STUDENT',
           institutionId,
+          mustChangePassword: true, // Force change on login
         },
       });
 
-      // 5. Create Student record
+      // 6. Guardian entity handling (Requirement 8)
+      let parentId = data.parentId || null;
+      if (!parentId && (data.fatherName || data.motherName) && data.parentPhone) {
+        const parent = await tx.parent.create({
+          data: {
+            firstName: data.fatherName || 'Guardian',
+            lastName: data.lastName || '',
+            phone: encrypt(data.parentPhone) || '',
+            occupation: data.fatherOccupation || null,
+            address: data.street ? encrypt(`${data.houseNo || ''} ${data.street}`) : null,
+          },
+        });
+        parentId = parent.id;
+      }
+
+      // 7. Create Student record
       const student = await tx.student.create({
         data: {
           userId: user.id,
           scholarNumber,
-          rollNumber: data.rollNumber,
+          rollNumber: data.rollNumber || `ROLL-${studentCount + 1}`,
           firstName: data.firstName,
           lastName: data.lastName,
           dateOfBirth: new Date(data.dateOfBirth),
           gender: data.gender,
           classId: data.classId,
-          parentId: data.parentId || null,
+          parentId,
           institutionId,
           
           // Indian demographic credentials
@@ -230,7 +341,7 @@ export class StudentService {
         },
       });
 
-      // 6. Log Timeline milestone
+      // 8. Log Timeline milestone
       await tx.timelineEvent.create({
         data: {
           studentId: student.id,
@@ -239,13 +350,41 @@ export class StudentService {
         },
       });
 
+      // 9. Initial Status History entry
+      if (creatorUserId) {
+        await tx.studentStatusHistory.create({
+          data: {
+            studentId: student.id,
+            oldStatus: 'NONE',
+            newStatus: 'ACTIVE',
+            changedById: creatorUserId,
+            remarks: 'Initial status assignment upon student admission.',
+          },
+        });
+      }
+
       return student;
     });
 
-    return this.processSensitiveFields(createdStudent, 'SUPER_ADMIN');
+    const processed = this.processSensitiveFields(createdStudent, 'SUPER_ADMIN');
+
+    // 10. Audit Log with snapshot (Requirement 7)
+    if (creatorUserId) {
+      await this.auditLogService.logAction(
+        creatorUserId,
+        'CREATE_STUDENT',
+        JSON.stringify({
+          message: `Admitted student ${processed.firstName} ${processed.lastName} under scholar number ${processed.scholarNumber}`,
+          before: null,
+          after: processed,
+        }),
+      );
+    }
+
+    return { ...processed, temporaryPassword: tempPassword };
   }
 
-  async update(institutionId: string, id: string, data: any) {
+  async update(institutionId: string, id: string, data: any, updaterUserId?: string) {
     const student = await this.prisma.student.findFirst({
       where: { id, institutionId },
     });
@@ -261,45 +400,89 @@ export class StudentService {
       throw new BadRequestException('Invalid bank IFSC code format');
     }
 
-    const updatedStudent = await this.prisma.student.update({
-      where: { id },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        gender: data.gender,
-        classId: data.classId,
-        rollNumber: data.rollNumber,
-        
-        aadhaarNumber: data.aadhaarNumber !== undefined ? (encrypt(data.aadhaarNumber) || null) : undefined,
-        samagraId: data.samagraId !== undefined ? (encrypt(data.samagraId) || null) : undefined,
-        familyId: data.familyId !== undefined ? (encrypt(data.familyId) || null) : undefined,
-        penNumber: data.penNumber !== undefined ? (encrypt(data.penNumber) || null) : undefined,
-        birthCertificateNumber: data.birthCertificateNumber,
-        casteCategory: data.casteCategory,
-        religion: data.religion,
-        bloodGroup: data.bloodGroup,
+    const beforeSnapshot = this.processSensitiveFields(student, 'SUPER_ADMIN');
 
-        fatherName: data.fatherName !== undefined ? (encrypt(data.fatherName) || null) : undefined,
-        motherName: data.motherName !== undefined ? (encrypt(data.motherName) || null) : undefined,
-        annualIncome: data.annualIncome ? parseFloat(data.annualIncome) : undefined,
-        
-        bankName: data.bankName,
-        accHolderName: data.accHolderName,
-        accNumber: data.accNumber !== undefined ? (encrypt(data.accNumber) || null) : undefined,
-        ifscCode: data.ifscCode !== undefined ? (data.ifscCode ? encrypt(data.ifscCode.toUpperCase()) : null) : undefined,
-        bankBranch: data.bankBranch,
+    const updatedStudent = await this.prisma.$transaction(async (tx) => {
+      const oldStatus = student.status;
+      const newStatus = data.status || oldStatus;
 
-        houseNo: data.houseNo !== undefined ? (encrypt(data.houseNo) || null) : undefined,
-        street: data.street !== undefined ? (encrypt(data.street) || null) : undefined,
-        city: data.city,
-        district: data.district,
-        state: data.state,
-        pinCode: data.pinCode,
-      },
+      const updated = await tx.student.update({
+        where: { id },
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+          gender: data.gender,
+          classId: data.classId,
+          rollNumber: data.rollNumber,
+          status: data.status,
+          
+          aadhaarNumber: data.aadhaarNumber !== undefined ? (encrypt(data.aadhaarNumber) || null) : undefined,
+          samagraId: data.samagraId !== undefined ? (encrypt(data.samagraId) || null) : undefined,
+          familyId: data.familyId !== undefined ? (encrypt(data.familyId) || null) : undefined,
+          penNumber: data.penNumber !== undefined ? (encrypt(data.penNumber) || null) : undefined,
+          birthCertificateNumber: data.birthCertificateNumber,
+          casteCategory: data.casteCategory,
+          religion: data.religion,
+          bloodGroup: data.bloodGroup,
+
+          fatherName: data.fatherName !== undefined ? (encrypt(data.fatherName) || null) : undefined,
+          motherName: data.motherName !== undefined ? (encrypt(data.motherName) || null) : undefined,
+          annualIncome: data.annualIncome ? parseFloat(data.annualIncome) : undefined,
+          
+          bankName: data.bankName,
+          accHolderName: data.accHolderName,
+          accNumber: data.accNumber !== undefined ? (encrypt(data.accNumber) || null) : undefined,
+          ifscCode: data.ifscCode !== undefined ? (data.ifscCode ? encrypt(data.ifscCode.toUpperCase()) : null) : undefined,
+          bankBranch: data.bankBranch,
+
+          houseNo: data.houseNo !== undefined ? (encrypt(data.houseNo) || null) : undefined,
+          street: data.street !== undefined ? (encrypt(data.street) || null) : undefined,
+          city: data.city,
+          district: data.district,
+          state: data.state,
+          pinCode: data.pinCode,
+        },
+      });
+
+      if (oldStatus !== newStatus && updaterUserId) {
+        await tx.studentStatusHistory.create({
+          data: {
+            studentId: id,
+            oldStatus,
+            newStatus,
+            changedById: updaterUserId,
+            remarks: data.statusRemarks || 'Status updated via profile update.',
+          },
+        });
+
+        await tx.timelineEvent.create({
+          data: {
+            studentId: id,
+            type: 'STATUS_CHANGE',
+            description: `Status changed from ${oldStatus} to ${newStatus}.`,
+          },
+        });
+      }
+
+      return updated;
     });
 
-    return this.processSensitiveFields(updatedStudent, 'SUPER_ADMIN');
+    const afterSnapshot = this.processSensitiveFields(updatedStudent, 'SUPER_ADMIN');
+
+    if (updaterUserId) {
+      await this.auditLogService.logAction(
+        updaterUserId,
+        'UPDATE_STUDENT',
+        JSON.stringify({
+          message: `Updated profile details for student ${afterSnapshot.firstName} ${afterSnapshot.lastName}`,
+          before: beforeSnapshot,
+          after: afterSnapshot,
+        }),
+      );
+    }
+
+    return afterSnapshot;
   }
 
   async promote(institutionId: string, data: { studentIds: string[]; targetClassId: string }, promotedById?: string) {
@@ -311,7 +494,6 @@ export class StudentService {
         throw new BadRequestException('Target class not found');
       }
 
-      // Fallback admin user if promotedById is missing (e.g. CLI/tests)
       let activePromotedById = promotedById;
       if (!activePromotedById) {
         const fallbackAdmin = await tx.user.findFirst({
@@ -332,20 +514,20 @@ export class StudentService {
 
         if (!student) continue;
 
-        // Auto-generate class roll number: target class name numeric digits + index
+        const beforeSnapshot = this.processSensitiveFields(student, 'SUPER_ADMIN');
+
         const classStudents = await tx.student.count({
           where: { classId: data.targetClassId },
         });
         const classDigits = targetClass.name.replace(/\D/g, '') || '0';
         const nextRoll = `${classDigits}1${String(classStudents + 1).padStart(2, '0')}`;
 
-        // Create PromotionHistory record BEFORE updating classId to preserve history
         await tx.promotionHistory.create({
           data: {
             studentId,
             fromClassId: student.classId,
             toClassId: data.targetClassId,
-            academicYear: '2026-2027', // Default CBSE/Indian standard academic year
+            academicYear: '2026-2027',
             promotedById: activePromotedById,
           },
         });
@@ -365,6 +547,18 @@ export class StudentService {
             description: `Promoted automatically to ${targetClass.name} under Roll No. ${nextRoll}.`,
           },
         });
+
+        const afterSnapshot = this.processSensitiveFields(updated, 'SUPER_ADMIN');
+
+        await this.auditLogService.logAction(
+          activePromotedById,
+          'PROMOTE_STUDENT',
+          JSON.stringify({
+            message: `Promoted student ${afterSnapshot.firstName} ${afterSnapshot.lastName} from ${beforeSnapshot.classId} to ${targetClass.name}`,
+            before: beforeSnapshot,
+            after: afterSnapshot,
+          }),
+        );
 
         results.push(updated);
       }
@@ -388,7 +582,7 @@ export class StudentService {
     });
   }
 
-  async remove(institutionId: string, id: string) {
+  async remove(institutionId: string, id: string, archiverUserId?: string) {
     const student = await this.prisma.student.findFirst({
       where: { id, institutionId },
     });
@@ -397,15 +591,17 @@ export class StudentService {
       throw new NotFoundException('Student profile not found');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const beforeSnapshot = this.processSensitiveFields(student, 'SUPER_ADMIN');
+
+    const archivedStudent = await this.prisma.$transaction(async (tx) => {
       // Deactivate associated user login
       await tx.user.update({
         where: { id: student.userId },
         data: { isActive: false },
       });
 
-      // Update student status to ARCHIVED
-      const archivedStudent = await tx.student.update({
+      // Update student status to ARCHIVED (archiving instead of deleting - Requirement 5)
+      const archived = await tx.student.update({
         where: { id },
         data: { status: 'ARCHIVED' },
       });
@@ -419,7 +615,320 @@ export class StudentService {
         },
       });
 
-      return archivedStudent;
+      // Add student status history entry
+      if (archiverUserId) {
+        await tx.studentStatusHistory.create({
+          data: {
+            studentId: id,
+            oldStatus: student.status,
+            newStatus: 'ARCHIVED',
+            changedById: archiverUserId,
+            remarks: 'Student record soft-deleted and archived.',
+          },
+        });
+      }
+
+      return archived;
     });
+
+    const afterSnapshot = this.processSensitiveFields(archivedStudent, 'SUPER_ADMIN');
+
+    if (archiverUserId) {
+      await this.auditLogService.logAction(
+        archiverUserId,
+        'ARCHIVE_STUDENT',
+        JSON.stringify({
+          message: `Archived student profile ${afterSnapshot.firstName} ${afterSnapshot.lastName}`,
+          before: beforeSnapshot,
+          after: afterSnapshot,
+        }),
+      );
+    }
+
+    return afterSnapshot;
+  }
+
+  // ─── Document Management ─────────────────────────────────────────────────────
+
+  async addDocument(
+    institutionId: string,
+    studentId: string,
+    name: string,
+    fileUrl: string,
+    actorId?: string,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, institutionId },
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const doc = await this.prisma.document.create({
+      data: {
+        studentId,
+        name,
+        fileUrl,
+      },
+    });
+
+    await this.prisma.timelineEvent.create({
+      data: {
+        studentId,
+        type: 'DOCUMENT_UPLOAD',
+        description: `Document "${name}" uploaded and linked to student profile.`,
+      },
+    });
+
+    if (actorId) {
+      await this.auditLogService.logAction(
+        actorId,
+        'ADD_DOCUMENT',
+        JSON.stringify({
+          message: `Uploaded document "${name}" for student ${student.firstName} ${student.lastName}`,
+          before: null,
+          after: doc,
+        }),
+      );
+    }
+
+    return doc;
+  }
+
+  async removeDocument(
+    institutionId: string,
+    studentId: string,
+    docId: string,
+    actorId?: string,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, institutionId },
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    const doc = await this.prisma.document.findFirst({
+      where: { id: docId, studentId },
+    });
+    if (!doc) {
+      throw new NotFoundException('Document not found');
+    }
+
+    // Delete physical file from disk
+    try {
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      const filename = doc.fileUrl.split('/').pop();
+      if (filename) {
+        const filePath = path.join(uploadDir, filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not delete physical file:', err.message);
+    }
+
+    await this.prisma.document.delete({ where: { id: docId } });
+
+    await this.prisma.timelineEvent.create({
+      data: {
+        studentId,
+        type: 'DOCUMENT_REMOVE',
+        description: `Document "${doc.name}" removed from student profile.`,
+      },
+    });
+
+    if (actorId) {
+      await this.auditLogService.logAction(
+        actorId,
+        'REMOVE_DOCUMENT',
+        JSON.stringify({
+          message: `Removed document "${doc.name}" from student ${student.firstName} ${student.lastName}`,
+          before: doc,
+          after: null,
+        }),
+      );
+    }
+
+    return { success: true, docId };
+  }
+
+  // ─── Bulk Import Pipeline ────────────────────────────────────────────────────
+
+  async importStudents(
+    institutionId: string,
+    rows: any[],
+    creatorUserId?: string,
+  ) {
+    // Phase 1: Validate all rows before any DB mutations
+    const errors: { row: number; field: string; message: string }[] = [];
+    const emailsSeen = new Set<string>();
+
+    // Check subscription limits before full batch
+    await this.subscriptionLimitService.checkLimits(institutionId, 'STUDENTS');
+
+    // Load existing emails and class IDs for validation
+    const existingEmails = new Set(
+      (await this.prisma.user.findMany({ select: { email: true } })).map(u => u.email.toLowerCase()),
+    );
+    const existingClasses = new Map(
+      (await this.prisma.class.findMany({ where: { institutionId }, select: { id: true, name: true } }))
+        .map(c => [c.name.toLowerCase(), c.id]),
+    );
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 1;
+
+      if (!row.firstName?.trim()) errors.push({ row: rowNum, field: 'firstName', message: 'First name is required' });
+      if (!row.lastName?.trim()) errors.push({ row: rowNum, field: 'lastName', message: 'Last name is required' });
+      if (!row.email?.trim()) {
+        errors.push({ row: rowNum, field: 'email', message: 'Email is required' });
+      } else {
+        const emailLower = row.email.trim().toLowerCase();
+        if (existingEmails.has(emailLower)) {
+          errors.push({ row: rowNum, field: 'email', message: `Email "${emailLower}" already exists in the system` });
+        } else if (emailsSeen.has(emailLower)) {
+          errors.push({ row: rowNum, field: 'email', message: `Email "${emailLower}" is duplicated in this CSV batch` });
+        }
+        emailsSeen.add(emailLower);
+      }
+      if (!row.dateOfBirth?.trim()) {
+        errors.push({ row: rowNum, field: 'dateOfBirth', message: 'Date of birth is required (YYYY-MM-DD)' });
+      } else if (isNaN(new Date(row.dateOfBirth).getTime())) {
+        errors.push({ row: rowNum, field: 'dateOfBirth', message: 'Invalid date of birth format. Use YYYY-MM-DD' });
+      }
+      if (!row.gender?.trim()) errors.push({ row: rowNum, field: 'gender', message: 'Gender is required (MALE/FEMALE/OTHER)' });
+      if (!row.className?.trim()) {
+        errors.push({ row: rowNum, field: 'className', message: 'Class name is required' });
+      } else if (!existingClasses.has(row.className.trim().toLowerCase())) {
+        errors.push({ row: rowNum, field: 'className', message: `Class "${row.className}" not found in institution` });
+      }
+      if (row.aadhaarNumber && !/^\d{12}$/.test(row.aadhaarNumber)) {
+        errors.push({ row: rowNum, field: 'aadhaarNumber', message: 'Aadhaar must be 12 digits' });
+      }
+      if (row.pinCode && !/^\d{6}$/.test(row.pinCode)) {
+        errors.push({ row: rowNum, field: 'pinCode', message: 'PIN code must be 6 digits' });
+      }
+    }
+
+    if (errors.length > 0) {
+      return { success: false, errors, imported: 0 };
+    }
+
+    // Phase 2: Transactional bulk creation
+    const settingGroup = await this.prisma.organizationSetting.findUnique({
+      where: { organizationId_groupCode: { organizationId: institutionId, groupCode: 'ACADEMIC_RULES' } },
+      include: { items: true },
+    });
+    const prefixItem = settingGroup?.items.find(item => item.key === 'scholar_number_prefix');
+    const digitsItem = settingGroup?.items.find(item => item.key === 'scholar_number_digits');
+    const prefix = prefixItem?.value || 'SCH';
+    const digitsCount = digitsItem ? parseInt(digitsItem.value, 10) : 4;
+
+    const existingClasses2 = new Map(
+      (await this.prisma.class.findMany({ where: { institutionId }, select: { id: true, name: true } }))
+        .map(c => [c.name.toLowerCase(), c.id]),
+    );
+
+    const results: any[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      let studentBaseCount = await tx.student.count({ where: { institutionId } });
+      const currentYear = new Date().getFullYear();
+
+      for (const row of rows) {
+        const classId = existingClasses2.get(row.className.trim().toLowerCase())!;
+        studentBaseCount++;
+        const scholarNumber = `${prefix}-${currentYear}-${String(studentBaseCount).padStart(digitsCount, '0')}`;
+
+        const tempPassword = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        const passwordHash = await argon2.hash(tempPassword);
+
+        const user = await tx.user.create({
+          data: {
+            email: row.email.trim().toLowerCase(),
+            passwordHash,
+            role: 'STUDENT',
+            institutionId,
+            mustChangePassword: true,
+          },
+        });
+
+        let parentId: string | null = null;
+        if (row.fatherName || row.motherName) {
+          const parent = await tx.parent.create({
+            data: {
+              firstName: row.fatherName || 'Guardian',
+              lastName: row.lastName || '',
+              phone: encrypt(row.parentPhone || '9999999999') || '',
+              occupation: row.fatherOccupation || null,
+            },
+          });
+          parentId = parent.id;
+        }
+
+        const student = await tx.student.create({
+          data: {
+            userId: user.id,
+            scholarNumber,
+            rollNumber: row.rollNumber || `ROLL-${studentBaseCount}`,
+            firstName: row.firstName.trim(),
+            lastName: row.lastName.trim(),
+            dateOfBirth: new Date(row.dateOfBirth),
+            gender: row.gender.toUpperCase(),
+            classId,
+            parentId,
+            institutionId,
+            aadhaarNumber: row.aadhaarNumber ? encrypt(row.aadhaarNumber) : null,
+            bloodGroup: row.bloodGroup || null,
+            religion: row.religion || null,
+            casteCategory: row.casteCategory || 'GENERAL',
+            fatherName: row.fatherName ? encrypt(row.fatherName) : null,
+            motherName: row.motherName ? encrypt(row.motherName) : null,
+            city: row.city || null,
+            state: row.state || null,
+            pinCode: row.pinCode || null,
+          },
+        });
+
+        await tx.timelineEvent.create({
+          data: {
+            studentId: student.id,
+            type: 'ADMISSION',
+            description: `Bulk imported. Scholar No: ${scholarNumber}`,
+          },
+        });
+
+        if (creatorUserId) {
+          await tx.studentStatusHistory.create({
+            data: {
+              studentId: student.id,
+              oldStatus: 'NONE',
+              newStatus: 'ACTIVE',
+              changedById: creatorUserId,
+              remarks: 'Initial status set during bulk import.',
+            },
+          });
+        }
+
+        results.push({ scholarNumber, email: row.email, temporaryPassword: tempPassword });
+      }
+    });
+
+    if (creatorUserId) {
+      await this.auditLogService.logAction(
+        creatorUserId,
+        'BULK_IMPORT_STUDENTS',
+        JSON.stringify({
+          message: `Bulk imported ${results.length} students into institution ${institutionId}`,
+          before: null,
+          after: { count: results.length },
+        }),
+      );
+    }
+
+    return { success: true, errors: [], imported: results.length, students: results };
   }
 }

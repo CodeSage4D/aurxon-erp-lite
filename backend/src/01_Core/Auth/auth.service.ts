@@ -209,6 +209,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       profileId: profileId || null,
+      mustChangePassword: user.mustChangePassword,
     };
 
     return {
@@ -218,6 +219,7 @@ export class AuthService {
         email: user.email,
         profileName,
         profileId: profileId || null,
+        mustChangePassword: user.mustChangePassword,
       },
       memberships: formattedMemberships,
     };
@@ -246,7 +248,10 @@ export class AuthService {
     }
 
     const newHash = await argon2.hash(newPassword);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash, mustChangePassword: false },
+    });
 
     await this.prisma.securityEventLog.create({
       data: {
@@ -325,9 +330,14 @@ export class AuthService {
     const primaryColor = branding?.primaryColor || membership.institution.primaryColor || '#0284c7';
     const logoUrl = branding?.logoUrl || membership.institution.logoUrl || '';
 
+    const userRec = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, mustChangePassword: true },
+    });
+
     const payload = {
       sub: userId,
-      email: (await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } }))?.email,
+      email: userRec?.email,
       organizationId: membership.institutionId,
       schoolId: membership.schoolId || null,
       campusId: membership.campusId || null,
@@ -336,6 +346,7 @@ export class AuthService {
       permissions,
       enabledModules,
       enabledFeatures,
+      mustChangePassword: userRec?.mustChangePassword || false,
     };
 
     const token = this.jwtService.sign(payload);
@@ -352,6 +363,7 @@ export class AuthService {
         permissions,
         enabledModules,
         enabledFeatures,
+        mustChangePassword: userRec?.mustChangePassword || false,
         branding: {
           primaryColor,
           logoUrl,

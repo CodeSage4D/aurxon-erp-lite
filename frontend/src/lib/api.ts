@@ -764,11 +764,26 @@ export async function getDashboardStatsApi() {
 }
 
 // 3. Students CRUD
-export async function getStudentsApi(classId?: string, search?: string) {
+export async function getStudentsApi(
+  opts: {
+    classId?: string;
+    search?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  } = {}
+) {
   try {
     const query = new URLSearchParams();
-    if (classId) query.append('classId', classId);
-    if (search) query.append('search', search);
+    if (opts.classId) query.append('classId', opts.classId);
+    if (opts.search) query.append('search', opts.search);
+    if (opts.status) query.append('status', opts.status);
+    if (opts.page) query.append('page', String(opts.page));
+    if (opts.limit) query.append('limit', String(opts.limit));
+    if (opts.sortBy) query.append('sortBy', opts.sortBy);
+    if (opts.sortOrder) query.append('sortOrder', opts.sortOrder);
     
     const res = await fetch(`${API_URL}/students?${query.toString()}`, { headers: getHeaders() });
     if (!res.ok) throw new Error();
@@ -776,18 +791,38 @@ export async function getStudentsApi(classId?: string, search?: string) {
   } catch (error) {
     const db = getMockDb();
     let filtered = [...db.students];
-    if (classId) {
-      filtered = filtered.filter(s => s.classId === classId);
+    if (opts.classId) {
+      filtered = filtered.filter((s: any) => s.classId === opts.classId);
     }
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(s => 
-        s.firstName.toLowerCase().includes(q) || 
-        s.lastName.toLowerCase().includes(q) || 
-        s.rollNumber.toLowerCase().includes(q)
+    if (opts.status) {
+      filtered = filtered.filter((s: any) => s.status === opts.status);
+    } else {
+      filtered = filtered.filter((s: any) => s.status !== 'ARCHIVED');
+    }
+    if (opts.search) {
+      const q = opts.search.toLowerCase();
+      filtered = filtered.filter((s: any) =>
+        s.firstName.toLowerCase().includes(q) ||
+        s.lastName.toLowerCase().includes(q) ||
+        (s.rollNumber || '').toLowerCase().includes(q) ||
+        (s.scholarNumber || '').toLowerCase().includes(q)
       );
     }
-    return filtered;
+    // Sort
+    const sortBy = opts.sortBy || 'rollNumber';
+    const sortOrder = opts.sortOrder || 'asc';
+    filtered.sort((a: any, b: any) => {
+      const av = (a[sortBy] || '').toString();
+      const bv = (b[sortBy] || '').toString();
+      return sortOrder === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    // Paginate
+    const page = opts.page || 1;
+    const limit = opts.limit || 20;
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limit);
+    const paginated = filtered.slice((page - 1) * limit, page * limit);
+    return { students: paginated, total, page, limit, totalPages };
   }
 }
 
@@ -885,12 +920,124 @@ export async function deleteStudentApi(id: string) {
     return await res.json();
   } catch (error) {
     const db = getMockDb();
-    db.students = db.students.filter(s => s.id !== id);
-    db.feeAllocations = db.feeAllocations.filter(a => a.studentId !== id);
-    db.attendance = db.attendance.filter(r => r.studentId !== id);
-    db.examResults = db.examResults.filter(r => r.studentId !== id);
+    const idx = db.students.findIndex((s: any) => s.id === id);
+    if (idx !== -1) {
+      db.students[idx] = { ...db.students[idx], status: 'ARCHIVED' };
+    }
+    db.feeAllocations = db.feeAllocations.filter((a: any) => a.studentId !== id);
+    db.attendance = db.attendance.filter((r: any) => r.studentId !== id);
+    db.examResults = db.examResults.filter((r: any) => r.studentId !== id);
     saveMockDb(db);
     return { id };
+  }
+}
+
+// 3b. Document Management
+export async function uploadDocumentApi(studentId: string, name: string, fileUrl: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/${studentId}/documents`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ name, fileUrl }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const student = db.students.find((s: any) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    const doc = { id: `doc-${Date.now()}`, studentId, name, fileUrl };
+    if (!student.documents) student.documents = [];
+    student.documents.push(doc);
+    if (!student.timeline) student.timeline = [];
+    student.timeline.unshift({ id: `t-${Date.now()}`, type: 'DOCUMENT_UPLOAD', description: `Document "${name}" uploaded.`, eventDate: new Date().toISOString() });
+    saveMockDb(db);
+    return doc;
+  }
+}
+
+export async function deleteDocumentApi(studentId: string, docId: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/${studentId}/documents/${docId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const student = db.students.find((s: any) => s.id === studentId);
+    if (student && student.documents) {
+      student.documents = student.documents.filter((d: any) => d.id !== docId);
+    }
+    saveMockDb(db);
+    return { success: true, docId };
+  }
+}
+
+// 3c. Bulk Import
+export async function importStudentsApi(students: any[]) {
+  try {
+    const res = await fetch(`${API_URL}/students/import`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ students }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    // Mock validation: check required fields and simulate import
+    const db = getMockDb();
+    const existingEmails = new Set(db.students.map((s: any) => s.email?.toLowerCase()));
+    const errors: any[] = [];
+    const emailsSeen = new Set<string>();
+
+    students.forEach((row: any, i: number) => {
+      const rowNum = i + 1;
+      if (!row.firstName?.trim()) errors.push({ row: rowNum, field: 'firstName', message: 'First name is required' });
+      if (!row.lastName?.trim()) errors.push({ row: rowNum, field: 'lastName', message: 'Last name is required' });
+      if (!row.email?.trim()) {
+        errors.push({ row: rowNum, field: 'email', message: 'Email is required' });
+      } else {
+        const emailLower = row.email.trim().toLowerCase();
+        if (existingEmails.has(emailLower)) errors.push({ row: rowNum, field: 'email', message: `Email already exists: ${emailLower}` });
+        else if (emailsSeen.has(emailLower)) errors.push({ row: rowNum, field: 'email', message: `Duplicate email in batch: ${emailLower}` });
+        emailsSeen.add(emailLower);
+      }
+      if (!row.dateOfBirth?.trim() || isNaN(new Date(row.dateOfBirth).getTime())) errors.push({ row: rowNum, field: 'dateOfBirth', message: 'Invalid date (YYYY-MM-DD)' });
+      if (!row.gender?.trim()) errors.push({ row: rowNum, field: 'gender', message: 'Gender required (MALE/FEMALE/OTHER)' });
+      if (!row.className?.trim()) errors.push({ row: rowNum, field: 'className', message: 'Class name is required' });
+      if (row.aadhaarNumber && !/^\d{12}$/.test(row.aadhaarNumber)) errors.push({ row: rowNum, field: 'aadhaarNumber', message: 'Aadhaar must be 12 digits' });
+    });
+
+    if (errors.length > 0) return { success: false, errors, imported: 0 };
+
+    const results: any[] = [];
+    students.forEach((row: any, i: number) => {
+      const newId = `stud-import-${Date.now()}-${i}`;
+      const classObj = db.classes.find((c: any) => c.name.toLowerCase() === row.className?.trim().toLowerCase());
+      const tempPass = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const newStudent = {
+        id: newId,
+        firstName: row.firstName.trim(),
+        lastName: row.lastName.trim(),
+        email: row.email.trim().toLowerCase(),
+        dateOfBirth: row.dateOfBirth,
+        gender: row.gender.toUpperCase(),
+        classId: classObj?.id || 'unknown',
+        class: classObj || { name: row.className },
+        status: 'ACTIVE',
+        rollNumber: row.rollNumber || `ROLL-${Date.now()}`,
+        scholarNumber: `SCH-${new Date().getFullYear()}-${String(db.students.length + i + 1).padStart(4, '0')}`,
+        timeline: [{ id: `t-${newId}`, type: 'ADMISSION', description: 'Bulk imported.', eventDate: new Date().toISOString() }],
+        documents: [],
+        parent: { firstName: row.fatherName || 'Guardian', phone: row.parentPhone || '' },
+      };
+      db.students.push(newStudent);
+      results.push({ scholarNumber: newStudent.scholarNumber, email: newStudent.email, temporaryPassword: tempPass });
+    });
+    saveMockDb(db);
+    return { success: true, errors: [], imported: results.length, students: results };
   }
 }
 

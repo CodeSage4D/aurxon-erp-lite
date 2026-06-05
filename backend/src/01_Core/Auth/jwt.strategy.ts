@@ -32,6 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         id: true,
         email: true,
         isActive: true,
+        mustChangePassword: true,
       },
     });
 
@@ -53,6 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       enabledModules: payload.enabledModules || [],
       enabledFeatures: payload.enabledFeatures || [],
       profileId: payload.profileId || null,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 }

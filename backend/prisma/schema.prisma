@@ -53,6 +53,7 @@ model User {
   passwordHash  String
   role          String      // e.g. "SUPER_ADMIN", "INSTITUTE_ADMIN", etc.
   isActive      Boolean     @default(true)
+  mustChangePassword Boolean @default(true)
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
   createdAt     DateTime    @default(now())
@@ -72,6 +73,7 @@ model User {
   
   notifications       Notification[]
   promotionsInitiated PromotionHistory[]
+  statusChangesInitiated StudentStatusHistory[]
 
   todoTasks           TodoTask[]
   diaryEntries        DiaryEntry[]
@@ -155,6 +157,7 @@ model Student {
   promotions    PromotionHistory[]
   reportCards   ReportCardStatus[]
   homeworkSubs  HomeworkSubmission[]
+  statusHistory StudentStatusHistory[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -166,8 +169,8 @@ model Student {
 
 model Parent {
   id            String      @id @default(uuid())
-  userId        String      @unique
-  user          User        @relation(fields: [userId], references: [id])
+  userId        String?     @unique
+  user          User?       @relation(fields: [userId], references: [id])
   firstName     String
   lastName      String
   phone         String
@@ -1105,5 +1108,19 @@ model ConfigurationItem {
   updatedAt  DateTime            @updatedAt
 
   @@unique([settingId, key])
+}
+
+model StudentStatusHistory {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  oldStatus    String
+  newStatus    String
+  changedById  String
+  changedBy    User     @relation(fields: [changedById], references: [id])
+  remarks      String?
+  changedAt    DateTime @default(now())
+
+  @@index([studentId])
 }
 

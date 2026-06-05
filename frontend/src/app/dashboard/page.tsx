@@ -284,7 +284,10 @@ export default function DashboardPage() {
       }
     }
   };
-  const loadStudents = async () => setStudents(await getStudentsApi());
+  const loadStudents = async () => {
+    const data = await getStudentsApi();
+    setStudents(Array.isArray(data) ? data : (data.students || []));
+  };
   const loadClasses = async () => {
     const data = await getClassesApi();
     setClasses(data);

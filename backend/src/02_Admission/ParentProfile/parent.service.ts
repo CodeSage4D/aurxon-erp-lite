@@ -32,14 +32,25 @@ export class ParentService {
   }
 
   async findAll(institutionId: string, search?: string, requesterRole?: string) {
-    const where: any = { user: { institutionId } };
+    const where: any = {
+      AND: [
+        {
+          OR: [
+            { user: { institutionId } },
+            { students: { some: { institutionId } } },
+          ],
+        },
+      ],
+    };
 
     if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
-      ];
+      where.AND.push({
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { user: { email: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
     }
 
     const parents = await this.prisma.parent.findMany({
@@ -65,7 +76,13 @@ export class ParentService {
 
   async findOne(institutionId: string, id: string, requesterRole?: string) {
     const parent = await this.prisma.parent.findFirst({
-      where: { id, user: { institutionId } },
+      where: {
+        id,
+        OR: [
+          { user: { institutionId } },
+          { students: { some: { institutionId } } },
+        ],
+      },
       include: {
         user: { select: { id: true, email: true, isActive: true, role: true } },
         students: {
@@ -197,7 +214,13 @@ export class ParentService {
 
   async remove(institutionId: string, id: string) {
     const parent = await this.prisma.parent.findFirst({
-      where: { id, user: { institutionId } },
+      where: {
+        id,
+        OR: [
+          { user: { institutionId } },
+          { students: { some: { institutionId } } },
+        ],
+      },
       include: { user: true },
     });
 
@@ -210,7 +233,9 @@ export class ParentService {
     });
 
     await this.prisma.parent.delete({ where: { id } });
-    await this.prisma.user.delete({ where: { id: parent.userId } });
+    if (parent.userId) {
+      await this.prisma.user.delete({ where: { id: parent.userId } });
+    }
 
     return { success: true, message: 'Parent profile removed successfully' };
   }
