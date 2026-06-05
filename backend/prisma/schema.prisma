@@ -10,15 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  SUPER_ADMIN
-  INSTITUTE_ADMIN
-  STAFF
-  TEACHER
-  STUDENT
-  PARENT
-  ACCOUNTANT
-}
 
 model Institution {
   id           String   @id @default(uuid())
@@ -45,6 +36,15 @@ model Institution {
   boards        Board[]
   streams       Stream[]
   gradeScales   GradeScale[]
+  roles         Role[]
+  memberships   OrganizationMembership[]
+  domains       TenantDomain[]
+  branding      OrganizationBranding?
+  subscription  Subscription?
+  license       License?
+  modules       OrganizationModule[]
+  features      OrganizationFeature[]
+  orgSettings   OrganizationSetting[]
 }
 
 model User {
@@ -57,6 +57,8 @@ model User {
   institution   Institution @relation(fields: [institutionId], references: [id])
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  memberships   OrganizationMembership[]
 
   // Lockout parameters
   failedLoginAttempts Int       @default(0)
@@ -924,5 +926,184 @@ model AssignedTask {
   feedback      String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+// Sprint 1 Core Control Plane Tables
+model OrganizationMembership {
+  id             String      @id @default(uuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institutionId  String
+  institution    Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  schoolId       String?     // Null for whole-org level memberships
+  campusId       String?     // Null for whole-org or school level memberships
+  roleId         String
+  role           Role        @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  status         String      @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  isPrimary      Boolean     @default(false)
+  joinedAt       DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([userId, institutionId, schoolId, campusId])
+  @@index([userId])
+  @@index([institutionId])
+}
+
+model Role {
+  id             String         @id @default(uuid())
+  name           String         // e.g. "Principal", "Teacher", "CustomAuditor"
+  code           String         // e.g. "PRINCIPAL", "TEACHER"
+  description    String?
+  isSystem       Boolean        @default(false) // System-defined roles cannot be deleted
+  institutionId  String?        // Null if global system role
+  institution    Institution?   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  permissions    Permission[]
+  memberships    OrganizationMembership[]
+
+  @@unique([institutionId, code])
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  resource    String   // e.g. "student:profile", "finance:ledger"
+  action      String   // e.g. "CREATE", "READ", "UPDATE", "DELETE", "APPROVE"
+  roleId      String
+  role        Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([roleId, resource, action])
+}
+
+// Sprint 2 Branding and Domain Mappings
+model TenantDomain {
+  id             String       @id @default(uuid())
+  domain         String       @unique // e.g. "delhi.rkmvp.edu"
+  organizationId String
+  organization   Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isPrimary      Boolean      @default(false)
+  sslStatus      String       @default("PENDING") // PENDING, ACTIVE, FAILED
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model OrganizationBranding {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  logoUrl        String?
+  primaryColor   String       @default("#0284c7")
+  secondaryColor String       @default("#0f172a")
+  loginBannerUrl String?
+  customCss      String?
+  termsUrl       String?
+  privacyUrl     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// Sprint 3 Billing and Modules Marketplace
+model Subscription {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planCode       String       // e.g. "STARTER", "PROFESSIONAL", "ENTERPRISE"
+  status         String       @default("ACTIVE") // ACTIVE, GRACE_PERIOD, UNPAID, CANCELLED
+  studentLimit   Int          @default(500)
+  storageLimitGb Float        @default(10.0)
+  startDate      DateTime     @default(now())
+  endDate        DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model License {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  licenseKey     String       @unique
+  licenseType    String       @default("TRIAL") // TRIAL, SUBSCRIPTION, ENTERPRISE_CONTRACT
+  status         String       @default("ACTIVE") // ACTIVE, EXPIRED, REVOKED
+  expiresAt      DateTime
+  activatedAt    DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Student Management"
+  code        String   @unique // e.g. "STUDENT_MANAGEMENT"
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  features    Feature[]
+  orgModules  OrganizationModule[]
+}
+
+model Feature {
+  id          String   @id @default(uuid())
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  name        String   // e.g. "Biometric Attendance"
+  code        String   @unique // e.g. "BIOMETRIC_ATTENDANCE"
+  description String?
+  createdAt   DateTime @default(now())
+
+  orgFeatures OrganizationFeature[]
+}
+
+model OrganizationModule {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  moduleCode     String
+  module         Module       @relation(fields: [moduleCode], references: [code], onDelete: Cascade)
+  isEnabled      Boolean      @default(true)
+  activatedAt    DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, moduleCode])
+}
+
+model OrganizationFeature {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  featureCode    String
+  feature        Feature      @relation(fields: [featureCode], references: [code], onDelete: Cascade)
+  isEnabled      Boolean      @default(true)
+  activatedAt    DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, featureCode])
+}
+
+model OrganizationSetting {
+  id             String              @id @default(uuid())
+  organizationId String
+  organization   Institution        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  groupCode      String              // e.g. "ACADEMIC_RULES", "GRADE_RULES"
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  items          ConfigurationItem[]
+
+  @@unique([organizationId, groupCode])
+}
+
+model ConfigurationItem {
+  id         String              @id @default(uuid())
+  settingId  String
+  setting    OrganizationSetting @relation(fields: [settingId], references: [id], onDelete: Cascade)
+  key        String              // e.g. "board_affiliation", "grading_system"
+  value      String              // e.g. "CBSE", "ICSE", "GPA_SCALE_10"
+  type       String              @default("STRING") // STRING, BOOLEAN, NUMBER, JSON
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([settingId, key])
 }
 
