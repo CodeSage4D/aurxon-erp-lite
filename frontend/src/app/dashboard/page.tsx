@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, Search, Sparkles, Bell, Sun, Moon, ChevronRight } from 'lucide-react';
+import { Menu, Search, Sparkles, Bell, Sun, Moon, ChevronRight, Building2, ShieldCheck, Database, HardDrive, KeyRound, ArrowUpRight, Plus, HelpCircle, Activity } from 'lucide-react';
 
 import {
   getDashboardStatsApi,
+  getFounderStatsApi,
+  switchContextApi,
   getStudentsApi,
   getClassesApi,
   getStaffApi,
@@ -97,6 +99,7 @@ export default function DashboardPage() {
 
   // Datasets
   const [stats, setStats] = useState<any>(null);
+  const [founderStats, setFounderStats] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
@@ -183,6 +186,32 @@ export default function DashboardPage() {
     setUser(parsed);
     setCurrentRole(parsed.role);
 
+    // Verify onboarding setup completion
+    const checkSetup = async () => {
+      try {
+        const setup = await getSetupStatusApi();
+        if (!setup.setupCompleted && parsed.role !== 'SUPER_ADMIN') {
+          router.push('/setup-wizard');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    checkSetup();
+
+    // Apply branding color dynamically if set
+    const contextStr = localStorage.getItem('aurxon_context');
+    if (contextStr) {
+      try {
+        const ctx = JSON.parse(contextStr);
+        if (ctx.branding && ctx.branding.primaryColor) {
+          document.documentElement.style.setProperty('--primary', ctx.branding.primaryColor);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     // Initial sync
     loadDashboardStats();
     loadStudents();
@@ -238,7 +267,22 @@ export default function DashboardPage() {
   }, [selectedAcademicClassId]);
 
   // Loader implementations
-  const loadDashboardStats = async () => setStats(await getDashboardStatsApi());
+  const loadDashboardStats = async () => {
+    const cached = localStorage.getItem('aurxon_user');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.role === 'SUPER_ADMIN') {
+          const data = await getFounderStatsApi();
+          setFounderStats(data);
+        } else {
+          setStats(await getDashboardStatsApi());
+        }
+      } catch (e) {
+        console.error('Failed to load stats', e);
+      }
+    }
+  };
   const loadStudents = async () => setStudents(await getStudentsApi());
   const loadClasses = async () => {
     const data = await getClassesApi();
@@ -565,7 +609,177 @@ export default function DashboardPage() {
         {/* WORKSPACE CONTENT SHEETS */}
         <div className="flex-1 p-6 overflow-y-auto space-y-6">
           
-          {activeCategory === 'overview' && stats && (
+          {activeCategory === 'overview' && currentRole === 'SUPER_ADMIN' && founderStats && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Premium Title */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
+                    <ShieldCheck className="h-6 w-6 text-primary animate-pulse" />
+                    Founder Control Plane
+                  </h1>
+                  <p className="text-xs text-muted-foreground font-semibold mt-1">
+                    System-wide SaaS telemetry, organization directories, licensing logs, and node metrics.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-500 border border-emerald-500/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Control Plane Online
+                  </span>
+                </div>
+              </div>
+
+              {/* KPI Cards Grid */}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="glass rounded-2xl p-5 border border-border/80 shadow-md hover-lift">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Institutions</span>
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                      <Building2 className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-3xl font-black tracking-tight text-foreground">{founderStats.totalOrganizations}</span>
+                    <span className="text-[10px] font-bold text-emerald-500">Live Tenants</span>
+                  </div>
+                </div>
+
+                <div className="glass rounded-2xl p-5 border border-border/80 shadow-md hover-lift">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Active Users</span>
+                    <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
+                      <Database className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-3xl font-black tracking-tight text-foreground">{founderStats.totalUsers}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground">{founderStats.totalMemberships} memberships</span>
+                  </div>
+                </div>
+
+                <div className="glass rounded-2xl p-5 border border-border/80 shadow-md hover-lift">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Active Licenses</span>
+                    <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-3xl font-black tracking-tight text-foreground">{founderStats.activeLicenses}</span>
+                    <span className="text-[10px] font-bold text-amber-500">Subscription verified</span>
+                  </div>
+                </div>
+
+                <div className="glass rounded-2xl p-5 border border-border/80 shadow-md hover-lift">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Storage Allocated</span>
+                    <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500">
+                      <HardDrive className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-3xl font-black tracking-tight text-foreground">{founderStats.totalStorageLimit} <span className="text-sm font-bold text-muted-foreground">GB</span></span>
+                    <span className="text-[10px] font-bold text-muted-foreground">{founderStats.totalStudentLimit} Max Students</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main SaaS directories */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Left side: Recent Institutions Directory */}
+                <div className="lg:col-span-2 glass rounded-3xl p-6 border border-border shadow-lg space-y-4">
+                  <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                    <h2 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      Recent Tenants
+                    </h2>
+                    <span className="text-[10px] text-muted-foreground font-semibold">Directory list</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {founderStats.recentOrganizations.map((org: any) => (
+                      <div key={org.id} className="flex items-center justify-between p-4 rounded-xl border border-border bg-card/30 hover:bg-card/70 transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center border border-border overflow-hidden">
+                            {org.logoUrl ? (
+                              <img src={org.logoUrl} alt={org.name} className="h-full w-full object-cover" />
+                            ) : (
+                              <Building2 className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-bold text-foreground">{org.name}</h3>
+                            <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">
+                              Created on {new Date(org.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <span 
+                          style={{ borderColor: org.primaryColor, color: org.primaryColor }}
+                          className="text-[9px] font-extrabold tracking-widest uppercase border px-2.5 py-1 rounded-full bg-background"
+                        >
+                          Active
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right side: Module marketplace statistics */}
+                <div className="glass rounded-3xl p-6 border border-border shadow-lg space-y-4">
+                  <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                    <h2 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                      Module Penetration
+                    </h2>
+                  </div>
+
+                  <div className="space-y-4">
+                    {founderStats.moduleUsage.map((m: any) => (
+                      <div key={m.code} className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-bold text-foreground">{m.name}</span>
+                          <span className="font-bold text-primary">{m.activeCount} active</span>
+                        </div>
+                        {/* Custom progress bar */}
+                        <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
+                          <div 
+                            style={{ width: `${(m.activeCount / Math.max(founderStats.totalOrganizations, 1)) * 100}%` }}
+                            className="h-full bg-primary rounded-full"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-4 border-t border-border/50 space-y-2">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">SaaS Actions</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        onClick={() => triggerToast('Tenant onboarding wizard will open in the next phase.')}
+                        className="p-2.5 rounded-xl border border-border bg-card hover:bg-muted text-[10px] font-bold text-foreground text-center transition hover-lift flex items-center justify-center gap-1"
+                      >
+                        <Plus className="h-3 w-3 text-primary" />
+                        Add Tenant
+                      </button>
+                      <button 
+                        onClick={() => triggerToast('License key generator is restricted to corporate root authorization.')}
+                        className="p-2.5 rounded-xl border border-border bg-card hover:bg-muted text-[10px] font-bold text-foreground text-center transition hover-lift flex items-center justify-center gap-1"
+                      >
+                        <KeyRound className="h-3 w-3 text-amber-500" />
+                        New License
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {activeCategory === 'overview' && currentRole !== 'SUPER_ADMIN' && stats && (
             <OverviewTab
               stats={stats}
               students={students}
