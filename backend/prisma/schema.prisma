@@ -53,11 +53,14 @@ model Institution {
   orgType                String                      @default("SCHOOL")
   status                 String                      @default("ACTIVE")
   registrations          OrganizationRegistration[]
+  activationKeys         ActivationKey[]
+  renewalRequests        RenewalRequest[]
   storageSnapshots       StorageSnapshot[]
   securityThreatLogs     SecurityThreatLog[]         @relation("ThreatInstitution")
   invoices               Invoice[]
   backupRecords          BackupRecord[]
   impersonationSessions  ImpersonationSession[]
+  setupStatus            OrganizationSetupStatus?
 }
 
 model User {
@@ -1169,31 +1172,82 @@ model Tenant {
 }
 
 model OrganizationRegistration {
-  id               String           @id @default(uuid())
-  orgName          String
-  orgType          String           @default("SCHOOL") // SCHOOL, HOSPITAL, UNIVERSITY, COMPANY, NGO
-  email            String           @unique
-  phone            String
-  address          String?
-  city             String?
-  state            String?
-  expectedUsers    Int              @default(50)
-  requestedModules String[]         // array of module codes
-  status           String           @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED
-  reviewNotes      String?
-  reviewedById     String?
-  reviewedBy       User?            @relation("ReviewedRegistrations", fields: [reviewedById], references: [id])
-  approvedAt       DateTime?
-  rejectedAt       DateTime?
+  id                String           @id @default(uuid())
+  referenceNumber   String?          @unique // e.g. AURX-2026-SCH-000145
+  orgName           String
+  orgType           String           @default("SCHOOL") // SCHOOL, HOSPITAL, UNIVERSITY, COMPANY, NGO
+  email             String           @unique
+  phone             String
+  address           String?
+  city              String?
+  state             String?
+  expectedUsers     Int              @default(50)
+  requestedModules  String[]         // array of module codes
+  status            String           @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED, CHANGES_REQUESTED, APPROVED_WITH_CONDITIONS, READY_FOR_PROVISIONING, PROVISIONED, ACTIVATED, LIVE
+  reviewNotes       String?
+  reviewedById      String?
+  reviewedBy        User?            @relation("ReviewedRegistrations", fields: [reviewedById], references: [id])
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
   activationTokenId String?
-  activationToken  ActivationToken?
-  institutionId    String?
-  institution      Institution?     @relation(fields: [institutionId], references: [id])
-  industryPackCode String?
-  orgSize          String           @default("SMALL") // SMALL, MEDIUM, LARGE, ENTERPRISE
+  activationToken   ActivationToken?
+  institutionId     String?
+  institution       Institution?     @relation(fields: [institutionId], references: [id])
+  industryPackCode  String?
+  orgSize           String           @default("SMALL") // SMALL, MEDIUM, LARGE, ENTERPRISE
   requestedFeatures String[]         // array of feature codes
+  adminName         String?
+  adminPasswordHash String?
+  logoUrl           String?
+  primaryColor      String?
+  activationKey     ActivationKey?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+}
+
+model ActivationKey {
+  id               String       @id @default(uuid())
+  keyHash          String       @unique // SHA-256 hash
+  encryptedPackage String       // AES-256-GCM encrypted package JSON
+  status           String       @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED, EXPIRED, USED
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  expiresAt        DateTime
+  usedAt           DateTime?
+  
+  registrationId   String       @unique
+  registration     OrganizationRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  organizationId   String?
+  institution      Institution? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model RenewalRequest {
+  id               String       @id @default(uuid())
+  referenceNumber  String       @unique
+  status           String       @default("PENDING") // PENDING, APPROVED, REJECTED, PROCESSED
+  requestedMonths  Int          @default(12)
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  
+  organizationId   String
+  institution      Institution  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  renewalKeyId     String?      @unique
+  renewalKey       RenewalKey?
+}
+
+model RenewalKey {
+  id               String       @id @default(uuid())
+  keyHash          String       @unique
+  encryptedPackage String       // AES-256-GCM encrypted renewal settings
+  status           String       @default("ACTIVE") // ACTIVE, USED, REVOKED, EXPIRED
+  createdAt        DateTime     @default(now())
+  expiresAt        DateTime
+  usedAt           DateTime?
+  
+  renewalRequestId String       @unique
+  renewalRequest   RenewalRequest @relation(fields: [renewalRequestId], references: [id], onDelete: Cascade)
 }
 
 model ActivationToken {
@@ -1368,5 +1422,19 @@ model AurxonTeamMember {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 }
+
+model OrganizationSetupStatus {
+  id                 String       @id @default(uuid())
+  institutionId      String       @unique
+  institution        Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  setupStarted       Boolean      @default(false)
+  setupCompleted     Boolean      @default(false)
+  setupCompletedAt   DateTime?
+  currentStep        Int          @default(1)
+  wizardVersion      String       @default("1.0")
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
 
 

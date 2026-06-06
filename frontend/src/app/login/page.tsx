@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginApi, switchContextApi } from '@/lib/api';
-import { Shield, Sparkles, LogIn, UserCheck, Users, CreditCard, GraduationCap, Briefcase } from 'lucide-react';
+import { Shield, Sparkles, LogIn } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,10 +12,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [theme, setTheme] = useState('dark');
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
+
+  const triggerToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 4000);
+  };
 
   const toggleTheme = () => {
     const root = document.documentElement;
@@ -57,16 +63,19 @@ export default function LoginPage() {
     }
   };
 
-  const autofill = (roleEmail: string) => {
-    setEmail(roleEmail);
-    setPassword('password123');
-  };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 transition-colors duration-500 sm:px-6 relative overflow-hidden">
       {/* Decorative background blobs */}
       <div className="absolute top-[-10%] left-[-10%] h-[40%] w-[40%] rounded-full bg-primary/20 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] h-[40%] w-[40%] rounded-full bg-accent/20 blur-[100px] pointer-events-none" />
+
+      {/* Toast Alert */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-xs font-bold text-primary-foreground shadow-xl border border-primary/20 uppercase tracking-wide">
+          <Sparkles className="h-4 w-4 animate-pulse" />
+          <span>{toast}</span>
+        </div>
+      )}
 
       {/* Top right theme toggle */}
       <div className="absolute top-6 right-6 z-10">
@@ -122,6 +131,13 @@ export default function LoginPage() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Password
                 </label>
+                <button
+                  type="button"
+                  onClick={() => triggerToast('Please contact your administrator to reset your password.')}
+                  className="text-xs font-semibold text-primary hover:underline bg-transparent border-0 cursor-pointer p-0"
+                >
+                  Forgot Password?
+                </button>
               </div>
               <input
                 type="password"
@@ -136,7 +152,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <span>Authenticating...</span>
@@ -147,86 +163,38 @@ export default function LoginPage() {
                 </>
               )}
             </button>
+
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between pt-2 text-xs font-semibold text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => router.push('/register')}
+                className="hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0"
+              >
+                Register Organization
+              </button>
+              <span className="hidden sm:inline text-border">•</span>
+              <button
+                type="button"
+                onClick={() => triggerToast('Demo request registered! Our team will reach out to you shortly.')}
+                className="hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0"
+              >
+                Request Demo
+              </button>
+            </div>
           </form>
         </div>
 
-        {/* Demo Accounts Panel */}
-        <div className="glass rounded-3xl p-6 border border-border/80 shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-primary/30 to-accent/30" />
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">
-            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-            <span>Select a Demo Role Profile</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
-            Click one of the profiles below to autofill verified multi-tenant accounts from our Neon DB database.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Development Mode bypass console link */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-center pt-2">
             <button
-              onClick={() => autofill('founder@aurxon.com')}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
+              onClick={() => router.push('/founder-console')}
+              className="text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary transition-colors hover:underline bg-transparent border-0 cursor-pointer p-0"
             >
-              <div className="p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary shrink-0">
-                <Shield className="h-4 w-4" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="text-xs font-black text-foreground group-hover:text-primary transition-colors truncate">Founder / SaaS Admin</div>
-                <div className="text-[10px] text-muted-foreground font-medium truncate">founder@aurxon.com</div>
-              </div>
-            </button>
-            
-            <button
-              onClick={() => autofill('admin@aurxon.com')}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
-            >
-              <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-500 shrink-0">
-                <Briefcase className="h-4 w-4" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="text-xs font-black text-foreground group-hover:text-purple-500 transition-colors truncate">Institute Admin (DPS)</div>
-                <div className="text-[10px] text-muted-foreground font-medium truncate">admin@aurxon.com</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => autofill('principal@rkmvp.edu')}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
-            >
-              <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 shrink-0">
-                <UserCheck className="h-4 w-4" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="text-xs font-black text-foreground group-hover:text-rose-500 transition-colors truncate">Principal (RKMVP)</div>
-                <div className="text-[10px] text-muted-foreground font-medium truncate">principal@rkmvp.edu</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => autofill('teacher@rkmvp.edu')}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group"
-            >
-              <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 shrink-0">
-                <GraduationCap className="h-4 w-4" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="text-xs font-black text-foreground group-hover:text-indigo-500 transition-colors truncate">Teacher (RKMVP)</div>
-                <div className="text-[10px] text-muted-foreground font-medium truncate">teacher@rkmvp.edu</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => autofill('consultant@aurxon.com')}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card/30 p-3 text-left transition hover:border-primary hover:bg-card/80 hover-lift group sm:col-span-2"
-            >
-              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 shrink-0">
-                <Users className="h-4 w-4" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="text-xs font-black text-foreground group-hover:text-emerald-500 transition-colors truncate">Multi-Member Consultant (RKMVP + KPPHS)</div>
-                <div className="text-[10px] text-muted-foreground font-medium truncate">consultant@aurxon.com (Tests Selection Screen)</div>
-              </div>
+              Product Operations & Demo Center
             </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -82,9 +82,18 @@ export class AuthController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @Post('activate/verify')
+  async activateWithKey(
+    @Body() body: { referenceNumber: string; activationKey: string },
+  ) {
+    return this.authService.activateWorkspaceWithKey(body.referenceNumber, body.activationKey);
+  }
+
+  @HttpCode(HttpStatus.OK)
   @Post('activate/:token')
   async activate(@Param('token') token: string, @Body() body: { pass?: string; password?: string }) {
     const password = body.password || body.pass || '';
     return this.authService.activateOrganization(token, password);
   }
 }
+

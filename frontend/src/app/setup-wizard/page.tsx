@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Sparkles, Building2, Calendar, MapPin, Sliders, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
-import { getSetupStatusApi, submitSetupApi, refreshContextApi } from '@/lib/api';
+import { Shield, Sparkles, Building2, Calendar, MapPin, Sliders, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { getSetupStatusApi, submitSetupApi, saveSetupDraftApi, refreshContextApi } from '@/lib/api';
 import CountryPhoneInput from '@/01_Core/Dashboard/CountryPhoneInput';
 import { INDIAN_STATES_AND_UTS } from '@/lib/indianData';
 
@@ -14,6 +14,7 @@ export default function SetupWizardPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState<any>(null);
+  const [industryPackCode, setIndustryPackCode] = useState('SCHOOL_ERP');
 
   // Form State
   const [form, setForm] = useState({
@@ -21,6 +22,7 @@ export default function SetupWizardPage() {
     gradingSystem: 'CBSE',
     timezone: 'Asia/Kolkata',
     currency: 'INR',
+    departments: '',
     branch: {
       name: '',
       code: '',
@@ -45,36 +47,97 @@ export default function SetupWizardPage() {
         router.replace('/dashboard');
         return;
       }
+      
+      setIndustryPackCode(data.industryPackCode || 'SCHOOL_ERP');
+      
+      // Support resuming steps
+      if (data.currentStep) {
+        setStep(data.currentStep);
+      }
+
       if (data.details) {
         setForm(prev => ({
           ...prev,
-          academicYear: data.details.academicYear || '2026-2027',
-          gradingSystem: data.details.gradingSystem || 'CBSE',
+          academicYear: data.details.academicYear || (data.industryPackCode === 'CORPORATE_ERP' ? 'FY-2026' : '2026-2027'),
+          gradingSystem: data.details.gradingSystem || (data.industryPackCode === 'SCHOOL_ERP' ? 'CBSE' : 'STANDARD'),
           timezone: data.details.timezone || 'Asia/Kolkata',
           currency: data.details.currency || 'INR',
+          departments: data.details.departments || '',
+          branch: data.details.branch ? {
+            name: data.details.branch.name || '',
+            code: data.details.branch.code || '',
+            phone: data.details.branch.phone || '',
+            address: data.details.branch.address || '',
+            city: data.details.branch.city || '',
+            state: data.details.branch.state || '',
+            pinCode: data.details.branch.pinCode || '',
+          } : prev.branch
         }));
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to verify setup wizard status:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1) {
-      if (!form.academicYear || !form.gradingSystem) {
-        setError('Please fill in all academic configuration fields.');
-        return;
+      // Validation based on industry pack
+      if (industryPackCode === 'SCHOOL_ERP') {
+        if (!form.academicYear || !form.gradingSystem) {
+          setError('Please fill in all academic configuration fields.');
+          return;
+        }
+      } else if (industryPackCode === 'HOSPITAL_ERP') {
+        if (!form.departments || !form.timezone) {
+          setError('Please fill in all hospital configuration fields.');
+          return;
+        }
+      } else if (industryPackCode === 'CORPORATE_ERP') {
+        if (!form.academicYear || !form.departments) {
+          setError('Please fill in all corporate configuration fields.');
+          return;
+        }
       }
+
       setError('');
-      setStep(2);
+      setSubmitting(true);
+      try {
+        // Auto-save Step 1 to database draft
+        await saveSetupDraftApi(1, {
+          academicYear: form.academicYear,
+          gradingSystem: form.gradingSystem,
+          timezone: form.timezone,
+          currency: form.currency,
+          departments: form.departments,
+        });
+        setStep(2);
+      } catch (err: any) {
+        setError(err.message || 'Failed to save progress. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     setError('');
-    setStep(1);
+    setSubmitting(true);
+    try {
+      // Auto-save current Step 2 values as draft
+      await saveSetupDraftApi(2, {
+        branch: form.branch,
+      });
+      // Move currentStep back to 1
+      await saveSetupDraftApi(0, {}); // Triggers currentStep to set to 1
+      setStep(1);
+    } catch (err) {
+      console.error('Failed to save back draft:', err);
+      setStep(1);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,7 +166,7 @@ export default function SetupWizardPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-xs text-muted-foreground font-black uppercase tracking-widest">
             Checking organization status...
           </p>
@@ -128,8 +191,11 @@ export default function SetupWizardPage() {
             Onboarding Setup Wizard
           </h2>
           <p className="mt-2 text-xs text-muted-foreground font-medium">
-            Initialize your institution's control plane parameters.
+            Initialize your organization's control plane parameters.
           </p>
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-3 py-1 text-[10px] font-black uppercase text-primary">
+            {industryPackCode.replace('_', ' ')} Pack
+          </div>
         </div>
 
         {/* Wizard Progress Stepper */}
@@ -154,7 +220,7 @@ export default function SetupWizardPage() {
         </div>
 
         {/* Content Card */}
-        <div className="glass rounded-3xl p-8 shadow-2xl border border-border relative overflow-hidden">
+        <div className="glass rounded-3xl p-8 shadow-2xl border border-border relative overflow-hidden bg-slate-900/40 backdrop-blur-xl">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-accent" />
 
           {error && (
@@ -171,33 +237,87 @@ export default function SetupWizardPage() {
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current Academic Year</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.academicYear}
-                    onChange={e => setForm({ ...form, academicYear: e.target.value })}
-                    placeholder="e.g. 2026-2027"
-                    className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-bold"
-                  />
-                </div>
+                {/* SCHOOL_ERP Industry Fields */}
+                {industryPackCode === 'SCHOOL_ERP' && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current Academic Year</label>
+                      <input
+                        type="text"
+                        required
+                        value={form.academicYear}
+                        onChange={e => setForm({ ...form, academicYear: e.target.value })}
+                        placeholder="e.g. 2026-2027"
+                        className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-bold"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Grading Affiliation Standard</label>
-                  <select
-                    value={form.gradingSystem}
-                    onChange={e => setForm({ ...form, gradingSystem: e.target.value })}
-                    className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-bold"
-                  >
-                    <option value="CBSE">CBSE Board (CCE Grading System)</option>
-                    <option value="PERCENTAGE">State Board / Marks Percentages</option>
-                    <option value="GPA">ICSE Board (GPA Scale)</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Grading Affiliation Standard</label>
+                      <select
+                        value={form.gradingSystem}
+                        onChange={e => setForm({ ...form, gradingSystem: e.target.value })}
+                        className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-bold"
+                      >
+                        <option value="CBSE">CBSE Board (CCE Grading System)</option>
+                        <option value="PERCENTAGE">State Board / Marks Percentages</option>
+                        <option value="GPA">ICSE Board (GPA Scale)</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
+                {/* HOSPITAL_ERP Industry Fields */}
+                {industryPackCode === 'HOSPITAL_ERP' && (
+                  <>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Medical Departments</label>
+                      <input
+                        type="text"
+                        required
+                        value={form.departments}
+                        onChange={e => setForm({ ...form, departments: e.target.value })}
+                        placeholder="e.g. Emergency, Cardiology, Pediatrics, General Medicine, OPD"
+                        className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-semibold"
+                      />
+                      <p className="mt-1 text-[9px] text-muted-foreground">Provide a comma-separated list of clinical departments to set up in the clinic database.</p>
+                    </div>
+                  </>
+                )}
+
+                {/* CORPORATE_ERP Industry Fields */}
+                {industryPackCode === 'CORPORATE_ERP' && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Fiscal Year</label>
+                      <input
+                        type="text"
+                        required
+                        value={form.academicYear}
+                        onChange={e => setForm({ ...form, academicYear: e.target.value })}
+                        placeholder="e.g. FY-2026"
+                        className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-bold"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Corporate Departments</label>
+                      <input
+                        type="text"
+                        required
+                        value={form.departments}
+                        onChange={e => setForm({ ...form, departments: e.target.value })}
+                        placeholder="e.g. Engineering, Sales, Product, Marketing, Finance, HR"
+                        className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-semibold"
+                      />
+                      <p className="mt-1 text-[9px] text-muted-foreground">Provide a comma-separated list of company organizational departments.</p>
+                    </div>
+                  </>
+                )}
+
+                {/* Common Fields */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Biometric Clock Timezone</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Timezone Setting</label>
                   <input
                     type="text"
                     required
@@ -209,7 +329,7 @@ export default function SetupWizardPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Fee Billing Currency</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">System Local Currency</label>
                   <select
                     value={form.currency}
                     onChange={e => setForm({ ...form, currency: e.target.value })}
@@ -226,10 +346,20 @@ export default function SetupWizardPage() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition hover-lift"
+                  disabled={submitting}
+                  className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition hover-lift disabled:opacity-50"
                 >
-                  <span>Continue</span>
-                  <ArrowRight className="h-4 w-4" />
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving draft...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -239,16 +369,16 @@ export default function SetupWizardPage() {
             <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
               <h3 className="text-sm font-black uppercase tracking-wider text-foreground flex items-center gap-2">
                 <Building2 className="h-4.5 w-4.5 text-primary" />
-                <span>Step 2: Initialize Primary Campus</span>
+                <span>Step 2: Initialize Default Branch / Campus Location</span>
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Branch / Campus Name</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Branch / Site Name</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Ramakrishna Mission Vidyapith Main Campus"
+                    placeholder="e.g. Main Headquarters or Campus 1"
                     value={form.branch.name}
                     onChange={e => setForm({ ...form, branch: { ...form.branch, name: e.target.value } })}
                     className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-bold"
@@ -256,11 +386,11 @@ export default function SetupWizardPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Branch Code</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Branch / Site Code</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. RKMVP-MAIN"
+                    placeholder="e.g. BR-MAIN"
                     value={form.branch.code}
                     onChange={e => setForm({ ...form, branch: { ...form.branch, code: e.target.value } })}
                     className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-mono uppercase"
@@ -268,16 +398,16 @@ export default function SetupWizardPage() {
                 </div>
 
                 <CountryPhoneInput
-                  label="Campus Helpline Phone"
+                  label="Helpline Helpline Phone"
                   value={form.branch.phone}
                   onChange={val => setForm({ ...form, branch: { ...form.branch, phone: val } })}
                 />
 
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Street Address</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Physical Street Address</label>
                   <input
                     type="text"
-                    placeholder="Vidyapith Road, Ramakrishna Sector"
+                    placeholder="Sector 5, Salt Lake City"
                     value={form.branch.address}
                     onChange={e => setForm({ ...form, branch: { ...form.branch, address: e.target.value } })}
                     className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground"
@@ -285,7 +415,7 @@ export default function SetupWizardPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">State</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">State / Province</label>
                   <select
                     value={form.branch.state}
                     onChange={e => setForm({ ...form, branch: { ...form.branch, state: e.target.value, city: '' } })}
@@ -322,7 +452,7 @@ export default function SetupWizardPage() {
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Postal PIN Code</label>
                   <input
                     type="text"
-                    placeholder="700124"
+                    placeholder="700091"
                     value={form.branch.pinCode}
                     onChange={e => setForm({ ...form, branch: { ...form.branch, pinCode: e.target.value } })}
                     className="mt-2 w-full rounded-xl border border-border bg-input/50 px-3.5 py-2.5 text-xs outline-none focus:border-primary text-foreground font-mono"
@@ -334,7 +464,8 @@ export default function SetupWizardPage() {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="flex items-center gap-1.5 rounded-xl border border-border hover:bg-muted px-4 py-2.5 text-xs font-bold text-zinc-400 transition"
+                  disabled={submitting}
+                  className="flex items-center gap-1.5 rounded-xl border border-border hover:bg-muted px-4 py-2.5 text-xs font-bold text-zinc-400 transition disabled:opacity-50"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   <span>Back</span>
@@ -344,8 +475,17 @@ export default function SetupWizardPage() {
                   disabled={submitting}
                   className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-md transition hover-lift disabled:opacity-50"
                 >
-                  <span>{submitting ? 'Initializing...' : 'Complete Setup'}</span>
-                  <CheckCircle className="h-4 w-4" />
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Completing setup...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Complete Setup</span>
+                      <CheckCircle className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -356,7 +496,7 @@ export default function SetupWizardPage() {
               <CheckCircle className="h-16 w-16 text-emerald-500 animate-bounce" />
               <h3 className="text-lg font-black text-foreground">Organization Configured successfully!</h3>
               <p className="text-xs text-muted-foreground max-w-sm">
-                Default primary campus established, affiliation configurations loaded, and seed database keys created. Redirecting to workspace dashboard...
+                Default site established, industry pack options finalized, and configuration entries saved. Redirecting to workspace dashboard...
               </p>
             </div>
           )}

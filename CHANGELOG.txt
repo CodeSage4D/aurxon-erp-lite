@@ -19,6 +19,11 @@ FEATURES ADDED
 3. Multi-Tenant Registration & Onboarding Lifecycle Workflow
    - Implemented registration approval, rejection, and activation workflows.
    - Restricts login activation until a trial key is verified.
+4. Dedicated Founder Development & Demo Console (/founder-console)
+   - Added a developers console for role-based testing and context updates.
+   - Provides preset buttons for quick login (Founder, Principal, Doctor, etc.).
+   - Support for manual workspace (School, Hospital, Corporate) and role switches.
+   - Utilities for clearing session cache and wiping the local storage mock DB.
 
 FEATURES IMPROVED
 --------------------------------------------------------------------------------
@@ -34,8 +39,11 @@ FEATURES IMPROVED
    - Created a client-side state machine in page.tsx that blocks background page
      queries and visual flicker on reload.
    - Shows a premium full-screen loading skeleton during auth context switches.
+4. Clean Enterprise Login Interface
+   - Removed demo profile selector grid from the public login page.
+   - Added links for Forgot Password recovery and Request Demo dispatch triggers.
 
-BUGS FIXED
+Bugs Fixed
 --------------------------------------------------------------------------------
 1. Reports Dashboard Console Fetch Crash
    - Patched `getClassPerformanceReportApi` and ReportsDashboard.tsx to guard against
@@ -45,10 +53,19 @@ BUGS FIXED
 2. Route Permissions & Role Leakages
    - Hardened RBAC routes to block cross-role access (e.g., standard users or
      finance managers trying to access backup management routes).
+3. Student Service Spec Dependency Resolution Failures
+   - Fixed missing injectables in `student.service.spec.ts` unit tests by mocking
+     `SubscriptionLimitService` and `AuditLogService`.
+4. Auth Controller Activation Route Collision
+   - Resolved a NestJS route collision where `@Post('activate/:token')` shadowed the
+     static `@Post('activate/verify')` route, causing workspace activation attempts
+     to fail with invalid token errors. Swapped registration order to prioritize
+     the static verify endpoint.
 
 FILES MODIFIED
 --------------------------------------------------------------------------------
 - backend/prisma/schema.prisma
+- backend/src/01_Core/Auth/auth.controller.ts
 - backend/src/01_Core/Auth/auth.service.ts
 - backend/src/01_Core/Auth/jwt-auth.guard.ts
 - backend/src/01_Core/Auth/jwt.strategy.ts
@@ -64,12 +81,14 @@ FILES MODIFIED
 - backend/src/01_Core/Registration/dto/create-registration.dto.ts
 - backend/src/01_Core/Registration/registration.service.ts
 - backend/src/02_Admission/StudentProfile/student.service.ts
+- backend/src/02_Admission/StudentProfile/student.service.spec.ts
 - backend/src/04_Attendance/StudentAttendance/attendance.controller.ts
 - backend/src/05_Fees/FeeStructure/fee.controller.ts
 - backend/src/05_Fees/Receipts/fees-extended.controller.ts
 - backend/src/06_Exams/ExamSetup/exam.controller.ts
 - frontend/src/09_Reports/ReportsDashboard.tsx
 - frontend/src/app/dashboard/page.tsx
+- frontend/src/app/login/page.tsx
 - frontend/src/app/register/page.tsx
 - frontend/src/lib/api.ts
 
@@ -79,6 +98,7 @@ UNTRACKED FILES (NEW ADDITIONS)
 - backend/validation-runner.ts
 - frontend/src/01_Core/Dashboard/DynamicDashboard.tsx
 - frontend/src/app/teams/
+- frontend/src/app/founder-console/
 - frontend/src/middleware.ts
 
 BREAKING CHANGES & MIGRATION NOTES

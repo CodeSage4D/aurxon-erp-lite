@@ -14,6 +14,22 @@ export class SetupController {
     return this.setupService.getSetupStatus(req.user.organizationId);
   }
 
+  @Post('save-draft')
+  @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
+  async saveDraft(
+    @Request() req: any,
+    @Body() body: {
+      step: number;
+      data: any;
+    },
+  ) {
+    return this.setupService.saveDraft(
+      req.user.organizationId,
+      body.step,
+      body.data,
+    );
+  }
+
   @Post('submit')
   @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
   async submitSetup(
@@ -23,6 +39,7 @@ export class SetupController {
       gradingSystem: string;
       timezone: string;
       currency: string;
+      departments?: string;
       branch: {
         name: string;
         code: string;

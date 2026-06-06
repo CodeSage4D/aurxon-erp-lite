@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
+import { encrypt } from '../../common/utils/crypto';
 
 @Injectable()
 export class ProvisioningService {
@@ -42,8 +43,8 @@ export class ProvisioningService {
       throw new BadRequestException('Registration record not found');
     }
 
-    if (registration.status !== 'APPROVED') {
-      throw new BadRequestException('Registration must be approved before provisioning');
+    if (registration.status !== 'APPROVED' && registration.status !== 'READY_FOR_PROVISIONING') {
+      throw new BadRequestException('Registration must be approved or ready before provisioning');
     }
 
     if (registration.institutionId) {
@@ -78,10 +79,20 @@ export class ProvisioningService {
           name: registration.orgName,
           tenantId: tenant.id,
           orgType: registration.orgType,
-          status: 'ACTIVE',
-          primaryColor: '#0284c7', // sky-600 default
+          status: 'ACTIVE', // Kept active for seamless setup, status mapped to LIVE upon activation
+          primaryColor: registration.primaryColor || '#0284c7', // Sky-600 or custom primary color
+          logoUrl: registration.logoUrl || null,
           industryPackCode: pack.code,
         },
+      });
+
+      // Create Custom Branding record
+      await tx.organizationBranding.create({
+        data: {
+          organizationId: institution.id,
+          logoUrl: registration.logoUrl || null,
+          primaryColor: registration.primaryColor || '#0284c7',
+        }
       });
 
       // 3. Link Institution to Registration
@@ -202,6 +213,64 @@ export class ProvisioningService {
         },
       });
 
+      // 8.5 Create Activation Key
+      let activationKey = '';
+      let activationToken = '';
+      if (registration.adminPasswordHash) {
+        const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+        const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+        const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
+        activationKey = `AURX-ACT-${part1}-${part2}-${part3}`;
+        const keyHash = crypto.createHash('sha256').update(activationKey).digest('hex');
+
+        activationToken = crypto.randomBytes(48).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(activationToken).digest('hex');
+
+        const pkg = {
+          referenceNumber: registration.referenceNumber,
+          orgName: registration.orgName,
+          industry: packCode,
+          subscription: 'TRIAL',
+          modules: modulesToEnable,
+          features: featuresToEnable,
+          activationToken,
+          activationKey,
+          issueDate: startDate.toISOString(),
+          expiryDate: endDate.toISOString(),
+          workspaceUrl: `${slug}.aurxon.com`,
+          supportContact: 'support@aurxon.com',
+        };
+
+        const encryptedPackage = encrypt(JSON.stringify(pkg));
+
+        await tx.activationKey.create({
+          data: {
+            keyHash,
+            encryptedPackage,
+            status: 'ACTIVE',
+            expiresAt: endDate,
+            registrationId: registration.id,
+            organizationId: institution.id,
+          },
+        });
+
+        // Set registration status and token
+        await tx.organizationRegistration.update({
+          where: { id: registration.id },
+          data: {
+            status: 'PROVISIONED',
+            activationTokenId: tokenHash,
+          },
+        });
+      } else {
+        await tx.organizationRegistration.update({
+          where: { id: registration.id },
+          data: {
+            status: 'PROVISIONED',
+          },
+        });
+      }
+
       // 9. Create Default Settings
       const setting = await tx.organizationSetting.create({
         data: {
@@ -224,7 +293,10 @@ export class ProvisioningService {
         institutionId: institution.id,
         slug,
         licenseKey,
+        activationKey,
+        activationToken,
       };
     }, { timeout: 30000 });
   }
 }
+

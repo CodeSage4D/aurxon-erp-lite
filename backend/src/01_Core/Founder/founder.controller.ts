@@ -343,4 +343,162 @@ export class FounderController {
       storageStats,
     };
   }
+
+  // ─── Activation Key Engine ──────────────────────────────────────────────────
+
+  @Get('activation-keys')
+  async getActivationKeys(@Request() req) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    return this.prisma.activationKey.findMany({
+      include: {
+        registration: {
+          select: {
+            orgName: true,
+            email: true,
+            referenceNumber: true,
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  @Post('activation-keys/:id/revoke')
+  async revokeActivationKey(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    
+    const key = await this.prisma.activationKey.findUnique({ where: { id } });
+    if (!key) throw new NotFoundException('Activation key not found');
+
+    const updated = await this.prisma.activationKey.update({
+      where: { id },
+      data: { status: 'REVOKED' },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'KEY_REVOCATION',
+        details: `Activation key revoked for key ID: ${id}`,
+      }
+    });
+
+    return updated;
+  }
+
+  @Post('activation-keys/:id/suspend')
+  async suspendActivationKey(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    
+    const key = await this.prisma.activationKey.findUnique({ where: { id } });
+    if (!key) throw new NotFoundException('Activation key not found');
+
+    const updated = await this.prisma.activationKey.update({
+      where: { id },
+      data: { status: 'SUSPENDED' },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'KEY_SUSPENSION',
+        details: `Activation key suspended for key ID: ${id}`,
+      }
+    });
+
+    return updated;
+  }
+
+  @Post('activation-keys/:id/renew')
+  async renewActivationKey(@Request() req, @Param('id') id: string, @Body() body: { months: number }) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    
+    const key = await this.prisma.activationKey.findUnique({ where: { id } });
+    if (!key) throw new NotFoundException('Activation key not found');
+
+    const newExpiry = new Date(key.expiresAt);
+    newExpiry.setMonth(newExpiry.getMonth() + (body.months || 12));
+
+    const updated = await this.prisma.activationKey.update({
+      where: { id },
+      data: { 
+        status: 'ACTIVE',
+        expiresAt: newExpiry,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'KEY_RENEWAL',
+        details: `Activation key renewed for key ID: ${id}. New expiry: ${newExpiry.toISOString()}`,
+      }
+    });
+
+    return updated;
+  }
+
+  @Post('activation-keys/:id/regenerate')
+  async regenerateActivationKey(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    
+    const oldKey = await this.prisma.activationKey.findUnique({
+      where: { id },
+      include: { registration: true },
+    });
+    if (!oldKey) throw new NotFoundException('Activation key not found');
+
+    await this.prisma.activationKey.update({
+      where: { id },
+      data: { status: 'REVOKED' },
+    });
+
+    const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+    const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+    const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
+    const newRawKey = `AURX-ACT-${part1}-${part2}-${part3}`;
+    const keyHash = crypto.createHash('sha256').update(newRawKey).digest('hex');
+
+    await this.prisma.organizationRegistration.update({
+      where: { id: oldKey.registrationId },
+      data: {
+        status: 'PROVISIONED',
+      },
+    });
+
+    const created = await this.prisma.activationKey.create({
+      data: {
+        keyHash,
+        encryptedPackage: oldKey.encryptedPackage,
+        status: 'ACTIVE',
+        expiresAt: oldKey.expiresAt,
+        registrationId: oldKey.registrationId,
+        organizationId: oldKey.organizationId,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'KEY_REGENERATION',
+        details: `Regenerated activation key. Old ID: ${id}, New ID: ${created.id}`,
+      }
+    });
+
+    return {
+      newRawKey,
+      ...created,
+    };
+  }
 }
+

@@ -50,4 +50,29 @@ export class CreateRegistrationDto {
   @IsString({ each: true })
   @IsOptional()
   requestedFeatures?: string[];
+
+  @IsString()
+  @IsOptional()
+  adminName?: string;
+
+  @IsEmail()
+  @IsOptional()
+  adminEmail?: string;
+
+  @IsString()
+  @IsOptional()
+  adminPhone?: string;
+
+  @IsString()
+  @IsOptional()
+  adminPassword?: string;
+
+  @IsString()
+  @IsOptional()
+  logoUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  primaryColor?: string;
 }
+

@@ -13,7 +13,10 @@ import {
   getFounderMetricsCurrentApi, getFounderMetricsHistoryApi, getFounderStorageStatsApi,
   getSecurityThreatsApi, resolveSecurityThreatApi, getBackupRecordsApi, triggerBackupApi,
   founderGlobalSearchApi, impersonateOrganizationApi, getBillingStatsApi,
-  getPlanDefinitionsApi, createPlanDefinitionApi, getRbacMatrixApi, bulkUpdatePermissionsApi
+  getPlanDefinitionsApi, createPlanDefinitionApi, getRbacMatrixApi, bulkUpdatePermissionsApi,
+  getActivationKeysApi, revokeActivationKeyApi, suspendActivationKeyApi, renewActivationKeyApi, regenerateActivationKeyApi,
+  getRenewalRequestsApi, approveRenewalRequestApi, founderDirectRenewalApi,
+  technicalReviewRegistrationApi, provisionWorkspaceApi,
 } from '@/lib/api';
 
 import { 
@@ -40,6 +43,13 @@ export default function FounderDashboardPage() {
   const [billingStats, setBillingStats] = useState<any>(null);
   const [plans, setPlans] = useState<any[]>([]);
   const [rbacMatrix, setRbacMatrix] = useState<any>(null);
+  const [activationKeys, setActivationKeys] = useState<any[]>([]);
+  const [renewalRequests, setRenewalRequests] = useState<any[]>([]);
+  // Direct renewal state
+  const [directRenewalOrgId, setDirectRenewalOrgId] = useState('');
+  const [directRenewalMonths, setDirectRenewalMonths] = useState(12);
+  const [directRenewalNotes, setDirectRenewalNotes] = useState('');
+  const [directRenewalResult, setDirectRenewalResult] = useState<any>(null);
 
   // Impersonation state
   const [selectedImpersonateOrg, setSelectedImpersonateOrg] = useState('');
@@ -83,7 +93,7 @@ export default function FounderDashboardPage() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [regs, currMetrics, histMetrics, stor, threats, backups, bills, plns, rbac] = await Promise.all([
+      const [regs, currMetrics, histMetrics, stor, threats, backups, bills, plns, rbac, actKeys, renewals] = await Promise.all([
         getRegistrationsApi(),
         getFounderMetricsCurrentApi(),
         getFounderMetricsHistoryApi(12),
@@ -92,7 +102,9 @@ export default function FounderDashboardPage() {
         getBackupRecordsApi(),
         getBillingStatsApi(),
         getPlanDefinitionsApi(),
-        getRbacMatrixApi()
+        getRbacMatrixApi(),
+        getActivationKeysApi().catch(() => []),
+        getRenewalRequestsApi().catch(() => []),
       ]);
 
       setRegistrations(regs);
@@ -104,6 +116,8 @@ export default function FounderDashboardPage() {
       setBillingStats(bills);
       setPlans(plns);
       setRbacMatrix(rbac);
+      setActivationKeys(actKeys);
+      setRenewalRequests(renewals);
 
       if (rbac?.roles?.length > 0) {
         setSelectedMatrixRoleId(rbac.roles[0].id);
@@ -320,6 +334,8 @@ export default function FounderDashboardPage() {
             {[
               { id: 'overview', label: 'Platform Overview', icon: Activity },
               { id: 'registrations', label: 'Pending Approvals', count: registrations.filter(r => r.status === 'PENDING_REVIEW').length, icon: UserCheck },
+              { id: 'activation-keys', label: 'Activation Keys', count: activationKeys.filter((k: any) => k.status === 'ACTIVE').length, icon: KeyRound },
+              { id: 'renewals', label: 'Renewals Engine', count: renewalRequests.filter((r: any) => r.status === 'PENDING').length, icon: RefreshCw },
               { id: 'matrix', label: 'RBAC Policy Editor', icon: ShieldCheck },
               { id: 'security', label: 'Security threat logs', count: threatLogs.filter(t => !t.resolved).length, icon: ShieldAlert },
               { id: 'impersonate', label: 'Support Tunnel', icon: Play },
@@ -862,6 +878,141 @@ export default function FounderDashboardPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ════ ACTIVATION KEYS TAB ════ */}
+        {activeTab === 'activation-keys' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-slate-950/20 border border-slate-900 rounded-3xl p-6 shadow-lg space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-white">Activation Key Engine</h3>
+                  <p className="text-xs text-zinc-400 mt-1">Manage workspace activation keys. Revoke, suspend, or regenerate keys for any tenant.</p>
+                </div>
+                <button
+                  onClick={async () => { const keys = await getActivationKeysApi().catch(() => []); setActivationKeys(keys); triggerToast('Refreshed.'); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-zinc-300 hover:bg-slate-800 transition"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Refresh
+                </button>
+              </div>
+              {activationKeys.length === 0 ? (
+                <div className="text-center py-12 text-zinc-500 text-xs font-medium italic border border-dashed border-slate-800 rounded-2xl">
+                  No activation keys generated yet. Keys are created during workspace provisioning.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activationKeys.map((key: any) => {
+                    const sc: Record<string,string> = { ACTIVE: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10', USED: 'text-sky-400 border-sky-500/20 bg-sky-500/10', SUSPENDED: 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10', REVOKED: 'text-red-400 border-red-500/20 bg-red-500/10', EXPIRED: 'text-zinc-500 border-slate-700 bg-slate-700/20' };
+                    return (
+                      <div key={key.id} className="rounded-2xl border border-slate-900 bg-slate-950/30 p-5 space-y-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs font-black text-white">{key.registration?.orgName || '—'}</p>
+                            <p className="text-[10px] font-mono text-indigo-400">{key.registration?.referenceNumber || key.id}</p>
+                            <p className="text-[10px] text-zinc-400 font-semibold">Email: <span className="font-mono">{key.registration?.email || '—'}</span></p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${sc[key.status] || sc.ACTIVE}`}>{key.status}</span>
+                            <p className="text-[9px] text-zinc-500 font-mono">Exp: {new Date(key.expiresAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        {key.status !== 'USED' && (
+                          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-900">
+                            {key.status === 'ACTIVE' && (
+                              <button onClick={async () => { setSubmitting(true); try { await suspendActivationKeyApi(key.id); triggerToast('Suspended.'); setActivationKeys(await getActivationKeysApi()); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} className="px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-black text-yellow-400 hover:bg-yellow-500/20 transition">Suspend</button>
+                            )}
+                            {(key.status === 'ACTIVE' || key.status === 'SUSPENDED') && (
+                              <button onClick={async () => { setSubmitting(true); try { await revokeActivationKeyApi(key.id); triggerToast('Revoked.'); setActivationKeys(await getActivationKeysApi()); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-black text-red-400 hover:bg-red-500/20 transition">Revoke</button>
+                            )}
+                            <button onClick={async () => { setSubmitting(true); try { const r = await regenerateActivationKeyApi(key.id); triggerToast(`New Key: ${r.newRawKey}`); setActivationKeys(await getActivationKeysApi()); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-black text-indigo-400 hover:bg-indigo-500/20 transition">Regenerate</button>
+                            <button onClick={async () => { setSubmitting(true); try { await renewActivationKeyApi(key.id, 12); triggerToast('Extended +12mo.'); setActivationKeys(await getActivationKeysApi()); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black text-emerald-400 hover:bg-emerald-500/20 transition">+12 Months</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ════ RENEWALS ENGINE TAB ════ */}
+        {activeTab === 'renewals' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-slate-950/20 border border-slate-900 rounded-3xl p-6 shadow-lg space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-white">Renewal Requests Queue</h3>
+                  <p className="text-xs text-zinc-400 mt-1">Approve subscription renewal requests from organizations.</p>
+                </div>
+                <button onClick={async () => { setRenewalRequests(await getRenewalRequestsApi().catch(() => [])); triggerToast('Refreshed.'); }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-zinc-300 hover:bg-slate-800 transition"><RefreshCw className="h-3.5 w-3.5" /> Refresh</button>
+              </div>
+              {renewalRequests.length === 0 ? (
+                <div className="text-center py-10 text-zinc-500 text-xs italic border border-dashed border-slate-800 rounded-2xl">No renewal requests found.</div>
+              ) : (
+                <div className="space-y-3">
+                  {renewalRequests.map((req: any) => {
+                    const sc: Record<string,string> = { PENDING: 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10', APPROVED: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10', PROCESSED: 'text-sky-400 border-sky-500/20 bg-sky-500/10', REJECTED: 'text-red-400 border-red-500/20 bg-red-500/10' };
+                    return (
+                      <div key={req.id} className="rounded-2xl border border-slate-900 bg-slate-950/30 p-5 space-y-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs font-black text-white">{req.institution?.name || '—'}</p>
+                            <p className="text-[10px] font-mono text-indigo-400">{req.referenceNumber}</p>
+                            <p className="text-[10px] text-zinc-400 font-semibold">Duration: <span className="text-white font-black">{req.requestedMonths} months</span></p>
+                            {req.notes && <p className="text-[10px] text-zinc-500 italic">{req.notes}</p>}
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${sc[req.status] || sc.PENDING}`}>{req.status}</span>
+                            <p className="text-[9px] text-zinc-500 font-mono">{new Date(req.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        {req.status === 'PENDING' && (
+                          <div className="pt-1 border-t border-slate-900">
+                            <button onClick={async () => { setSubmitting(true); try { const r = await approveRenewalRequestApi(req.id); triggerToast(`Key: ${r.renewalKey}`); setRenewalRequests(await getRenewalRequestsApi()); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} className="px-4 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black text-emerald-400 hover:bg-emerald-500/20 transition">Approve & Generate Key</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Direct Renewal Override */}
+            <div className="bg-slate-950/20 border border-slate-900 rounded-3xl p-6 shadow-lg space-y-5">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-white">Direct Renewal Override</h3>
+                <p className="text-xs text-zinc-400 mt-1">Founder override: generate a renewal key for any organization directly.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Organization ID (UUID)</label>
+                  <input type="text" placeholder="Institution UUID" value={directRenewalOrgId} onChange={e => setDirectRenewalOrgId(e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs font-mono text-zinc-200 outline-none focus:border-indigo-500 transition" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Extension (months)</label>
+                  <input type="number" min={1} max={60} value={directRenewalMonths} onChange={e => setDirectRenewalMonths(parseInt(e.target.value)||12)} className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs font-mono text-zinc-200 outline-none focus:border-indigo-500 transition" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Notes (optional)</label>
+                <input type="text" placeholder="e.g. Complimentary renewal..." value={directRenewalNotes} onChange={e => setDirectRenewalNotes(e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5 text-xs text-zinc-200 outline-none focus:border-indigo-500 transition" />
+              </div>
+              {directRenewalResult && (
+                <div className="rounded-2xl bg-emerald-500/5 border border-emerald-500/20 p-4 space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Renewal Key Generated</p>
+                  <p className="text-sm font-mono font-black text-white">{directRenewalResult.renewalKey}</p>
+                  <p className="text-[10px] text-zinc-400 font-semibold">Ref: {directRenewalResult.referenceNumber} · New end: {directRenewalResult.newEndDate ? new Date(directRenewalResult.newEndDate).toLocaleDateString() : '—'}</p>
+                </div>
+              )}
+              <button onClick={async () => { if (!directRenewalOrgId.trim()) { triggerToast('Organization ID required'); return; } setSubmitting(true); setDirectRenewalResult(null); try { const r = await founderDirectRenewalApi(directRenewalOrgId, directRenewalMonths, directRenewalNotes||undefined); setDirectRenewalResult(r); triggerToast('Direct renewal key generated.'); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} disabled={submitting} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-black text-white shadow-lg transition disabled:opacity-60">
+                <KeyRound className="h-4 w-4" /> Generate Direct Renewal Key
+              </button>
             </div>
           </div>
         )}

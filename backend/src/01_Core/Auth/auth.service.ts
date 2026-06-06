@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
+import { decrypt } from '../../common/utils/crypto';
+
 
 const navCache = new Map<string, { data: any; timestamp: number }>();
 const switchCache = new Map<string, { data: any; timestamp: number }>();
@@ -585,4 +587,141 @@ export class AuthService {
       };
     });
   }
+
+  async validateActivationKey(referenceNumber: string, activationKey: string) {
+    const keyHash = crypto.createHash('sha256').update(activationKey.trim()).digest('hex');
+    const keyRecord = await this.prisma.activationKey.findUnique({
+      where: { keyHash },
+      include: { registration: true },
+    });
+
+    if (!keyRecord) {
+      throw new BadRequestException('Activation key is invalid or incorrect');
+    }
+
+    if (keyRecord.status === 'USED') {
+      throw new BadRequestException('Activation key has already been used');
+    }
+
+    if (keyRecord.status === 'REVOKED') {
+      throw new BadRequestException('Activation key has been revoked');
+    }
+
+    if (keyRecord.status === 'SUSPENDED') {
+      throw new BadRequestException('Activation key is suspended');
+    }
+
+    if (new Date() > keyRecord.expiresAt) {
+      await this.prisma.activationKey.update({
+        where: { id: keyRecord.id },
+        data: { status: 'EXPIRED' },
+      });
+      throw new BadRequestException('Activation key has expired');
+    }
+
+    if (keyRecord.registration.referenceNumber !== referenceNumber.trim()) {
+      throw new BadRequestException('Activation key does not match the provided reference number');
+    }
+
+    try {
+      const decrypted = decrypt(keyRecord.encryptedPackage);
+      return JSON.parse(decrypted);
+    } catch (err) {
+      throw new BadRequestException('Failed to decrypt activation package credentials');
+    }
+  }
+
+  async activateWorkspaceWithKey(referenceNumber: string, activationKey: string) {
+    const pkg = await this.validateActivationKey(referenceNumber, activationKey);
+
+    const keyHash = crypto.createHash('sha256').update(activationKey.trim()).digest('hex');
+    const keyRecord = await this.prisma.activationKey.findUnique({
+      where: { keyHash },
+      include: { registration: true },
+    });
+
+    const reg = keyRecord!.registration;
+
+    if (!reg.institutionId) {
+      throw new BadRequestException('Workspace is not yet technical-provisioned');
+    }
+
+    if (!reg.adminPasswordHash) {
+      throw new BadRequestException('Registration profile admin credentials missing');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Create the default Administrator user using wizard credentials
+      const user = await tx.user.create({
+        data: {
+          email: reg.email,
+          passwordHash: reg.adminPasswordHash!,
+          role: 'INSTITUTE_ADMIN',
+          institutionId: reg.institutionId!,
+          mustChangePassword: false,
+        },
+      });
+
+      // 2. Map to dynamic role
+      const adminRole = await tx.role.findFirst({
+        where: {
+          institutionId: reg.institutionId!,
+          code: 'INSTITUTE_ADMIN',
+        },
+      });
+
+      if (!adminRole) {
+        throw new BadRequestException('Default admin role not found for provisioned organization');
+      }
+
+      await tx.organizationMembership.create({
+        data: {
+          userId: user.id,
+          institutionId: reg.institutionId!,
+          roleId: adminRole.id,
+          status: 'ACTIVE',
+          isPrimary: true,
+        },
+      });
+
+      // 3. Mark Institution status to ACTIVE
+      await tx.institution.update({
+        where: { id: reg.institutionId! },
+        data: { status: 'ACTIVE' },
+      });
+
+      // 4. Mark key as USED
+      await tx.activationKey.update({
+        where: { id: keyRecord!.id },
+        data: {
+          status: 'USED',
+          usedAt: new Date(),
+        },
+      });
+
+      // 5. Shift registration status to LIVE
+      await tx.organizationRegistration.update({
+        where: { id: reg.id },
+        data: {
+          status: 'LIVE',
+        },
+      });
+
+      // 6. Record AuditLog
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'WORKSPACE_ACTIVATION',
+          details: `Workspace activated successfully for ${reg.orgName} using key (Ref: ${referenceNumber}).`,
+        },
+      });
+
+      return {
+        email: user.email,
+        orgName: reg.orgName,
+        status: 'LIVE',
+      };
+    });
+  }
 }
+

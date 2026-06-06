@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Database, HardDrive, RefreshCw, AlertTriangle, CheckCircle, 
-  Upload, Download, FileText, Activity, MessageSquare, Play, Plus, Clock, Info
+  Upload, Download, FileText, Activity, MessageSquare, Play, Plus, Clock, Info, KeyRound
 } from 'lucide-react';
 import { 
   getMonitoringMetricsApi, getSystemAlertsApi, runBackupApi, 
   runIntegritySweepApi, validateImportApi, createUatTicketApi, 
-  getUatTicketsApi, updateUatTicketStatusApi 
+  getUatTicketsApi, updateUatTicketStatusApi, getMyRenewalRequestsApi, submitRenewalRequestApi, applyRenewalKeyApi
 } from '@/lib/api';
 
 interface OperationsDashboardProps {
@@ -20,6 +20,13 @@ export default function OperationsDashboard({ triggerToast }: OperationsDashboar
   const [metrics, setMetrics] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
+
+  // Subscription state
+  const [subStatus, setSubStatus] = useState<any>(null);
+  const [renewalRequests, setRenewalRequests] = useState<any[]>([]);
+  const [renewalKeyInput, setRenewalKeyInput] = useState('');
+  const [applyingKey, setApplyingKey] = useState(false);
+  const [renewalMonths, setRenewalMonths] = useState(12);
 
   // CSV Import States
   const [csvInput, setCsvInput] = useState('');
@@ -36,14 +43,25 @@ export default function OperationsDashboard({ triggerToast }: OperationsDashboar
   const loadData = async () => {
     try {
       setLoading(true);
-      const [mRes, aRes, tRes] = await Promise.all([
+      const [mRes, aRes, tRes, renewals] = await Promise.all([
         getMonitoringMetricsApi(),
         getSystemAlertsApi(),
-        getUatTicketsApi()
+        getUatTicketsApi(),
+        getMyRenewalRequestsApi().catch(() => [])
       ]);
       setMetrics(mRes);
       setAlerts(aRes);
       setTickets(tRes);
+      setRenewalRequests(renewals);
+
+      // Read subscription from cached user
+      try {
+        const cached = localStorage.getItem('aurxon_user');
+        if (cached) {
+          const user = JSON.parse(cached);
+          if (user.subscription) setSubStatus(user.subscription);
+        }
+      } catch {}
     } catch (e: any) {
       console.error(e);
       triggerToast('Failed to load system operational data.');
@@ -146,7 +164,114 @@ export default function OperationsDashboard({ triggerToast }: OperationsDashboar
 
   return (
     <div className="space-y-6">
-      
+
+      {/* SUBSCRIPTION & LICENSE STATUS */}
+      <div className="rounded-2xl border border-border bg-card p-5 glass space-y-4">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-5 w-5 text-indigo-500" />
+          <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Subscription & License</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Status card */}
+          <div className="rounded-xl border border-border bg-input/20 p-4 space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Current Status</p>
+            <p className={`text-sm font-black ${
+              subStatus?.status === 'ACTIVE' ? 'text-emerald-500' :
+              subStatus?.status === 'EXPIRED' ? 'text-destructive' : 'text-amber-500'
+            }`}>
+              {subStatus?.status || 'UNKNOWN'}
+            </p>
+            {subStatus?.endDate && (() => {
+              const days = Math.ceil((new Date(subStatus.endDate).getTime() - Date.now()) / 86400000);
+              return (
+                <p className="text-[10px] text-muted-foreground font-semibold">
+                  {days > 0 ? `${days} days remaining` : 'Expired'} · Ends {new Date(subStatus.endDate).toLocaleDateString()}
+                </p>
+              );
+            })()}
+          </div>
+
+          {/* Apply Renewal Key */}
+          <div className="md:col-span-2 rounded-xl border border-border bg-input/20 p-4 space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Apply Renewal Key</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="AURX-REN-XXXX-XXXX-XXXX"
+                value={renewalKeyInput}
+                onChange={e => setRenewalKeyInput(e.target.value.toUpperCase())}
+                className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-xs font-mono font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              <button
+                onClick={async () => {
+                  if (!renewalKeyInput.trim()) { triggerToast('Please enter a renewal key'); return; }
+                  setApplyingKey(true);
+                  try {
+                    const result = await applyRenewalKeyApi(renewalKeyInput.trim());
+                    triggerToast(`Renewal applied! New expiry: ${new Date(result.newEndDate).toLocaleDateString()}`);
+                    setRenewalKeyInput('');
+                    await loadData();
+                  } catch (err: any) {
+                    triggerToast(err.message || 'Failed to apply renewal key');
+                  } finally {
+                    setApplyingKey(false);
+                  }
+                }}
+                disabled={applyingKey}
+                className="px-4 py-2 rounded-xl bg-primary text-xs font-black text-primary-foreground hover:bg-primary/90 transition disabled:opacity-60"
+              >
+                {applyingKey ? 'Applying…' : 'Apply'}
+              </button>
+            </div>
+
+            {/* Request Renewal */}
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={renewalMonths}
+                onChange={e => setRenewalMonths(parseInt(e.target.value) || 12)}
+                className="w-20 rounded-xl border border-border bg-card px-3 py-2 text-xs font-mono font-semibold outline-none focus:border-primary transition"
+              />
+              <span className="text-[10px] text-muted-foreground font-semibold">months</span>
+              <button
+                onClick={async () => {
+                  try {
+                    await submitRenewalRequestApi(renewalMonths);
+                    triggerToast('Renewal request submitted. The platform team will generate your renewal key.');
+                    await loadData();
+                  } catch (err: any) {
+                    triggerToast(err.message || 'Failed to submit renewal request');
+                  }
+                }}
+                className="ml-auto px-3 py-1.5 rounded-xl border border-border bg-card text-[10px] font-black text-foreground hover:bg-muted transition"
+              >
+                Request Renewal
+              </button>
+            </div>
+
+            {/* My Renewal Requests */}
+            {renewalRequests.length > 0 && (
+              <div className="space-y-1 pt-1 border-t border-border/40">
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Recent Renewal Requests</p>
+                {renewalRequests.slice(0, 3).map((req: any) => (
+                  <div key={req.id} className="flex items-center justify-between text-[10px] font-semibold">
+                    <span className="font-mono text-muted-foreground">{req.referenceNumber}</span>
+                    <span className="text-muted-foreground">{req.requestedMonths}mo</span>
+                    <span className={`font-black ${
+                      req.status === 'PROCESSED' ? 'text-emerald-500' :
+                      req.status === 'APPROVED' ? 'text-sky-500' :
+                      req.status === 'PENDING' ? 'text-amber-500' : 'text-muted-foreground'
+                    }`}>{req.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* HEADER SECTION */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>

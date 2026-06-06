@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { StudentService } from './student.service';
 import { PrismaService } from '../../01_Core/prisma/prisma.service';
 import { encrypt } from '../../common/helpers/encryption.helper';
+import { SubscriptionLimitService } from '../../01_Core/Operations/subscription-limit.service';
+import { AuditLogService } from '../../01_Core/AuditLogs/audit-log.service';
 
 // Ensure the encryption key is defined for the tests
 process.env.BACKEND_ENCRYPTION_KEY = '12345678901234567890123456789012';
@@ -26,6 +28,14 @@ describe('StudentService (PII Encryption & Masking)', () => {
     $transaction: jest.fn((cb) => cb(mockPrismaService)),
   };
 
+  const mockSubscriptionLimitService = {
+    checkLimits: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockAuditLogService = {
+    logAction: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -33,6 +43,14 @@ describe('StudentService (PII Encryption & Masking)', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: SubscriptionLimitService,
+          useValue: mockSubscriptionLimitService,
+        },
+        {
+          provide: AuditLogService,
+          useValue: mockAuditLogService,
         },
       ],
     }).compile();

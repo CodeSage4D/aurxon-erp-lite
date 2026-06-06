@@ -3959,6 +3959,24 @@ export async function submitSetupApi(data: any) {
   }
 }
 
+export async function saveSetupDraftApi(step: number, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/setup/save-draft`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ step, data }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to save setup draft');
+    }
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Backend save-draft offline, simulating locally...');
+    return { success: true };
+  }
+}
+
 // =========================================================================
 // SaaS Control Plane: Custom Organization Configurations
 // =========================================================================
@@ -4544,6 +4562,203 @@ export async function getTeamsDashboardStatsApi() {
 export async function getTeamsMemberProfileApi() {
   const res = await fetch(`${API_URL}/founder/team-member`, { headers: getHeaders() });
   if (!res.ok) throw new Error('Failed to fetch team member profile');
+  return await res.json();
+}
+
+// ─── Activation Key Management (Founder) ─────────────────────────────────────
+
+export async function getActivationKeysApi() {
+  const res = await fetch(`${API_URL}/founder/activation-keys`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch activation keys');
+  return await res.json();
+}
+
+export async function revokeActivationKeyApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/revoke`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to revoke activation key');
+  }
+  return await res.json();
+}
+
+export async function suspendActivationKeyApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/suspend`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to suspend activation key');
+  }
+  return await res.json();
+}
+
+export async function renewActivationKeyApi(id: string, months: number) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/renew`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ months }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to renew activation key');
+  }
+  return await res.json();
+}
+
+export async function regenerateActivationKeyApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/regenerate`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to regenerate activation key');
+  }
+  return await res.json();
+}
+
+// ─── Workspace Activation with Key ───────────────────────────────────────────
+
+export async function verifyActivationKeyApi(referenceNumber: string, activationKey: string) {
+  const res = await fetch(`${API_URL}/auth/activate/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ referenceNumber, activationKey }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Activation verification failed');
+  }
+  return await res.json();
+}
+
+// ─── Registration Workflow Extensions ────────────────────────────────────────
+
+export async function registerOrganizationWithAdminApi(data: {
+  orgName: string;
+  orgType: string;
+  orgSize: string;
+  industryPackCode: string;
+  email: string;
+  phone: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  expectedUsers?: number;
+  requestedModules: string[];
+  requestedFeatures: string[];
+  adminName?: string;
+  adminPassword: string;
+  logoUrl?: string;
+  primaryColor?: string;
+}) {
+  const res = await fetch(`${API_URL}/registrations/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Registration failed. Please try again.');
+  }
+  return await res.json();
+}
+
+export async function technicalReviewRegistrationApi(id: string, notes?: string) {
+  const res = await fetch(`${API_URL}/registrations/${id}/technical-review`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Technical review failed');
+  }
+  return await res.json();
+}
+
+export async function provisionWorkspaceApi(id: string) {
+  const res = await fetch(`${API_URL}/registrations/${id}/provision`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Workspace provisioning failed');
+  }
+  return await res.json();
+}
+
+// ─── Subscription Renewals ────────────────────────────────────────────────────
+
+export async function getRenewalRequestsApi(status?: string) {
+  const url = status
+    ? `${API_URL}/renewals?status=${encodeURIComponent(status)}`
+    : `${API_URL}/renewals`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch renewal requests');
+  return await res.json();
+}
+
+export async function approveRenewalRequestApi(id: string) {
+  const res = await fetch(`${API_URL}/renewals/${id}/approve`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to approve renewal request');
+  }
+  return await res.json();
+}
+
+export async function founderDirectRenewalApi(institutionId: string, months: number, notes?: string) {
+  const res = await fetch(`${API_URL}/renewals/direct/${institutionId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ months, notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to generate direct renewal key');
+  }
+  return await res.json();
+}
+
+export async function submitRenewalRequestApi(months: number, notes?: string) {
+  const res = await fetch(`${API_URL}/renewals/request`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ months, notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to submit renewal request');
+  }
+  return await res.json();
+}
+
+export async function applyRenewalKeyApi(renewalKey: string) {
+  const res = await fetch(`${API_URL}/renewals/apply`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ renewalKey }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to apply renewal key');
+  }
+  return await res.json();
+}
+
+export async function getMyRenewalRequestsApi() {
+  const res = await fetch(`${API_URL}/renewals/my-requests`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch renewal requests');
   return await res.json();
 }
 
