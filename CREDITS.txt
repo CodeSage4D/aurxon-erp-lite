@@ -1,0 +1,38 @@
+AURXON PLATFORM OS - CREDITS
+
+================================================================================
+PROJECT DETAILS
+================================================================================
+Project:                       AURXON Platform OS
+Core Platform Vision:          Aurxon
+Founder & Chief Visionary:     Karan Mishra
+
+================================================================================
+DEVELOPMENT & ENGINEERING
+================================================================================
+Lead Development:             Aurxon Engineering Team
+
+AI Assisted Development:       Antigravity (Google DeepMind Advanced Agentic Coding)
+                               - Platform Architecture Specifications
+                               - Enterprise Product Strategy
+                               - Technical Database & Security Design
+                               - Documentation and Product Bible Authoring
+                               - Active Bug Resolution & Test Automation Implementation
+
+================================================================================
+MAJOR SPRINT MILESTONES
+================================================================================
+- Phase 1.0: Student Management Foundation (Completed & Accepted)
+  - Unified core DB architecture setup, tenant isolation, basic RBAC, and gateway routing.
+
+- Phase 1.1: Student Operations Layer (Completed & Accepted)
+  - Student directory, multi-page profile views, timeline tracking, and document archive support.
+
+- Phase 2.0: Platform Productization & Stabilization Sprint (Active Sprint Release)
+  - Implemented the Zero-Flash Auth Shield.
+  - Standardized UI/UX themes: replaced bright gradients with Minimal slate/indigo style.
+  - Hardened Multi-Tenant Data Boundaries, Founder privacy impersonation workflows, and Industry Pack gating.
+  - Automated Platform Validation suite covering 17 end-to-end integration scenarios.
+
+Last Update: June 6, 2026
+Released under licensing guidelines of Aurxon.

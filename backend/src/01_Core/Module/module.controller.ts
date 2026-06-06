@@ -24,10 +24,13 @@ export class ModuleController {
   @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
   async toggleModule(
     @Request() req: any,
-    @Body() body: { moduleCode: string; isEnabled: boolean },
+    @Body() body: { moduleCode: string; isEnabled: boolean; organizationId?: string },
   ) {
+    const orgId = (req.user.role === 'SUPER_ADMIN' && body.organizationId)
+      ? body.organizationId
+      : req.user.organizationId;
     return this.moduleService.toggleModule(
-      req.user.organizationId,
+      orgId,
       req.user.id,
       body.moduleCode,
       body.isEnabled,
@@ -50,10 +53,13 @@ export class ModuleController {
   @Roles('SUPER_ADMIN', 'INSTITUTE_ADMIN')
   async toggleFeature(
     @Request() req: any,
-    @Body() body: { featureCode: string; isEnabled: boolean },
+    @Body() body: { featureCode: string; isEnabled: boolean; organizationId?: string },
   ) {
+    const orgId = (req.user.role === 'SUPER_ADMIN' && body.organizationId)
+      ? body.organizationId
+      : req.user.organizationId;
     return this.moduleService.toggleFeature(
-      req.user.organizationId,
+      orgId,
       req.user.id,
       body.featureCode,
       body.isEnabled,

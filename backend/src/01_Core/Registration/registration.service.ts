@@ -47,6 +47,9 @@ export class RegistrationService {
         state: dto.state,
         expectedUsers: dto.expectedUsers || 50,
         requestedModules: dto.requestedModules || [],
+        industryPackCode: dto.industryPackCode || 'SCHOOL_ERP',
+        orgSize: dto.orgSize || 'SMALL',
+        requestedFeatures: dto.requestedFeatures || [],
         status: 'PENDING_REVIEW',
       },
     });

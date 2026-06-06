@@ -3,6 +3,7 @@ import { PlatformMetricsService } from './platform-metrics.service';
 import { JwtAuthGuard } from '../Auth/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { BillingService } from '../Billing/billing.service';
 import * as crypto from 'crypto';
 
 @UseGuards(JwtAuthGuard)
@@ -12,30 +13,68 @@ export class FounderController {
     private metricsService: PlatformMetricsService,
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private billingService: BillingService,
   ) {}
 
-  private verifyFounder(role: string) {
-    if (role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Only platform founders have access to the Command Center');
+  /**
+   * Helper to verify if user is an authorized internal team member with allowed roles.
+   */
+  private async verifyTeamMember(userId: string, allowedRoles: string[] = ['*']) {
+    const member = await this.prisma.aurxonTeamMember.findUnique({
+      where: { userId }
+    });
+
+    if (!member) {
+      throw new ForbiddenException('Access denied: User is not an authorized Aurxon team member.');
     }
+
+    if (!allowedRoles.includes('*') && !allowedRoles.includes(member.role)) {
+      throw new ForbiddenException(`Access denied: Team role ${member.role} is not authorized for this operation.`);
+    }
+
+    return member;
+  }
+
+  @Get('team-member')
+  async getTeamMember(@Request() req) {
+    return this.verifyTeamMember(req.user.id);
+  }
+
+  @Get('packs')
+  async getIndustryPacks(@Request() req) {
+    await this.verifyTeamMember(req.user.id);
+    return this.prisma.industryPack.findMany({
+      where: { isActive: true }
+    });
   }
 
   @Get('metrics/current')
   async getCurrentMetrics(@Request() req) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'SALES_MANAGER', 
+      'CUSTOMER_SUCCESS_MANAGER', 'FINANCE_MANAGER'
+    ]);
     return this.metricsService.getLatestMetrics();
   }
 
   @Get('metrics/history')
   async getMetricsHistory(@Request() req, @Query('limit') limit?: string) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'SALES_MANAGER', 
+      'CUSTOMER_SUCCESS_MANAGER', 'FINANCE_MANAGER'
+    ]);
     const lim = limit ? parseInt(limit, 10) : 12;
     return this.metricsService.getMetricsHistory(lim);
   }
 
   @Get('metrics/storage')
   async getStorageStats(@Request() req) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'CUSTOMER_SUCCESS_MANAGER'
+    ]);
     return this.metricsService.getStorageStats();
   }
 
@@ -43,20 +82,10 @@ export class FounderController {
 
   @Get('security/threats')
   async getSecurityThreats(@Request() req) {
-    this.verifyFounder(req.user.role);
-    
-    // Auto-create dummy threat logs if empty so dashboard shows activity
-    const count = await this.prisma.securityThreatLog.count();
-    if (count === 0) {
-      await this.prisma.securityThreatLog.createMany({
-        data: [
-          { threatType: 'BRUTE_FORCE', severity: 'HIGH', ipAddress: '198.51.100.42', details: '12 failed login attempts on admin@school.com from suspicious geolocation (RU)', resolved: false },
-          { threatType: 'SUSPICIOUS_IP', severity: 'MEDIUM', ipAddress: '203.0.113.111', details: 'Rapid API request spike detected on /students roster endpoints without cached validation', resolved: true, resolvedAt: new Date() },
-          { threatType: 'PERMISSION_ESCALATION', severity: 'CRITICAL', ipAddress: '127.0.0.1', details: 'Attempted role change assignment on membership context path by unauthorized account', resolved: false },
-        ]
-      });
-    }
-
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'SUPPORT_MANAGER'
+    ]);
     return this.prisma.securityThreatLog.findMany({
       orderBy: { createdAt: 'desc' },
     });
@@ -64,7 +93,10 @@ export class FounderController {
 
   @Patch('security/threats/:id/resolve')
   async resolveThreat(@Request() req, @Param('id') id: string) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'SUPPORT_MANAGER'
+    ]);
     const threat = await this.prisma.securityThreatLog.findUnique({ where: { id } });
     if (!threat) {
       throw new NotFoundException('Threat log entry not found');
@@ -82,22 +114,10 @@ export class FounderController {
 
   @Get('backup/records')
   async getBackupRecords(@Request() req) {
-    this.verifyFounder(req.user.role);
-
-    const count = await this.prisma.backupRecord.count();
-    if (count === 0) {
-      await this.prisma.backupRecord.create({
-        data: {
-          backupType: 'SYSTEM',
-          status: 'COMPLETED',
-          sizeGb: 1.45,
-          storedAt: 's3://aurxon-backups/system/backup-2026-06-01.tar.gz',
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          notes: 'Automated weekly database system backup.',
-        }
-      });
-    }
-
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'SUPPORT_MANAGER'
+    ]);
     return this.prisma.backupRecord.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -108,7 +128,10 @@ export class FounderController {
 
   @Post('backup/trigger')
   async triggerBackup(@Request() req, @Body() body: { notes?: string }) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 
+      'TECHNICAL_ADMINISTRATOR', 'SUPPORT_MANAGER'
+    ]);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days retention
@@ -121,7 +144,7 @@ export class FounderController {
         storedAt: `s3://aurxon-backups/system/manual-backup-${Date.now()}.tar.gz`,
         expiresAt,
         triggeredById: req.user.id,
-        notes: body.notes || 'Manual backup initiated by Founder.',
+        notes: body.notes || 'Manual backup initiated by Founder Admin.',
       },
     });
 
@@ -144,14 +167,14 @@ export class FounderController {
 
   @Get('search')
   async globalSearch(@Request() req, @Query('q') q: string) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id);
     if (!q || q.trim().length < 2) {
       return [];
     }
 
     const query = q.trim().toLowerCase();
 
-    // 1. Search organizations
+    // Search organizations
     const orgs = await this.prisma.institution.findMany({
       where: {
         name: { contains: query, mode: 'insensitive' },
@@ -159,7 +182,7 @@ export class FounderController {
       take: 5,
     });
 
-    // 2. Search user logins
+    // Search user logins
     const users = await this.prisma.user.findMany({
       where: {
         email: { contains: query, mode: 'insensitive' },
@@ -175,7 +198,7 @@ export class FounderController {
         id: org.id,
         label: org.name,
         sublabel: `Institution Code: ${org.id.slice(0, 8)}`,
-        href: `/founder?tab=orgs&id=${org.id}`,
+        href: `/teams/dashboard?tab=orgs&id=${org.id}`,
       });
     }
 
@@ -185,7 +208,7 @@ export class FounderController {
         id: u.id,
         label: u.email,
         sublabel: `Role: ${u.role} · Institution ID: ${u.institutionId.slice(0, 8)}`,
-        href: `/founder?tab=orgs&id=${u.institutionId}`,
+        href: `/teams/dashboard?tab=orgs&id=${u.institutionId}`,
       });
     }
 
@@ -200,7 +223,9 @@ export class FounderController {
     @Param('institutionId') institutionId: string,
     @Body() body: { reason: string; supportTicketRef?: string },
   ) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'SUPPORT_MANAGER'
+    ]);
 
     if (!body.reason || body.reason.trim().length < 5) {
       throw new ForbiddenException('A valid reason is required to launch support impersonation sessions');
@@ -213,7 +238,6 @@ export class FounderController {
       throw new NotFoundException('Target organization not found');
     }
 
-    // Generate short-lived impersonation token (15 mins duration)
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
@@ -227,17 +251,16 @@ export class FounderController {
       },
     });
 
-    // Lookup targeted Admin user or primary context roles
     const adminUser = await this.prisma.user.findFirst({
       where: { institutionId, role: 'INSTITUTE_ADMIN' },
     });
 
     const impersonationPayload = {
-      sub: adminUser?.id || req.user.id, // Act as target admin or founder in context
+      sub: adminUser?.id || req.user.id,
       email: adminUser?.email || req.user.email,
       organizationId: institutionId,
       role: 'INSTITUTE_ADMIN',
-      permissions: ['student:profile:read', 'attendance:records:read', 'exams:setup:read', 'finance:ledger:read', 'organization:settings:read'], // Read-only matrix
+      permissions: ['student:profile:read', 'attendance:records:read', 'exams:setup:read', 'finance:ledger:read', 'organization:settings:read'],
       enabledModules: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'],
       isImpersonation: true,
       originalFounderId: req.user.id,
@@ -245,7 +268,7 @@ export class FounderController {
 
     const token = this.jwtService.sign(impersonationPayload, {
       secret: process.env.JWT_SECRET || 'super-secret-aurxon-jwt-key-2026-lite-erp',
-      expiresIn: '15m', // Valid for exactly 15 minutes
+      expiresIn: '15m',
     });
 
     return {
@@ -258,19 +281,9 @@ export class FounderController {
 
   @Get('plans')
   async getPlans(@Request() req) {
-    this.verifyFounder(req.user.role);
-    
-    const count = await this.prisma.planDefinition.count();
-    if (count === 0) {
-      await this.prisma.planDefinition.createMany({
-        data: [
-          { code: 'STARTER', name: 'Starter Plan', monthlyPrice: 4999, studentLimit: 250, storageLimitGb: 5, moduleAccess: ['STUDENT_MANAGEMENT', 'ATTENDANCE'] },
-          { code: 'PROFESSIONAL', name: 'Professional Plan', monthlyPrice: 9999, studentLimit: 1000, storageLimitGb: 20, moduleAccess: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION'] },
-          { code: 'ENTERPRISE', name: 'Enterprise Contract', monthlyPrice: 24999, studentLimit: 5000, storageLimitGb: 100, moduleAccess: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'] },
-        ]
-      });
-    }
-
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'PRODUCT_MANAGER', 'FINANCE_MANAGER'
+    ]);
     return this.prisma.planDefinition.findMany();
   }
 
@@ -279,7 +292,9 @@ export class FounderController {
     @Request() req,
     @Body() body: { code: string; name: string; monthlyPrice: number; studentLimit: number; storageLimitGb: number; moduleAccess: string[] },
   ) {
-    this.verifyFounder(req.user.role);
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'PRODUCT_MANAGER'
+    ]);
     return this.prisma.planDefinition.create({
       data: {
         code: body.code.toUpperCase(),
@@ -290,5 +305,42 @@ export class FounderController {
         moduleAccess: body.moduleAccess,
       }
     });
+  }
+
+  // ─── Dynamic Dashboard Layout for Team Members ──────────────────────────────
+
+  @Get('dashboard/layout')
+  async getTeamDashboardLayout(@Request() req) {
+    const member = await this.verifyTeamMember(req.user.id);
+    return this.metricsService.getTeamDashboardLayoutJSON(member.role);
+  }
+
+  @Get('dashboard/stats')
+  async getTeamDashboardStats(@Request() req) {
+    const member = await this.verifyTeamMember(req.user.id);
+    
+    // Aggregate platform metrics, registrations, storage status, threats and billing data
+    const basicMetrics = await this.metricsService.getLatestMetrics();
+    const billing = await this.billingService.getFounderBillingStats();
+    
+    const totalOrganizations = await this.prisma.institution.count();
+    const activeOrganizations = await this.prisma.institution.count({ where: { status: 'ACTIVE' } });
+    const industryPacksCount = await this.prisma.industryPack.count({ where: { isActive: true } });
+    const registrationsCount = await this.prisma.organizationRegistration.count({ where: { status: 'PENDING_REVIEW' } });
+    const threatsCount = await this.prisma.securityThreatLog.count({ where: { resolved: false } });
+    const storageStats = await this.metricsService.getStorageStats();
+
+    return {
+      metrics: basicMetrics,
+      billing,
+      overview: {
+        totalOrganizations,
+        activeOrganizations,
+        industryPacksCount,
+        registrationsCount,
+        threatsCount,
+      },
+      storageStats,
+    };
   }
 }

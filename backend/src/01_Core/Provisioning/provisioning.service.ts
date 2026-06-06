@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class ProvisioningService {
@@ -49,6 +50,15 @@ export class ProvisioningService {
       throw new BadRequestException('Organization has already been provisioned');
     }
 
+    // Load Industry Pack configuration
+    const packCode = registration.industryPackCode || 'SCHOOL_ERP';
+    const pack = await this.prisma.industryPack.findUnique({
+      where: { code: packCode }
+    });
+    if (!pack) {
+      throw new BadRequestException(`Industry pack ${packCode} not found in catalog.`);
+    }
+
     const slug = await this.generateUniqueSlug(registration.orgName);
 
     return await this.prisma.$transaction(async (tx) => {
@@ -70,6 +80,7 @@ export class ProvisioningService {
           orgType: registration.orgType,
           status: 'ACTIVE',
           primaryColor: '#0284c7', // sky-600 default
+          industryPackCode: pack.code,
         },
       });
 
@@ -80,87 +91,82 @@ export class ProvisioningService {
       });
 
       // 4. Create default Roles
-      const defaultRoles = [
-        { code: 'SUPER_ADMIN', name: 'Super Admin', isSystem: true },
-        { code: 'INSTITUTE_ADMIN', name: 'Institute Admin', isSystem: true },
-        { code: 'PRINCIPAL', name: 'Principal', isSystem: true },
-        { code: 'TEACHER', name: 'Teacher', isSystem: true },
-        { code: 'STAFF', name: 'Staff', isSystem: true },
-        { code: 'ACCOUNTANT', name: 'Accountant', isSystem: true },
-        { code: 'STUDENT', name: 'Student', isSystem: true },
-        { code: 'PARENT', name: 'Parent / Guardian', isSystem: true },
+      const defaultRoles = (pack.defaultRoles as any[]) || [
+        { roleCode: 'SUPER_ADMIN', roleName: 'Super Admin' },
+        { roleCode: 'INSTITUTE_ADMIN', roleName: 'Institute Admin' }
       ];
 
       const roles: Record<string, string> = {};
       for (const roleDef of defaultRoles) {
         const role = await tx.role.create({
           data: {
-            name: roleDef.name,
-            code: roleDef.code,
-            isSystem: roleDef.isSystem,
+            name: roleDef.roleName,
+            code: roleDef.roleCode,
+            isSystem: true,
             institutionId: institution.id,
           },
         });
-        roles[roleDef.code] = role.id;
+        roles[roleDef.roleCode] = role.id;
       }
 
       // 5. Seed default permissions for roles
-      const defaultPermissions = [
-        // INSTITUTE_ADMIN gets CRUD permissions on all student, finance, exams, and attendance logs
-        { roleCode: 'INSTITUTE_ADMIN', resource: 'student:profile', action: 'CRUD' },
-        { roleCode: 'INSTITUTE_ADMIN', resource: 'finance:ledger', action: 'CRUD' },
-        { roleCode: 'INSTITUTE_ADMIN', resource: 'exams:setup', action: 'CRUD' },
-        { roleCode: 'INSTITUTE_ADMIN', resource: 'attendance:records', action: 'CRUD' },
-        { roleCode: 'INSTITUTE_ADMIN', resource: 'organization:settings', action: 'CRUD' },
-
-        // PRINCIPAL gets similar broad permissions
-        { roleCode: 'PRINCIPAL', resource: 'student:profile', action: 'CRUD' },
-        { roleCode: 'PRINCIPAL', resource: 'exams:setup', action: 'CRUD' },
-        { roleCode: 'PRINCIPAL', resource: 'attendance:records', action: 'CRUD' },
-        { roleCode: 'PRINCIPAL', resource: 'finance:ledger', action: 'READ' },
-
-        // TEACHER gets read permissions for profiles, CRUD for attendance/exams
-        { roleCode: 'TEACHER', resource: 'student:profile', action: 'READ' },
-        { roleCode: 'TEACHER', resource: 'attendance:records', action: 'CRUD' },
-        { roleCode: 'TEACHER', resource: 'exams:setup', action: 'CRUD' },
-
-        // STAFF gets read on students and write on attendance
-        { roleCode: 'STAFF', resource: 'student:profile', action: 'READ' },
-        { roleCode: 'STAFF', resource: 'attendance:records', action: 'CRUD' },
-
-        // ACCOUNTANT gets CRUD finance
-        { roleCode: 'ACCOUNTANT', resource: 'finance:ledger', action: 'CRUD' },
-        { roleCode: 'ACCOUNTANT', resource: 'student:profile', action: 'READ' },
-      ];
-
-      for (const p of defaultPermissions) {
-        const roleId = roles[p.roleCode];
-        if (roleId) {
-          await tx.permission.create({
-            data: {
+      const permissionsTemplate = (pack.defaultPermissions as Record<string, any[]>) || {};
+      const permissionDataList: any[] = [];
+      for (const [roleCode, perms] of Object.entries(permissionsTemplate)) {
+        const roleId = roles[roleCode];
+        if (roleId && Array.isArray(perms)) {
+          for (const p of perms) {
+            permissionDataList.push({
               roleId,
               resource: p.resource,
               action: p.action,
-            },
+            });
+          }
+        }
+      }
+      if (permissionDataList.length > 0) {
+        await tx.permission.createMany({
+          data: permissionDataList,
+        });
+      }
+
+      // 6. Activate default modules for pack + requested modules
+      const modulesToEnable = Array.from(
+        new Set([...(pack.defaultModules || []), ...(registration.requestedModules || [])]),
+      );
+
+      if (modulesToEnable.length > 0) {
+        const modulesInDb = await tx.module.findMany({
+          where: { code: { in: modulesToEnable } },
+          select: { code: true }
+        });
+        const validModuleCodes = modulesInDb.map(m => m.code);
+        if (validModuleCodes.length > 0) {
+          await tx.organizationModule.createMany({
+            data: validModuleCodes.map(mCode => ({
+              organizationId: institution.id,
+              moduleCode: mCode,
+              isEnabled: true,
+            })),
           });
         }
       }
 
-      // 6. Activate Requested Modules
-      // Ensure STUDENT_MANAGEMENT is always enabled as foundation module
-      const modulesToEnable = Array.from(
-        new Set(['STUDENT_MANAGEMENT', ...(registration.requestedModules || [])]),
-      );
-
-      for (const mCode of modulesToEnable) {
-        const module = await tx.module.findUnique({ where: { code: mCode } });
-        if (module) {
-          await tx.organizationModule.create({
-            data: {
+      // 6.5 Activate requested features
+      const featuresToEnable = registration.requestedFeatures || [];
+      if (featuresToEnable.length > 0) {
+        const featuresInDb = await tx.feature.findMany({
+          where: { code: { in: featuresToEnable } },
+          select: { code: true }
+        });
+        const validFeatureCodes = featuresInDb.map(f => f.code);
+        if (validFeatureCodes.length > 0) {
+          await tx.organizationFeature.createMany({
+            data: validFeatureCodes.map(fCode => ({
               organizationId: institution.id,
-              moduleCode: mCode,
+              featureCode: fCode,
               isEnabled: true,
-            },
+            })),
           });
         }
       }
@@ -183,10 +189,7 @@ export class ProvisioningService {
       });
 
       // 8. Create Trial License
-      const licenseKey = `LIC-TRIAL-${slug.toUpperCase()}-${Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase()}`;
+      const licenseKey = `LIC-TRIAL-${slug.toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
       await tx.license.create({
         data: {
@@ -222,6 +225,6 @@ export class ProvisioningService {
         slug,
         licenseKey,
       };
-    });
+    }, { timeout: 30000 });
   }
 }

@@ -1,9 +1,12 @@
 import { Controller, Get, Post, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../../01_Core/Auth/roles.guard';
+import { ModuleActiveGuard } from '../../01_Core/Auth/module-active.guard';
+import { ModuleActive } from '../../01_Core/Auth/module-active.decorator';
 import { AttendanceService } from './attendance.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleActiveGuard, RolesGuard)
+@ModuleActive('ATTENDANCE')
 @Controller('attendance')
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}

@@ -1,9 +1,12 @@
 import { Controller, Get, Post, Delete, Body, Query, UseGuards, Request, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../../01_Core/Auth/roles.guard';
+import { ModuleActiveGuard } from '../../01_Core/Auth/module-active.guard';
+import { ModuleActive } from '../../01_Core/Auth/module-active.decorator';
 import { FeeService } from './fee.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ModuleActiveGuard, RolesGuard)
+@ModuleActive('FINANCE')
 @Controller('fees')
 export class FeeController {
   constructor(private feeService: FeeService) {}

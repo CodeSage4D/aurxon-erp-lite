@@ -10,6 +10,8 @@ import * as argon2 from 'argon2';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export const studentListCache = new Map<string, { data: any; timestamp: number }>();
+
 @Injectable()
 export class StudentService {
   constructor(
@@ -89,6 +91,12 @@ export class StudentService {
     sortBy: string = 'rollNumber',
     sortOrder: 'asc' | 'desc' = 'asc',
   ) {
+    const cacheKey = `${institutionId}-${classId || ''}-${search || ''}-${requesterRole || ''}-${requesterProfileId || ''}-${status || ''}-${page}-${limit}-${sortBy}-${sortOrder}`;
+    const cached = studentListCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < 5000) {
+      return cached.data;
+    }
+
     const where: any = { institutionId };
 
     // Default: exclude archived unless explicitly filtered
@@ -143,13 +151,16 @@ export class StudentService {
 
     const totalPages = Math.ceil(total / limitNum);
 
-    return {
+    const result = {
       students: this.processSensitiveFieldsList(students, requesterRole),
       total,
       page: pageNum,
       limit: limitNum,
       totalPages,
     };
+
+    studentListCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
   }
 
   async findOne(
@@ -211,6 +222,7 @@ export class StudentService {
   }
 
   async create(institutionId: string, data: any, creatorUserId?: string) {
+    studentListCache.clear();
     // 0. Check subscription limits (Requirement 6)
     await this.subscriptionLimitService.checkLimits(institutionId, 'STUDENTS');
 
@@ -385,6 +397,7 @@ export class StudentService {
   }
 
   async update(institutionId: string, id: string, data: any, updaterUserId?: string) {
+    studentListCache.clear();
     const student = await this.prisma.student.findFirst({
       where: { id, institutionId },
     });
@@ -486,6 +499,7 @@ export class StudentService {
   }
 
   async promote(institutionId: string, data: { studentIds: string[]; targetClassId: string }, promotedById?: string) {
+    studentListCache.clear();
     return this.prisma.$transaction(async (tx) => {
       const targetClass = await tx.class.findUnique({
         where: { id: data.targetClassId },
@@ -583,6 +597,7 @@ export class StudentService {
   }
 
   async remove(institutionId: string, id: string, archiverUserId?: string) {
+    studentListCache.clear();
     const student = await this.prisma.student.findFirst({
       where: { id, institutionId },
     });
@@ -761,6 +776,7 @@ export class StudentService {
     rows: any[],
     creatorUserId?: string,
   ) {
+    studentListCache.clear();
     // Phase 1: Validate all rows before any DB mutations
     const errors: { row: number; field: string; message: string }[] = [];
     const emailsSeen = new Set<string>();

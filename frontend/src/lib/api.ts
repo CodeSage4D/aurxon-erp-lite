@@ -597,6 +597,50 @@ export async function getFounderStatsApi() {
 }
 
 // 2. Dashboard Analytics
+export async function getDashboardLayoutApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/layout`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('API failed');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend layout offline, simulating dynamic layout...');
+    // Fallback: load based on user email or default to school erp principal
+    return {
+      sections: [
+        {
+          title: "Saffron Academy Performance Overview",
+          gridCols: 4,
+          widgets: [
+            { id: "kpi-students", type: "kpi", title: "Total Students", valuePath: "studentCount", icon: "Users", color: "sky" },
+            { id: "kpi-staff", type: "kpi", title: "Total Faculty", valuePath: "staffCount", icon: "GraduationCap", color: "indigo" },
+            { id: "kpi-attendance", type: "kpi", title: "Daily Attendance", valuePath: "attendanceRate", icon: "CalendarCheck", color: "emerald", isPercentage: true },
+            { id: "kpi-collection", type: "kpi", title: "Term Collections", valuePath: "feeOverview.collectionRate", icon: "CreditCard", color: "rose", isPercentage: true }
+          ]
+        },
+        {
+          title: "Academic Operations Dashboard",
+          gridCols: 2,
+          widgets: [
+            { id: "chart-finance", type: "chart", chartType: "line", title: "Fee Billings vs Receipts (INR)", dataPath: "feeOverview", dataKeys: ["totalDue", "totalPaid"], color: "#0284c7" },
+            { id: "list-alerts", type: "list", listType: "weak_students", title: "Students Requiring Academic Intervention", dataPath: "weakStudents" }
+          ]
+        }
+      ]
+    };
+  }
+}
+
+export async function getDashboardWidgetsDataApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/widgets/data`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('API failed');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend widgets/data offline, returning fallback stats...');
+    return getDashboardStatsApi();
+  }
+}
+
 export async function getDashboardStatsApi() {
   try {
     const res = await fetch(`${API_URL}/dashboard/stats`, { headers: getHeaders() });
@@ -3120,6 +3164,7 @@ export async function getFeeCollectionSummaryReportApi() {
 }
 
 export async function getClassPerformanceReportApi(examId: string) {
+  if (!examId) return { results: [], stats: null };
   const res = await fetch(`${API_URL}/reports/exams/class-performance/${examId}`, { headers: getHeaders() });
   if (!res.ok) throw new Error('Failed to fetch class performance report');
   return await res.json();
@@ -4481,6 +4526,24 @@ export async function createPlanDefinitionApi(data: any) {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Failed to create plan definition');
+  return await res.json();
+}
+
+export async function getTeamsDashboardLayoutApi() {
+  const res = await fetch(`${API_URL}/founder/dashboard/layout`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch dashboard layout');
+  return await res.json();
+}
+
+export async function getTeamsDashboardStatsApi() {
+  const res = await fetch(`${API_URL}/founder/dashboard/stats`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch dashboard stats');
+  return await res.json();
+}
+
+export async function getTeamsMemberProfileApi() {
+  const res = await fetch(`${API_URL}/founder/team-member`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch team member profile');
   return await res.json();
 }
 

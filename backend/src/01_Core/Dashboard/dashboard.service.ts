@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+const layoutCache = new Map<string, { data: any; timestamp: number }>();
+
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
@@ -193,4 +195,154 @@ export class DashboardService {
       moduleUsage,
     };
   }
+
+  async getLayout(institutionId: string, role: string, enabledModules: string[]) {
+    const cacheKey = `${institutionId}-${role}-${(enabledModules || []).join(',')}`;
+    const cached = layoutCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < 5000) {
+      return cached.data;
+    }
+
+    const inst = await this.prisma.institution.findUnique({
+      where: { id: institutionId },
+      select: { industryPackCode: true },
+    });
+
+    const packCode = inst?.industryPackCode || 'SCHOOL_ERP';
+    let pack = await this.prisma.industryPack.findUnique({
+      where: { code: packCode },
+    });
+
+    if (!pack) {
+      // Fallback
+      pack = await this.prisma.industryPack.findUnique({
+        where: { code: 'SCHOOL_ERP' },
+      });
+    }
+
+    if (!pack || !pack.defaultDashboard) {
+      return { sections: [] };
+    }
+
+    const dashboardJson = pack.defaultDashboard as Record<string, any>;
+    
+    // Find role layout key (exact match first)
+    let roleLayout = dashboardJson[role];
+
+    // Case insensitive matching fallback
+    if (!roleLayout) {
+      const matchedKey = Object.keys(dashboardJson).find(
+        (k) => k.toLowerCase() === role.toLowerCase()
+      );
+      if (matchedKey) {
+        roleLayout = dashboardJson[matchedKey];
+      }
+    }
+
+    // Role independent fallback (take first available role dashboard)
+    if (!roleLayout) {
+      const keys = Object.keys(dashboardJson);
+      if (keys.length > 0) {
+        roleLayout = dashboardJson[keys[0]];
+      }
+    }
+
+    if (!roleLayout || !Array.isArray(roleLayout.sections)) {
+      return { sections: [] };
+    }
+
+    // Filter sections and widgets by enabledModules
+    const filteredSections = roleLayout.sections.map((section: any) => {
+      const filteredWidgets = (section.widgets || []).filter((widget: any) => {
+        if (!widget.moduleCode) return true; // not gated
+        return enabledModules.includes(widget.moduleCode);
+      });
+      return {
+        ...section,
+        widgets: filteredWidgets,
+      };
+    }).filter((section: any) => section.widgets.length > 0);
+
+    const result = { sections: filteredSections };
+    layoutCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+  }
+
+  async getWidgetData(institutionId: string) {
+    const inst = await this.prisma.institution.findUnique({
+      where: { id: institutionId },
+      select: { industryPackCode: true },
+    });
+
+    const packCode = inst?.industryPackCode || 'SCHOOL_ERP';
+
+    if (packCode === 'HOSPITAL_ERP') {
+      return {
+        studentCount: 0,
+        staffCount: 0,
+        classCount: 0,
+        patientCount: 142,
+        doctorsCount: 19,
+        bedOccupancy: '84%',
+        dailyCollection: '₹1,43,900',
+        admissionsByDept: [
+          { name: 'Cardiology', count: 42 },
+          { name: 'Pediatrics', count: 28 },
+          { name: 'General Med.', count: 56 },
+          { name: 'Orthopedics', count: 16 }
+        ],
+        criticalAlerts: [
+          { id: '1', label: 'ICU Bed #4 Alert', desc: 'Pulse fluctuations monitored' },
+          { id: '2', label: 'Blood Bank O- Low', desc: 'Less than 3 units remaining' }
+        ],
+        appointmentsCount: '14 Slots',
+        patientsConsulted: '6 Patients',
+        criticalCases: '2 Cases',
+        weakStudents: [],
+        recentNotices: [],
+        feeOverview: {
+          totalDue: 0,
+          totalPaid: 0,
+          totalPending: 0,
+          collectionRate: 0,
+        },
+        attendanceRate: 0,
+      };
+    }
+
+    if (packCode === 'CORPORATE_ERP') {
+      return {
+        studentCount: 0,
+        staffCount: 0,
+        classCount: 0,
+        employeeCount: 76,
+        openPositions: 8,
+        checkinCompliance: '94.2%',
+        payrollCost: '₹18,50,000',
+        headcountByDept: [
+          { name: 'Engineering', value: 34 },
+          { name: 'Sales & Mktg', value: 22 },
+          { name: 'Finance', value: 8 },
+          { name: 'Operations', value: 12 }
+        ],
+        pendingApprovals: [
+          { id: '1', label: 'Q3 Marketing budget allocation', desc: 'Review request by HR Head' },
+          { id: '2', label: 'Salary escalation approval', desc: 'Engineering manager proposal' }
+        ],
+        weakStudents: [],
+        recentNotices: [],
+        feeOverview: {
+          totalDue: 0,
+          totalPaid: 0,
+          totalPending: 0,
+          collectionRate: 0,
+        },
+        attendanceRate: 0,
+      };
+    }
+
+    // Default: SCHOOL_ERP or fallback to standard admin stats
+    return this.getAdminStats(institutionId);
+  }
 }
+

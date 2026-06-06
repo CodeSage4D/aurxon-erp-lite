@@ -5,6 +5,9 @@ import * as bcrypt from 'bcryptjs';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 
+const navCache = new Map<string, { data: any; timestamp: number }>();
+const switchCache = new Map<string, { data: any; timestamp: number }>();
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -206,11 +209,16 @@ export class AuthService {
       isPrimary: m.isPrimary,
     }));
 
+    const teamMember = await this.prisma.aurxonTeamMember.findUnique({
+      where: { userId: user.id }
+    });
+
     const payload = {
       sub: user.id,
       email: user.email,
       profileId: profileId || null,
       mustChangePassword: user.mustChangePassword,
+      teamRole: teamMember ? teamMember.role : null,
     };
 
     return {
@@ -221,6 +229,7 @@ export class AuthService {
         profileName,
         profileId: profileId || null,
         mustChangePassword: user.mustChangePassword,
+        teamRole: teamMember ? teamMember.role : null,
       },
       memberships: formattedMemberships,
     };
@@ -270,6 +279,12 @@ export class AuthService {
     schoolId?: string,
     campusId?: string,
   ) {
+    const cacheKey = `${userId}-${organizationId}-${schoolId || ''}-${campusId || ''}`;
+    const cached = switchCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < 5000) {
+      return cached.data;
+    }
+
     const membership = await this.prisma.organizationMembership.findFirst({
       where: {
         userId,
@@ -284,6 +299,12 @@ export class AuthService {
             name: true,
             logoUrl: true,
             primaryColor: true,
+            industryPackCode: true,
+            industryPack: {
+              select: {
+                name: true
+              }
+            }
           },
         },
         role: {
@@ -336,6 +357,10 @@ export class AuthService {
       select: { email: true, mustChangePassword: true },
     });
 
+    const teamMember = await this.prisma.aurxonTeamMember.findUnique({
+      where: { userId }
+    });
+
     const payload = {
       sub: userId,
       email: userRec?.email,
@@ -348,11 +373,13 @@ export class AuthService {
       enabledModules,
       enabledFeatures,
       mustChangePassword: userRec?.mustChangePassword || false,
+      teamRole: teamMember ? teamMember.role : null,
+      industryPackCode: membership.institution.industryPackCode,
     };
 
     const token = this.jwtService.sign(payload);
 
-    return {
+    const result = {
       token,
       context: {
         organizationId: membership.institutionId,
@@ -365,48 +392,78 @@ export class AuthService {
         enabledModules,
         enabledFeatures,
         mustChangePassword: userRec?.mustChangePassword || false,
+        teamRole: teamMember ? teamMember.role : null,
         branding: {
           primaryColor,
           logoUrl,
+          industryPackCode: membership.institution.industryPackCode,
+          industryPackName: membership.institution.industryPack?.name || 'SaaS Standard Pack',
         },
       },
     };
+
+    switchCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
   }
 
   async getNavigation(userContext: any) {
-    const allCategories = [
-      { id: 'overview', label: 'Dashboard', icon: 'LayoutDashboard', roles: ['*'], section: 'Daily Use' },
-      { id: 'academic', label: 'Academic Desk', icon: 'BookOpen', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'COACHING_DIRECTOR', 'REGISTRAR', 'EXAM_CONTROLLER', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
-      { id: 'students', label: 'Student Desk', icon: 'Users', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'REGISTRAR', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
-      { id: 'exams', label: 'Exams & Grades', icon: 'Award', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'EXAM_CONTROLLER', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'], moduleCode: 'EXAMINATION', section: 'Daily Use' },
-      { id: 'attendance', label: 'Attendance', icon: 'CalendarCheck', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'ATTENDANCE_OFFICER', 'INSTITUTE_ADMIN'], moduleCode: 'ATTENDANCE', section: 'Daily Use' },
-      { id: 'fees', label: 'Fees & Finance', icon: 'CreditCard', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'], moduleCode: 'FINANCE', section: 'Daily Use' },
-      { id: 'comms', label: 'Comms Hub', icon: 'MessageSquare', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Communication' },
-      { id: 'library', label: 'Library Desk', icon: 'Book', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
-      { id: 'productivity', label: 'Productivity Desk', icon: 'ClipboardList', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'LIBRARIAN', 'STAFF', 'ACCOUNTANT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
-      { id: 'gate', label: 'Visitor Gate Desk', icon: 'ShieldAlert', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'STAFF'], section: 'Staff' },
-      { id: 'inventory', label: 'Inventory Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'STAFF'], section: 'Administration' },
-      { id: 'hr', label: 'HR System', icon: 'Briefcase', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'], section: 'Staff' },
-      { id: 'reports', label: 'Reports Desk', icon: 'FileText', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'TEACHER'], section: 'Insights' },
-      { id: 'analytics', label: 'Analytics Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'TEACHER'], section: 'Insights' },
-      { id: 'operations', label: 'Operations Desk', icon: 'ShieldCheck', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' },
-      { id: 'settings', label: 'Settings', icon: 'Settings', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' }
-    ];
-
-    const userRole = userContext.role || '';
+    const institutionId = userContext.institutionId || userContext.organizationId;
     const enabledModules = userContext.enabledModules || [];
+    const cacheKey = `${institutionId || 'global'}-${(enabledModules || []).join(',')}`;
+    
+    const cached = navCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < 5000) {
+      return cached.data;
+    }
 
-    return allCategories.filter(cat => {
-      // Check role restriction
-      if (!cat.roles.includes('*') && !cat.roles.includes(userRole)) {
-        return false;
+    let navItems: any[] = [];
+
+    if (institutionId) {
+      const inst = await this.prisma.institution.findUnique({
+        where: { id: institutionId },
+        select: { industryPackCode: true },
+      });
+      if (inst && inst.industryPackCode) {
+        const pack = await this.prisma.industryPack.findUnique({
+          where: { code: inst.industryPackCode },
+        });
+        if (pack && Array.isArray(pack.defaultNavigation)) {
+          navItems = pack.defaultNavigation as any[];
+        }
       }
+    }
+
+    if (navItems.length === 0) {
+      navItems = [
+        { id: 'overview', label: 'Dashboard', icon: 'LayoutDashboard', section: 'Daily Use' },
+        { id: 'academic', label: 'Academic Desk', icon: 'BookOpen', section: 'Daily Use', moduleCode: 'STUDENT_MANAGEMENT' },
+        { id: 'students', label: 'Student Desk', icon: 'Users', section: 'Daily Use', moduleCode: 'STUDENT_MANAGEMENT' },
+        { id: 'exams', label: 'Exams & Grades', icon: 'Award', section: 'Daily Use', moduleCode: 'EXAMINATION' },
+        { id: 'attendance', label: 'Attendance', icon: 'CalendarCheck', section: 'Daily Use', moduleCode: 'ATTENDANCE' },
+        { id: 'fees', label: 'Fees & Finance', icon: 'CreditCard', section: 'Daily Use', moduleCode: 'FINANCE' },
+        { id: 'comms', label: 'Comms Hub', icon: 'MessageSquare', section: 'Communication' },
+        { id: 'library', label: 'Library Desk', icon: 'Book', section: 'Daily Use' },
+        { id: 'productivity', label: 'Productivity Desk', icon: 'ClipboardList', section: 'Daily Use' },
+        { id: 'gate', label: 'Visitor Gate Desk', icon: 'ShieldAlert', section: 'Staff' },
+        { id: 'inventory', label: 'Inventory Desk', icon: 'BarChart2', section: 'Administration' },
+        { id: 'hr', label: 'HR System', icon: 'Briefcase', section: 'Staff' },
+        { id: 'reports', label: 'Reports Desk', icon: 'FileText', section: 'Insights' },
+        { id: 'analytics', label: 'Analytics Desk', icon: 'BarChart2', section: 'Insights' },
+        { id: 'operations', label: 'Operations Desk', icon: 'ShieldCheck', section: 'Administration' },
+        { id: 'settings', label: 'Settings', icon: 'Settings', section: 'Administration' }
+      ];
+    }
+
+    const result = navItems.filter(cat => {
       // Check module activation if mapped
       if (cat.moduleCode && !enabledModules.includes(cat.moduleCode)) {
         return false;
       }
       return true;
     });
+
+    navCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
   }
 
   async validateActivationToken(token: string) {

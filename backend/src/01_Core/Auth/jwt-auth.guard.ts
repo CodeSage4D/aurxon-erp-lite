@@ -10,6 +10,43 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
+    if (user && user.role === 'SUPER_ADMIN') {
+      const url = request.url || '';
+      const operationalPaths = [
+        '/students',
+        '/parents',
+        '/attendance',
+        '/staff-attendance',
+        '/fees',
+        '/payroll',
+        '/leaves',
+        '/lessons',
+        '/subjects',
+        '/classes',
+        '/academic-years',
+        '/exams',
+        '/documents',
+        '/staff',
+        '/notices',
+        '/notifications',
+        '/reports',
+        '/productivity',
+        '/library',
+        '/visitors',
+        '/inventory',
+        '/timetable',
+        '/dashboard',
+      ];
+      const isOperational = operationalPaths.some(
+        (path) => url.startsWith(path) || url.startsWith('/api' + path)
+      );
+      if (isOperational) {
+        throw new ForbiddenException(
+          'Founders cannot access tenant operational data directly. A support-access impersonation session is required.'
+        );
+      }
+    }
+
     if (user && user.mustChangePassword) {
       const url = request.url || '';
       // Allow only change-password and switch/refresh context endpoints

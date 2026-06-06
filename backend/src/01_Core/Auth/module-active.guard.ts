@@ -22,6 +22,26 @@ export class ModuleActiveGuard implements CanActivate {
     // SUPER_ADMIN bypasses standard module active checks
     if (user.role === 'SUPER_ADMIN') return true;
 
+    // Enforce Industry Pack Separation
+    const PACK_MODULES: Record<string, string[]> = {
+      SCHOOL_ERP: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'],
+      HOSPITAL_ERP: ['CLINICAL_DESK', 'APPOINTMENTS', 'PATIENTS', 'FINANCE'],
+      CORPORATE_ERP: ['HRMS', 'PAYROLL_ENGINE', 'RECRUITMENT', 'EMPLOYEES', 'FINANCE'],
+    };
+
+    const packCode = user.industryPackCode || 'SCHOOL_ERP';
+    const allowedModules = PACK_MODULES[packCode] || [];
+    if (!allowedModules.includes(requiredModule)) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.FORBIDDEN,
+          message: `Module ${requiredModule} is not compatible with the ${packCode} industry pack.`,
+          error: 'INDUSTRY_MODULE_LEAKAGE',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     const enabledModules = user.enabledModules || [];
     if (!enabledModules.includes(requiredModule)) {
       throw new HttpException(

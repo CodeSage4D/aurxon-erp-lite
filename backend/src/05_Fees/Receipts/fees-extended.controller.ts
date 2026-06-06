@@ -4,10 +4,13 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Request, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../../01_Core/Auth/roles.guard';
+import { ModuleActiveGuard } from '../../01_Core/Auth/module-active.guard';
+import { ModuleActive } from '../../01_Core/Auth/module-active.decorator';
 import { PrismaService } from '../../01_Core/prisma/prisma.service';
 
+@UseGuards(JwtAuthGuard, ModuleActiveGuard)
+@ModuleActive('FINANCE')
 @Controller('fees')
-@UseGuards(JwtAuthGuard)
 export class FeesExtendedController {
   constructor(private readonly prisma: PrismaService) {}
 

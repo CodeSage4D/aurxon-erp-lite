@@ -37,4 +37,17 @@ export class CreateRegistrationDto {
   @IsString({ each: true })
   @IsOptional()
   requestedModules?: string[];
+
+  @IsString()
+  @IsOptional()
+  industryPackCode?: string;
+
+  @IsString()
+  @IsOptional()
+  orgSize?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  requestedFeatures?: string[];
 }

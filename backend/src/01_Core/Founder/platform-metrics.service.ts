@@ -168,4 +168,172 @@ export class PlatformMetricsService {
 
     return stats;
   }
+
+  /**
+   * Generates dynamic layout configuration for internal team dashboard based on their role
+   */
+  getTeamDashboardLayoutJSON(role: string) {
+    const defaultLayout = {
+      sections: [
+        {
+          title: "Platform Command Center Telemetry",
+          gridCols: 4,
+          widgets: [
+            { id: "kpi-orgs", type: "kpi", title: "Total Organizations", valuePath: "overview.totalOrganizations", icon: "Building2", color: "sky" },
+            { id: "kpi-active-orgs", type: "kpi", title: "Active Organizations", valuePath: "overview.activeOrganizations", icon: "CheckCircle", color: "indigo" },
+            { id: "kpi-mrr", type: "kpi", title: "Monthly Recurring Revenue", valuePath: "billing.mrr", icon: "CreditCard", color: "emerald", isCurrency: true },
+            { id: "kpi-threats", type: "kpi", title: "Security Alerts", valuePath: "overview.threatsCount", icon: "ShieldAlert", color: "rose" }
+          ]
+        }
+      ]
+    };
+
+    if (role === 'FOUNDER' || role === 'CO_FOUNDER' || role === 'PLATFORM_DIRECTOR') {
+      return {
+        sections: [
+          {
+            title: "SaaS Command Center Telemetry",
+            gridCols: 4,
+            widgets: [
+              { id: "kpi-orgs", type: "kpi", title: "Total Organizations", valuePath: "overview.totalOrganizations", icon: "Building2", color: "sky" },
+              { id: "kpi-mrr", type: "kpi", title: "Platform MRR", valuePath: "billing.mrr", icon: "CreditCard", color: "indigo", isCurrency: true },
+              { id: "kpi-registrations", type: "kpi", title: "Pending Reviews", valuePath: "overview.registrationsCount", icon: "UserCheck", color: "emerald" },
+              { id: "kpi-threats", type: "kpi", title: "Security Warnings", valuePath: "overview.threatsCount", icon: "ShieldAlert", color: "rose" }
+            ]
+          },
+          {
+            title: "Growth & Subscriptions Analytics",
+            gridCols: 2,
+            widgets: [
+              { id: "chart-latency", type: "chart", chartType: "area", title: "API Traffic Throughput (req/min)", dataPath: "history", dataKeys: ["requestsPerMin"], color: "#6366f1" },
+              { id: "chart-plans", type: "chart", chartType: "pie", title: "Subscription Plan Split", dataPath: "billing", dataKeys: ["activeSubscriptions", "trialSubscriptions"], labels: ["Professional", "Trial"], color: "#0ea5e9" }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (role === 'PRODUCT_MANAGER') {
+      return {
+        sections: [
+          {
+            title: "Product Capabilities Workspace",
+            gridCols: 3,
+            widgets: [
+              { id: "kpi-packs", type: "kpi", title: "Active Industry Packs", valuePath: "overview.industryPacksCount", icon: "Layers", color: "sky" },
+              { id: "kpi-modules", type: "kpi", title: "Most Adopted Module", value: "Student Management", icon: "Sparkles", color: "indigo" },
+              { id: "kpi-active-subs", type: "kpi", title: "Active Subscriptions", valuePath: "billing.activeSubscriptions", icon: "CheckCircle", color: "emerald" }
+            ]
+          },
+          {
+            title: "Marketplace Adoption Metrics",
+            gridCols: 1,
+            widgets: [
+              { id: "chart-modules", type: "chart", chartType: "bar", title: "Global Module Installation Split", dataPath: "metrics.moduleUsage", dataKeys: ["activeCount"], color: "#8b5cf6" }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (role === 'SUPPORT_MANAGER') {
+      return {
+        sections: [
+          {
+            title: "Customer Support Workspace",
+            gridCols: 3,
+            widgets: [
+              { id: "kpi-active-orgs", type: "kpi", title: "Total Org Contexts", valuePath: "overview.activeOrganizations", icon: "Building2", color: "sky" },
+              { id: "kpi-backups", type: "kpi", title: "Last Backup Status", value: "Success", icon: "Database", color: "indigo" },
+              { id: "kpi-threats", type: "kpi", title: "Active Security Alerts", valuePath: "overview.threatsCount", icon: "ShieldAlert", color: "rose" }
+            ]
+          },
+          {
+            title: "System Logs & Support Access",
+            gridCols: 2,
+            widgets: [
+              { id: "list-threats", type: "list", listType: "threats", title: "Security Anomalies Alert Log", dataPath: "threats" },
+              { id: "action-support", type: "actions", title: "Quick Administrative Diagnostic Links", actions: [{ label: "Impersonate Workspace", path: "impersonate" }, { label: "Trigger Snapshot Backup", path: "backup" }] }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (role === 'SALES_MANAGER' || role === 'CUSTOMER_SUCCESS_MANAGER') {
+      return {
+        sections: [
+          {
+            title: "Growth & Client Success Workspace",
+            gridCols: 4,
+            widgets: [
+              { id: "kpi-active-orgs", type: "kpi", title: "Active Clients", valuePath: "overview.activeOrganizations", icon: "Building2", color: "sky" },
+              { id: "kpi-trials", type: "kpi", title: "Trial Clients", valuePath: "billing.trialSubscriptions", icon: "Activity", color: "indigo" },
+              { id: "kpi-conversion", type: "kpi", title: "Trial Conversion", valuePath: "billing.trialConversionRate", icon: "ArrowUpRight", color: "emerald", isPercentage: true },
+              { id: "kpi-registrations", type: "kpi", title: "Pending Registrations", valuePath: "overview.registrationsCount", icon: "UserCheck", color: "rose" }
+            ]
+          },
+          {
+            title: "Storage & Provisioning Roster",
+            gridCols: 2,
+            widgets: [
+              { id: "list-registrations", type: "list", listType: "registrations", title: "Pending Review Signups Queue", dataPath: "registrations" },
+              { id: "list-storage", type: "list", listType: "storage", title: "Tenant Quota Space Monitoring", dataPath: "storageStats" }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (role === 'FINANCE_MANAGER') {
+      return {
+        sections: [
+          {
+            title: "Financial Command Workspace",
+            gridCols: 4,
+            widgets: [
+              { id: "kpi-mrr", type: "kpi", title: "Monthly Recurring Revenue", valuePath: "billing.mrr", icon: "CreditCard", color: "sky", isCurrency: true },
+              { id: "kpi-arr", type: "kpi", title: "Annual Recurring Revenue", valuePath: "billing.arr", icon: "Activity", color: "indigo", isCurrency: true },
+              { id: "kpi-collected", type: "kpi", title: "Total Billings Collected", valuePath: "billing.totalRevenueCollected", icon: "CheckCircle", color: "emerald", isCurrency: true },
+              { id: "kpi-unpaid", type: "kpi", title: "Unpaid Invoices Log", valuePath: "billing.unpaidInvoices", icon: "ShieldAlert", color: "rose" }
+            ]
+          },
+          {
+            title: "Finance & Accounts Roster",
+            gridCols: 1,
+            widgets: [
+              { id: "list-invoices", type: "list", listType: "invoices", title: "Invoice History & Payment Receipts", dataPath: "invoices" }
+            ]
+          }
+        ]
+      };
+    }
+
+    if (role === 'TECHNICAL_ADMINISTRATOR') {
+      return {
+        sections: [
+          {
+            title: "Infrastructure & Node Observability",
+            gridCols: 4,
+            widgets: [
+              { id: "kpi-cpu", type: "kpi", title: "Average CPU Load", valuePath: "metrics.cpuUsagePercent", icon: "Activity", color: "sky", isPercentage: true },
+              { id: "kpi-mem", type: "kpi", title: "Free Memory Allocation", valuePath: "metrics.memUsagePercent", icon: "HardDrive", color: "indigo", isPercentage: true },
+              { id: "kpi-db-size", type: "kpi", title: "PG Database Capacity", valuePath: "metrics.dbSizeGb", icon: "Database", color: "emerald" },
+              { id: "kpi-db-conn", type: "kpi", title: "Active DB Connections", valuePath: "metrics.dbConnections", icon: "Users", color: "rose" }
+            ]
+          },
+          {
+            title: "API Throughput and Node Latencies",
+            gridCols: 2,
+            widgets: [
+              { id: "chart-latency", type: "chart", chartType: "area", title: "Request Rate & Avg Response (ms)", dataPath: "history", dataKeys: ["requestsPerMin", "avgResponseMs"], color: "#38bdf8" },
+              { id: "list-threats", type: "list", listType: "threats", title: "Active Intrusion Alerts", dataPath: "threats" }
+            ]
+          }
+        ]
+      };
+    }
+
+    return defaultLayout;
+  }
 }

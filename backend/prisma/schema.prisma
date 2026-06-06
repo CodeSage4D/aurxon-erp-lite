@@ -48,6 +48,8 @@ model Institution {
 
   tenantId               String?
   tenant                 Tenant?                     @relation(fields: [tenantId], references: [id])
+  industryPackCode       String?
+  industryPack           IndustryPack?               @relation(fields: [industryPackCode], references: [code])
   orgType                String                      @default("SCHOOL")
   status                 String                      @default("ACTIVE")
   registrations          OrganizationRegistration[]
@@ -80,6 +82,7 @@ model User {
   studentProfile Student?
   parentProfile  Parent?
   staffProfile   Staff?
+  teamProfile    AurxonTeamMember?
   auditLogs      AuditLog[]
   
   notifications       Notification[]
@@ -1186,6 +1189,9 @@ model OrganizationRegistration {
   activationToken  ActivationToken?
   institutionId    String?
   institution      Institution?     @relation(fields: [institutionId], references: [id])
+  industryPackCode String?
+  orgSize          String           @default("SMALL") // SMALL, MEDIUM, LARGE, ENTERPRISE
+  requestedFeatures String[]         // array of feature codes
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 }
@@ -1336,6 +1342,31 @@ model ImpersonationSession {
   actions            Json[]      // log of actions during impersonation
   tokenHash          String
   createdAt          DateTime    @default(now())
+}
+
+model IndustryPack {
+  id                 String        @id @default(uuid())
+  code               String        @unique // SCHOOL_ERP, HOSPITAL_ERP, CORPORATE_ERP
+  name               String
+  description        String?
+  defaultModules     String[]      // module codes enabled on provisioning
+  defaultRoles       Json?         // role template configurations
+  defaultPermissions  Json?         // permissions template configuration
+  defaultDashboard   Json?         // dashboard widgets layout JSON
+  defaultNavigation  Json?         // navigation sidebar layout JSON
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  institutions       Institution[]
+}
+
+model AurxonTeamMember {
+  id                 String        @id @default(uuid())
+  userId             String        @unique
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role               String        // FOUNDER, CO_FOUNDER, PLATFORM_DIRECTOR, PRODUCT_MANAGER, SUPPORT_MANAGER, SALES_MANAGER, CUSTOMER_SUCCESS_MANAGER, FINANCE_MANAGER, TECHNICAL_ADMINISTRATOR
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 

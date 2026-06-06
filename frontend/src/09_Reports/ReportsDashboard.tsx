@@ -59,6 +59,11 @@ export default function ReportsDashboard() {
       } else if (reportType === 'fees') {
         res = await getFeeCollectionSummaryReportApi();
       } else if (reportType === 'exams') {
+        if (!examId) {
+          setData({ results: [], stats: null });
+          setLoading(false);
+          return;
+        }
         res = await getClassPerformanceReportApi(examId);
       }
       setData(res);

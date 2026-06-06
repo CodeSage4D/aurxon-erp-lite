@@ -6,6 +6,8 @@ import { Menu, Search, Sparkles, Bell, Sun, Moon, ChevronRight, Building2, Shiel
 
 import {
   getDashboardStatsApi,
+  getDashboardLayoutApi,
+  getDashboardWidgetsDataApi,
   getSetupStatusApi,
   getFounderStatsApi,
   switchContextApi,
@@ -55,6 +57,7 @@ import Sidebar from '@/01_Core/Dashboard/Sidebar';
 import CommandPalette from '@/01_Core/Dashboard/CommandPalette';
 import AiAssistant from '@/01_Core/Dashboard/AiAssistant';
 import OverviewTab from '@/01_Core/Dashboard/OverviewTab';
+import DynamicDashboard from '@/01_Core/Dashboard/DynamicDashboard';
 import AcademicTab from '@/03_Academics/Class/AcademicTab';
 import StudentsTab from '@/02_Admission/StudentProfile/StudentsTab';
 import ExamsTab from '@/06_Exams/ExamSetup/ExamsTab';
@@ -78,7 +81,9 @@ export default function DashboardPage() {
   // Auth & Roles States
   const [user, setUser] = useState<any>(null);
   const [currentRole, setCurrentRole] = useState('STUDENT');
+  const [context, setContext] = useState<any>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
+  const [authStage, setAuthStage] = useState<'idle' | 'checking_session' | 'checking_setup' | 'resolving_context' | 'loading_data' | 'ready'>('idle');
 
   useEffect(() => {
     setIsImpersonating(localStorage.getItem('aurxon_impersonating') === 'true');
@@ -118,6 +123,7 @@ export default function DashboardPage() {
 
   // Datasets
   const [stats, setStats] = useState<any>(null);
+  const [dashboardLayout, setDashboardLayout] = useState<any>(null);
   const [founderStats, setFounderStats] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
@@ -196,60 +202,84 @@ export default function DashboardPage() {
 
   // Auth Guard & Core Loader
   useEffect(() => {
-    const cached = localStorage.getItem('aurxon_user');
-    if (!cached) {
-      router.push('/');
-      return;
-    }
-    const parsed = JSON.parse(cached);
-    setUser(parsed);
-    setCurrentRole(parsed.role);
+    const runAuthFlow = async () => {
+      // 1. Session verification stage
+      setAuthStage('checking_session');
+      const token = localStorage.getItem('aurxon_token');
+      const cached = localStorage.getItem('aurxon_user');
+      if (!token || !cached) {
+        router.push('/login');
+        return;
+      }
+      const parsed = JSON.parse(cached);
+      setUser(parsed);
+      setCurrentRole(parsed.role);
 
-    // Verify onboarding setup completion
-    const checkSetup = async () => {
+      // 2. Setup verification stage
+      setAuthStage('checking_setup');
       try {
         const setup = await getSetupStatusApi();
         if (!setup.setupCompleted && parsed.role !== 'SUPER_ADMIN') {
           router.push('/setup-wizard');
+          return;
         }
       } catch (e) {
-        console.error(e);
+        console.error('Setup verification failed:', e);
+        router.push('/login');
+        return;
       }
-    };
-    checkSetup();
 
-    // Apply branding color dynamically if set
-    const contextStr = localStorage.getItem('aurxon_context');
-    if (contextStr) {
+      // 3. Context resolution stage
+      setAuthStage('resolving_context');
+      const contextStr = localStorage.getItem('aurxon_context');
+      if (!contextStr) {
+        router.push('/organization-select');
+        return;
+      }
       try {
         const ctx = JSON.parse(contextStr);
+        setContext(ctx);
         if (ctx.branding && ctx.branding.primaryColor) {
           document.documentElement.style.setProperty('--primary', ctx.branding.primaryColor);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Context resolution failed:', e);
+        router.push('/organization-select');
+        return;
       }
-    }
 
-    // Initial sync
-    loadDashboardStats();
-    loadStudents();
-    loadClasses();
-    loadStaff();
-    loadNotices();
-    loadLeaves();
-    loadLessonPlans();
-    loadExpenses();
-    loadFinanceOverview();
-    loadBooks();
-    loadIssues();
-    loadPayrolls();
-    loadVisitors();
-    loadInventory();
-    loadSettings();
-    loadBranches();
-    loadNotifications();
-    loadPromotionsHistory();
+      // 4. Data loading stage
+      setAuthStage('loading_data');
+      try {
+        await Promise.all([
+          loadDashboardStats(),
+          loadStudents(),
+          loadClasses(),
+          loadStaff(),
+          loadNotices(),
+          loadLeaves(),
+          loadLessonPlans(),
+          loadExpenses(),
+          loadFinanceOverview(),
+          loadBooks(),
+          loadIssues(),
+          loadPayrolls(),
+          loadVisitors(),
+          loadInventory(),
+          loadSettings(),
+          loadBranches(),
+          loadNotifications(),
+          loadPromotionsHistory(),
+        ]);
+      } catch (e) {
+        console.error('Data compile sync failed:', e);
+      }
+
+      // 5. Auth flow completed successfully
+      setAuthStage('ready');
+    };
+
+    runAuthFlow();
 
     // Setup command shortcut (Ctrl+K)
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -295,7 +325,19 @@ export default function DashboardPage() {
           const data = await getFounderStatsApi();
           setFounderStats(data);
         } else {
-          setStats(await getDashboardStatsApi());
+          try {
+            const data = await getDashboardWidgetsDataApi();
+            setStats(data);
+          } catch (statsErr) {
+            console.error('Failed to load widgets data', statsErr);
+            setStats(await getDashboardStatsApi());
+          }
+          try {
+            const layoutData = await getDashboardLayoutApi();
+            setDashboardLayout(layoutData);
+          } catch (layoutErr) {
+            console.error('Failed to load dashboard layout', layoutErr);
+          }
         }
       } catch (e) {
         console.error('Failed to load stats', e);
@@ -462,8 +504,27 @@ export default function DashboardPage() {
     }
   };
 
-  if (!user) {
-    return <div className="p-8 text-center text-zinc-500 font-medium">Authorizing credentials. Syncing ERP modules...</div>;
+  if (authStage !== 'ready') {
+    let loadingText = 'Initializing workspace...';
+    if (authStage === 'checking_session') loadingText = 'Verifying security credentials...';
+    else if (authStage === 'checking_setup') loadingText = 'Syncing core platform configuration...';
+    else if (authStage === 'resolving_context') loadingText = 'Resolving workspace context...';
+    else if (authStage === 'loading_data') loadingText = 'Compiling database metrics...';
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white font-sans">
+        <div className="flex flex-col items-center gap-6 max-w-sm text-center">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute h-16 w-16 animate-ping rounded-full bg-blue-600/20" />
+            <div className="h-12 w-12 animate-spin rounded-full border-2 border-zinc-800 border-t-blue-600" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-100">Aurxon SaaS Platform OS</h3>
+            <p className="text-xs text-zinc-400 font-semibold tracking-wide animate-pulse">{loadingText}</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -547,14 +608,44 @@ export default function DashboardPage() {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="flex items-center gap-2 text-xs font-bold">
-              <span className="uppercase text-muted-foreground tracking-wider">AURXON</span>
-              <ChevronRight className="h-3 w-3 text-border" />
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-md">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                <span className="text-primary capitalize tracking-wide">{activeCategory} desk</span>
+            {currentRole === 'SUPER_ADMIN' ? (
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span className="uppercase text-muted-foreground tracking-wider">AURXON</span>
+                <ChevronRight className="h-3 w-3 text-border" />
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-md">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  <span className="text-primary capitalize tracking-wide">{activeCategory} desk</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 text-xs font-sans shrink-0">
+                <div className="flex items-center gap-2">
+                  {context?.branding?.logoUrl ? (
+                    <img src={context.branding.logoUrl} alt="Logo" className="h-6 w-6 object-contain rounded-md shrink-0 border border-zinc-200 dark:border-zinc-800" />
+                  ) : (
+                    <Building2 className="h-4 w-4 text-primary shrink-0" />
+                  )}
+                  <span className="text-sm font-black text-foreground uppercase tracking-tight truncate max-w-[160px] md:max-w-[240px]">
+                    {context?.organizationName || user?.institutionName || 'Active Organization'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold flex-wrap">
+                  <span className="hidden md:inline text-zinc-300 dark:text-zinc-850">•</span>
+                  <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-400 font-black tracking-wide">
+                    {context?.branding?.industryPackName || 'SaaS Workspace'}
+                  </span>
+                  <span className="text-zinc-300 dark:text-zinc-850">•</span>
+                  <span className="bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded text-blue-600 dark:text-blue-400 font-bold">
+                    {context?.roleName || currentRole}
+                  </span>
+                  <span className="hidden lg:inline text-zinc-300 dark:text-zinc-850">•</span>
+                  <span className="hidden lg:inline text-[9px] text-zinc-400 tracking-wide font-black uppercase">
+                    Powered by Aurxon Platform
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -817,31 +908,40 @@ export default function DashboardPage() {
           )}
 
           {activeCategory === 'overview' && currentRole !== 'SUPER_ADMIN' && stats && (
-            <OverviewTab
-              stats={stats}
-              students={students}
-              staff={staff}
-              classes={classes}
-              rfidLogs={rfidLogs}
-              notices={notices}
-              triggerToast={triggerToast}
-              setActiveCategory={setActiveCategory}
-              setStudentTab={setStudentTab}
-              setAdmissionWizardStep={setAdmissionWizardStep}
-              setLibrarySubTab={setLibrarySubTab}
-              setFeesTab={setFeesTab}
-              setExamsTab={setExamsTab}
-              setAcademicTab={setAcademicTab}
-              setAttendanceDate={setAttendanceDate}
-              setSelectedClass={setSelectedClass}
-              loadAttendanceRoster={loadAttendanceRoster}
-              setFeeForm={setFeeForm}
-              setPromotionTargetClassId={setPromotionTargetClassId}
-              setPromotionSelectedStudents={setPromotionSelectedStudents}
-              setStudentForm={setStudentForm}
-              currentRole={currentRole}
-              user={user}
-            />
+            dashboardLayout && dashboardLayout.sections && dashboardLayout.sections.length > 0 ? (
+              <DynamicDashboard
+                layout={dashboardLayout}
+                metricsData={stats}
+                triggerToast={triggerToast}
+                setActiveCategory={setActiveCategory}
+              />
+            ) : (
+              <OverviewTab
+                stats={stats}
+                students={students}
+                staff={staff}
+                classes={classes}
+                rfidLogs={rfidLogs}
+                notices={notices}
+                triggerToast={triggerToast}
+                setActiveCategory={setActiveCategory}
+                setStudentTab={setStudentTab}
+                setAdmissionWizardStep={setAdmissionWizardStep}
+                setLibrarySubTab={setLibrarySubTab}
+                setFeesTab={setFeesTab}
+                setExamsTab={setExamsTab}
+                setAcademicTab={setAcademicTab}
+                setAttendanceDate={setAttendanceDate}
+                setSelectedClass={setSelectedClass}
+                loadAttendanceRoster={loadAttendanceRoster}
+                setFeeForm={setFeeForm}
+                setPromotionTargetClassId={setPromotionTargetClassId}
+                setPromotionSelectedStudents={setPromotionSelectedStudents}
+                setStudentForm={setStudentForm}
+                currentRole={currentRole}
+                user={user}
+              />
+            )
           )}
 
           {activeCategory === 'academic' && (

@@ -1,0 +1,98 @@
+AURXON PLATFORM OS - CHANGELOG & RELEASE NOTES
+
+================================================================================
+VERSION: v1.1.0-Stabilization
+DATE: June 6, 2026
+SPRINT: Productization, Platform Maturity & Elite SaaS Refinement Sprint
+================================================================================
+
+FEATURES ADDED
+--------------------------------------------------------------------------------
+1. Founder Support Access Impersonation Session
+   - Implemented dynamic, time-limited, and audited support tokens.
+   - Allows Founders/Super Admins to troubleshoot organization tenant issues
+     with customer permission, while enforcing a privacy boundary preventing
+     unauthorized direct access to sensitive student, staff, and financial data.
+2. Context Switching Context Resolution
+   - Enhanced API context switches to return branding assets (logo URLs,
+     branding primary colors, active pack configuration) in the JWT payload.
+3. Multi-Tenant Registration & Onboarding Lifecycle Workflow
+   - Implemented registration approval, rejection, and activation workflows.
+   - Restricts login activation until a trial key is verified.
+
+FEATURES IMPROVED
+--------------------------------------------------------------------------------
+1. Overhaul Workspace Header UI
+   - Upgraded to an enterprise SaaS design displaying the active organization
+     logo, institution name, active workspace role, active packages,
+     notification indicators, and a clean profile menu.
+2. Visual Standardization (De-gradient Transformation)
+   - Removed hot/warm pink/red "Instagram-style" gradients.
+   - Replaced UI background panels with professional, high-contrast slate,
+     indigo, and sky blue enterprise themes.
+3. Authentication Experience (Zero-Flash Shield)
+   - Created a client-side state machine in page.tsx that blocks background page
+     queries and visual flicker on reload.
+   - Shows a premium full-screen loading skeleton during auth context switches.
+
+BUGS FIXED
+--------------------------------------------------------------------------------
+1. Reports Dashboard Console Fetch Crash
+   - Patched `getClassPerformanceReportApi` and ReportsDashboard.tsx to guard against
+     empty or undefined `examId` queries.
+   - Short-circuits invalid API calls directly in the client, eliminating
+     CORS block errors on NestJS 404 pages.
+2. Route Permissions & Role Leakages
+   - Hardened RBAC routes to block cross-role access (e.g., standard users or
+     finance managers trying to access backup management routes).
+
+FILES MODIFIED
+--------------------------------------------------------------------------------
+- backend/prisma/schema.prisma
+- backend/src/01_Core/Auth/auth.service.ts
+- backend/src/01_Core/Auth/jwt-auth.guard.ts
+- backend/src/01_Core/Auth/jwt.strategy.ts
+- backend/src/01_Core/Auth/module-active.guard.ts
+- backend/src/01_Core/Dashboard/dashboard.controller.ts
+- backend/src/01_Core/Dashboard/dashboard.service.ts
+- backend/src/01_Core/Founder/founder.controller.ts
+- backend/src/01_Core/Founder/founder.module.ts
+- backend/src/01_Core/Founder/platform-metrics.service.ts
+- backend/src/01_Core/Module/module.controller.ts
+- backend/src/01_Core/Module/module.service.ts
+- backend/src/01_Core/Provisioning/provisioning.service.ts
+- backend/src/01_Core/Registration/dto/create-registration.dto.ts
+- backend/src/01_Core/Registration/registration.service.ts
+- backend/src/02_Admission/StudentProfile/student.service.ts
+- backend/src/04_Attendance/StudentAttendance/attendance.controller.ts
+- backend/src/05_Fees/FeeStructure/fee.controller.ts
+- backend/src/05_Fees/Receipts/fees-extended.controller.ts
+- backend/src/06_Exams/ExamSetup/exam.controller.ts
+- frontend/src/09_Reports/ReportsDashboard.tsx
+- frontend/src/app/dashboard/page.tsx
+- frontend/src/app/register/page.tsx
+- frontend/src/lib/api.ts
+
+UNTRACKED FILES (NEW ADDITIONS)
+--------------------------------------------------------------------------------
+- backend/prisma/seed-packs.ts
+- backend/validation-runner.ts
+- frontend/src/01_Core/Dashboard/DynamicDashboard.tsx
+- frontend/src/app/teams/
+- frontend/src/middleware.ts
+
+BREAKING CHANGES & MIGRATION NOTES
+--------------------------------------------------------------------------------
+- Database schema migration required: Update schema to include impersonation
+  records and audit log fields. Run `npx prisma db push` or `npx prisma migrate dev`
+  to apply database changes.
+
+KNOWN ISSUES
+--------------------------------------------------------------------------------
+- Offline synchronization mode for biometric terminals is currently emulated in dev.
+  Full edge worker support scheduled for Phase 3.
+
+FUTURE WORK
+--------------------------------------------------------------------------------
+- Cloudflare Edge context resolution.
+- Industry-specific Startup Wizards.

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../AuditLogs/audit-log.service';
 
@@ -32,6 +32,25 @@ export class ModuleService {
     });
     if (!registryModule) {
       throw new NotFoundException(`Module with code ${moduleCode} does not exist in registry.`);
+    }
+
+    const inst = await this.prisma.institution.findUnique({
+      where: { id: organizationId },
+      select: { industryPackCode: true },
+    });
+
+    const PACK_MODULES: Record<string, string[]> = {
+      SCHOOL_ERP: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'],
+      HOSPITAL_ERP: ['CLINICAL_DESK', 'APPOINTMENTS', 'PATIENTS', 'FINANCE'],
+      CORPORATE_ERP: ['HRMS', 'PAYROLL_ENGINE', 'RECRUITMENT', 'EMPLOYEES', 'FINANCE'],
+    };
+
+    const packCode = inst?.industryPackCode || 'SCHOOL_ERP';
+    const allowedModules = PACK_MODULES[packCode] || [];
+    if (isEnabled && !allowedModules.includes(moduleCode)) {
+      throw new BadRequestException(
+        `Module ${moduleCode} is not compatible with the organization's industry pack (${packCode}).`
+      );
     }
 
     const existing = await this.prisma.organizationModule.findFirst({
