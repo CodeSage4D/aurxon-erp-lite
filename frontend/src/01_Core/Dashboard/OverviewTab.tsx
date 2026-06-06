@@ -448,7 +448,7 @@ export default function OverviewTab({
                 <span>Good morning, {user?.profileName || 'Principal'}</span>
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
               </h2>
-              <p className="text-xs text-muted-foreground font-medium mt-0.5">AURXON Demo School — Cockpit Dashboard</p>
+              <p className="text-xs text-muted-foreground font-medium mt-0.5">{user?.institutionName || 'Your Organization'} — Cockpit Dashboard</p>
             </div>
             <div className="flex items-center gap-3">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
@@ -877,7 +877,7 @@ export default function OverviewTab({
                     <Users className="h-10 w-10 text-primary mb-2" />
                     <h5 className="text-xs font-black text-foreground">66.7% Seat Enrollment Capacity</h5>
                     <p className="text-[11px] text-muted-foreground leading-relaxed mt-1.5 max-w-sm">
-                      AURXON Demo School active capacity: 100 enrolled out of 150 total allocated branch classroom desks.
+                      {user?.institutionName || 'Your institution'} active capacity: 100 enrolled out of 150 total allocated branch classroom desks.
                     </p>
                   </div>
                 </div>

@@ -798,7 +798,7 @@ export default function RegisterPage() {
 
       {/* Footer */}
       <footer className="max-w-7xl w-full mx-auto py-4 text-center text-[10px] text-gray-450 border-t border-gray-100 relative z-10 font-bold">
-        © 2026 AURXON ERP Lite. Enterprise-grade SaaS Operating System.
+        © 2026 Aurxon. All rights reserved.
       </footer>
     </div>
   );

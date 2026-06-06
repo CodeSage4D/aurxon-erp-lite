@@ -94,11 +94,11 @@ export default function LoginPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 hover-lift">
             <Shield className="h-7 w-7" />
           </div>
-          <h2 className="mt-6 text-4xl font-extrabold tracking-tight text-foreground animate-fade-in">
-            AURXON <span className="text-primary">ERP Lite</span>
+          <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-foreground animate-fade-in">
+            Secure Workspace Login
           </h2>
           <p className="mt-2 text-sm text-muted-foreground font-medium">
-            Next-Generation Educational Management
+            Sign in to access your organization portal.
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@aurxon.com"
+                placeholder="admin@yourschool.edu"
                 className="w-full rounded-xl border border-border bg-input/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 glass"
               />
             </div>
@@ -184,17 +184,12 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Development Mode bypass console link */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="text-center pt-2">
-            <button
-              onClick={() => router.push('/founder-console')}
-              className="text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary transition-colors hover:underline bg-transparent border-0 cursor-pointer p-0"
-            >
-              Product Operations & Demo Center
-            </button>
-          </div>
-        )}
+        {/* Powered by footer */}
+        <div className="text-center pt-2">
+          <p className="text-[10px] text-muted-foreground/40 font-medium">
+            Powered by <span className="font-bold">Aurxon</span>
+          </p>
+        </div>
       </div>
     </div>
   );

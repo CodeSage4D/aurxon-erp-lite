@@ -14,7 +14,7 @@ const MOCK_STORAGE_KEY = 'aurxon_mock_db';
 
 // Default mock data initialized on first load
 const DEFAULT_MOCK_DB = {
-  institutionName: 'Aurxon International Academy',
+  institutionName: 'Your Organization',
   primaryColor: '#6366f1',
   logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
   
@@ -2829,7 +2829,7 @@ export async function getNotificationsApi() {
     const db = getMockDb();
     if (!(db as any).notifications) {
       (db as any).notifications = [
-        { id: 'notif-1', title: 'Welcome to AURXON ERP Lite', content: 'Your school management platform is ready. Dwarka main branch registered successfully.', isRead: false, createdAt: new Date().toISOString() }
+        { id: 'notif-1', title: 'Welcome to your Workspace', content: 'Your management platform is ready. Your main branch has been registered successfully.', isRead: false, createdAt: new Date().toISOString() }
       ];
       saveMockDb(db);
     }
@@ -3277,7 +3277,7 @@ function initializeDemoSchoolDb(baseDb: any): any {
   const db = { ...baseDb };
   
   // 1. Institution Details
-  db.institutionName = "AURXON Demo School";
+  db.institutionName = "Workspace Organization";
 
   // 2. Clear out old limited arrays
   db.classes = [];

@@ -132,7 +132,7 @@ export default function ParentDashboard({ user, handleLogout }: ParentDashboardP
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-extrabold tracking-tight text-foreground">PARENT PORTAL</span>
-              <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Aurxon ERP Lite</span>
+              <span className="text-[9px] font-bold text-primary uppercase tracking-widest">{user?.institutionName || 'Parent Portal'}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">

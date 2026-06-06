@@ -53,7 +53,7 @@ export default function AiAssistant({
       const q = query.toLowerCase();
       
       if (q.includes('health') || q.includes('report') || q.includes('analytics')) {
-        reply = `**AURXON ERP Institutional Health Analysis:**
+        reply = `**Institutional Health Analysis:**
 - Academic Roster: **${students.length} students** enrolled across **${classes.length} grades**.
 - Term Fees Collections: **${stats?.feeOverview?.collectionRate || 85}%** collection rate. Net collections ₹${stats?.feeOverview?.totalPaid || 0}.
 - Attendance Rate: **${stats?.attendanceRate || 95.8}%** biometric check-ins active today.
@@ -76,12 +76,12 @@ export default function AiAssistant({
 - Pending Balance: **₹${stats?.feeOverview?.totalPending || 0}**
 - Cash Desk: ₹${expenses.reduce((sum, e) => sum + e.amount, 0)} operating expense recorded.`;
       } else {
-        reply = `I have received your request. Here are the core statistics for Aurxon:
+        reply = `I have received your request. Here are the core workspace statistics:
 - **Students**: ${students.length}
 - **Staff**: ${staff.length}
 - **Attendance**: ${stats?.attendanceRate || 95.8}%
 - **Fees collection**: ${stats?.feeOverview?.collectionRate || 85}%
-Type "financial health" or "attendance" to get detailed lists.`;
+Type "institutional health" or "attendance" to get detailed lists.`;
       }
 
       setAiChatMessages(prev => [...prev, { sender: 'assistant', text: reply }]);

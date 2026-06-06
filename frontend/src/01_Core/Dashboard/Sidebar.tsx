@@ -127,9 +127,13 @@ export default function Sidebar({
             <ShieldCheck className="h-5 w-5" />
           </div>
           {(!sidebarCollapsed || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
-            <div className="flex flex-col">
-              <span className="text-sm font-extrabold tracking-tight text-foreground">AURXON</span>
-              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">ERP Lite</span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-extrabold tracking-tight text-foreground truncate">
+                {user?.orgName || user?.institutionName || 'Your Workspace'}
+              </span>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
+                {user?.industryPack ? user.industryPack.replace('_ERP', '').replace('_', ' ') : 'Management Portal'}
+              </span>
             </div>
           )}
         </div>
@@ -245,7 +249,7 @@ export default function Sidebar({
                 {user?.profileName || 'Active User'}
               </span>
               <span className="text-[10px] text-muted-foreground truncate">
-                {user?.email || 'user@aurxon.com'}
+                {user?.email || ''}
               </span>
             </div>
           )}
@@ -262,6 +266,15 @@ export default function Sidebar({
           <LogOut className="h-4 w-4 shrink-0" />
           {(!sidebarCollapsed || (typeof window !== 'undefined' && window.innerWidth < 768)) && <span>Secure Sign Out</span>}
         </button>
+
+        {/* Powered by Aurxon */}
+        {(!sidebarCollapsed || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
+          <div className="text-center pt-1">
+            <span className="text-[9px] text-muted-foreground/30 font-medium tracking-wide">
+              Powered by Aurxon
+            </span>
+          </div>
+        )}
       </div>
     </aside>
   );

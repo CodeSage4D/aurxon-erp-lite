@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AURXON ERP Lite - Elite Educational ERP",
-  description: "Lightweight, modern, and premium educational ERP platform for schools, tuition centers, and coaching institutes.",
+  title: "Workspace Portal",
+  description: "Secure institutional management workspace.",
 };
 
 export default function RootLayout({

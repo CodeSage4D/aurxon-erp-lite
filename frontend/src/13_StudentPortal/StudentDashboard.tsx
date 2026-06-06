@@ -97,7 +97,7 @@ export default function StudentDashboard({ user, handleLogout }: StudentDashboar
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-extrabold tracking-tight text-foreground">STUDENT DESK</span>
-            <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Aurxon ERP Lite</span>
+            <span className="text-[9px] font-bold text-primary uppercase tracking-widest">{user?.institutionName || 'Student Portal'}</span>
           </div>
         </div>
         <div className="flex items-center gap-4">
