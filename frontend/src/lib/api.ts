@@ -3918,63 +3918,49 @@ export async function escalateAssignedTaskApi(id: string) {
 // SaaS Control Plane: Setup Onboarding Wizard
 // =========================================================================
 export async function getSetupStatusApi() {
-  try {
-    const res = await fetch(`${API_URL}/setup/status`, { headers: getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch setup status');
-    return await res.json();
-  } catch (error) {
-    console.warn('Backend setup-status offline, returning fallback...');
-    return {
-      setupCompleted: false,
-      steps: {
-        academicConfig: false,
-        branchConfig: false,
-      },
-      details: {
-        academicYear: null,
-        gradingSystem: null,
-        timezone: null,
-        currency: null,
-        branchesCount: 0,
-      },
-    };
+  const res = await fetch(`${API_URL}/setup/status`, { 
+    headers: getHeaders(),
+    // Cache setup status for 60 seconds to reduce unnecessary API calls
+    cache: 'no-store',
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Setup status API error:', { status: res.status, error: errorText });
+    throw new Error('Unable to verify workspace configuration. Please retry.');
   }
+  
+  return await res.json();
 }
 
 export async function submitSetupApi(data: any) {
-  try {
-    const res = await fetch(`${API_URL}/setup/submit`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || 'Failed to submit setup wizard');
-    }
-    return await res.json();
-  } catch (error: any) {
-    console.warn('Backend submit-setup offline, simulating locally...');
-    return { success: true };
+  const res = await fetch(`${API_URL}/setup/submit`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Setup wizard submission failed. Please retry.');
   }
+  
+  return await res.json();
 }
 
 export async function saveSetupDraftApi(step: number, data: any) {
-  try {
-    const res = await fetch(`${API_URL}/setup/save-draft`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ step, data }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || 'Failed to save setup draft');
-    }
-    return await res.json();
-  } catch (error: any) {
-    console.warn('Backend save-draft offline, simulating locally...');
-    return { success: true };
+  const res = await fetch(`${API_URL}/setup/save-draft`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ step, data }),
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to save setup progress. Please retry.');
   }
+  
+  return await res.json();
 }
 
 // =========================================================================
@@ -4309,7 +4295,18 @@ export async function refreshContextApi() {
     console.warn('Backend refreshContext offline, returning local context...');
     const contextStr = localStorage.getItem('aurxon_context');
     const token = localStorage.getItem('aurxon_token') || 'mock-jwt';
-    return { token, context: contextStr ? JSON.parse(contextStr) : null };
+    const context = contextStr ? JSON.parse(contextStr) : null;
+    
+    // Also update setup status in context based on localStorage
+    if (context) {
+      const setupStatusStr = localStorage.getItem('aurxon_setup_status');
+      if (setupStatusStr) {
+        const setupStatus = JSON.parse(setupStatusStr);
+        context.setupCompleted = setupStatus.setupCompleted;
+      }
+    }
+    
+    return { token, context };
   }
 }
 

@@ -218,14 +218,23 @@ export default function DashboardPage() {
       // 2. Setup verification stage
       setAuthStage('checking_setup');
       try {
-        const setup = await getSetupStatusApi();
-        if (!setup.setupCompleted && parsed.role !== 'SUPER_ADMIN') {
-          router.push('/setup-wizard');
-          return;
+        // SUPER_ADMIN bypass: Platform founders don't need workspace setup
+        if (parsed.role === 'SUPER_ADMIN') {
+          // Proceed to context resolution (SUPER_ADMIN skips setup requirement)
+        } else {
+          // All other roles must complete setup before accessing dashboard
+          const setup = await getSetupStatusApi();
+          
+          if (!setup.setupCompleted) {
+            router.push('/setup-wizard');
+            return;
+          }
         }
       } catch (e) {
-        console.error('Setup verification failed:', e);
-        router.push('/login');
+        console.error('Setup status verification failed:', e);
+        // On setup verification error, display error and don't allow dashboard access
+        setError('Unable to verify workspace configuration. Please retry.');
+        setLoading(false);
         return;
       }
 

@@ -6,6 +6,9 @@ import { PrismaService } from './01_Core/prisma/prisma.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { WinstonLogger } from './common/logger/winston.logger';
 import * as Sentry from '@sentry/node';
+import * as dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
 
 async function bootstrap() {
   // Validate Encryption Key at application startup

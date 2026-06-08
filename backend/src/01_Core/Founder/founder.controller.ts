@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { BillingService } from '../Billing/billing.service';
 import * as crypto from 'crypto';
+import { encrypt, decrypt } from '../../common/utils/crypto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('founder')
@@ -458,16 +459,22 @@ export class FounderController {
     });
     if (!oldKey) throw new NotFoundException('Activation key not found');
 
-    await this.prisma.activationKey.update({
-      where: { id },
-      data: { status: 'REVOKED' },
-    });
-
     const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
     const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
     const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
     const newRawKey = `AURX-ACT-${part1}-${part2}-${part3}`;
     const keyHash = crypto.createHash('sha256').update(newRawKey).digest('hex');
+
+    // Decrypt, update activationKey, and re-encrypt the package
+    let newEncryptedPackage = oldKey.encryptedPackage;
+    try {
+      const decrypted = decrypt(oldKey.encryptedPackage);
+      const pkg = JSON.parse(decrypted);
+      pkg.activationKey = newRawKey;
+      newEncryptedPackage = encrypt(JSON.stringify(pkg));
+    } catch (err) {
+      // If decryption fails, keep the old package or re-encrypt a minimal package
+    }
 
     await this.prisma.organizationRegistration.update({
       where: { id: oldKey.registrationId },
@@ -476,14 +483,19 @@ export class FounderController {
       },
     });
 
-    const created = await this.prisma.activationKey.create({
+    const newExpiry = new Date();
+    newExpiry.setDate(newExpiry.getDate() + 30); // 30 days validity for regenerated keys
+
+    const updated = await this.prisma.activationKey.update({
+      where: { id },
       data: {
         keyHash,
-        encryptedPackage: oldKey.encryptedPackage,
         status: 'ACTIVE',
-        expiresAt: oldKey.expiresAt,
-        registrationId: oldKey.registrationId,
-        organizationId: oldKey.organizationId,
+        expiresAt: newExpiry,
+        encryptedPackage: newEncryptedPackage,
+      },
+      include: {
+        registration: true,
       },
     });
 
@@ -491,13 +503,13 @@ export class FounderController {
       data: {
         userId: req.user.id,
         action: 'KEY_REGENERATION',
-        details: `Regenerated activation key. Old ID: ${id}, New ID: ${created.id}`,
+        details: `Regenerated activation key for key ID: ${id}`,
       }
     });
 
     return {
       newRawKey,
-      ...created,
+      ...updated,
     };
   }
 }

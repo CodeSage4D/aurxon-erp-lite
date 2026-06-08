@@ -37,6 +37,8 @@ export default function ProductOperationsPage() {
   const [renewMonths, setRenewMonths] = useState(12);
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [showRenewModal, setShowRenewModal] = useState(false);
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationKeyDetails, setActivationKeyDetails] = useState<any>(null);
 
   // Simulation form states
   const [orgId, setOrgId] = useState('inst-gvis');
@@ -124,7 +126,15 @@ export default function ProductOperationsPage() {
     setError('');
     try {
       const res = await provisionWorkspaceApi(id);
-      triggerToast(`Workspace provisioned! Activation Token: ${res.activationToken || 'Token Generated'}`);
+      const reg = registrations.find((r: any) => r.id === id);
+      setActivationKeyDetails({
+        orgName: reg?.orgName || 'Workspace',
+        referenceNumber: reg?.referenceNumber || 'N/A',
+        activationKey: res.activationKey,
+        workspaceUrl: `http://localhost:3000/activate`,
+        initialAdminEmail: reg?.email || 'N/A',
+      });
+      setShowActivationModal(true);
       await loadOnboardingLifecycleData();
     } catch (err: any) {
       setError(err.message || 'Workspace provisioning failed');
@@ -188,7 +198,14 @@ export default function ProductOperationsPage() {
     setError('');
     try {
       const res = await regenerateActivationKeyApi(id);
-      triggerToast(`Key regenerated! New Key: ${res.newRawKey}`);
+      setActivationKeyDetails({
+        orgName: res.registration?.orgName || 'Workspace',
+        referenceNumber: res.registration?.referenceNumber || 'N/A',
+        activationKey: res.newRawKey,
+        workspaceUrl: `http://localhost:3000/activate`,
+        initialAdminEmail: res.registration?.email || 'N/A',
+      });
+      setShowActivationModal(true);
       await loadOnboardingLifecycleData();
     } catch (err: any) {
       setError(err.message || 'Failed to regenerate activation key');
@@ -902,6 +919,96 @@ export default function ProductOperationsPage() {
                       className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold uppercase cursor-pointer"
                     >
                       Confirm Renewal
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Activation Details Modal */}
+            {showActivationModal && activationKeyDetails && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+                <div className="bg-[#0b0f19] border border-slate-900 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 to-indigo-500" />
+                  
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <KeyRound className="h-5 w-5 text-emerald-400" />
+                      <span>Workspace Key Issued</span>
+                    </h3>
+                    <button 
+                      onClick={() => setShowActivationModal(false)}
+                      className="text-zinc-500 hover:text-white p-1 hover:bg-slate-900 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <XCircle className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-400 font-semibold leading-relaxed">
+                    Workspace has been successfully provisioned. Copy these activation credentials and send them to the customer to log in and configure their platform.
+                  </p>
+
+                  <div className="space-y-3 bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
+                    <div>
+                      <span className="block text-[9px] font-black uppercase text-zinc-500 tracking-wider">Organization Name</span>
+                      <span className="text-xs text-white font-bold">{activationKeyDetails.orgName}</span>
+                    </div>
+
+                    <div>
+                      <span className="block text-[9px] font-black uppercase text-zinc-500 tracking-wider">Reference Number</span>
+                      <span className="text-xs text-zinc-300 font-mono font-bold">{activationKeyDetails.referenceNumber}</span>
+                    </div>
+
+                    <div>
+                      <span className="block text-[9px] font-black uppercase text-zinc-500 tracking-wider">Initial Admin Email</span>
+                      <span className="text-xs text-zinc-300 font-bold">{activationKeyDetails.initialAdminEmail}</span>
+                    </div>
+
+                    <div>
+                      <span className="block text-[9px] font-black uppercase text-zinc-500 tracking-wider">Activation Key (Customer Entry)</span>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="bg-slate-950 px-3 py-2 border border-slate-900 rounded-xl text-xs font-mono font-black text-emerald-400 tracking-wide select-all w-full text-center">
+                          {activationKeyDetails.activationKey || 'NO_KEY_GENERATED'}
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(activationKeyDetails.activationKey || '');
+                            triggerToast('Activation Key copied!');
+                          }}
+                          className="p-2 bg-slate-950 hover:bg-slate-900 border border-slate-900 rounded-xl text-zinc-400 hover:text-white transition cursor-pointer"
+                          title="Copy Key"
+                        >
+                          <Database className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-[9px] font-black uppercase text-zinc-500 tracking-wider">Manual Activation URL</span>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="bg-slate-950 px-3 py-2 border border-slate-900 rounded-xl text-[10px] font-mono text-zinc-300 select-all w-full">
+                          {activationKeyDetails.workspaceUrl}
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(activationKeyDetails.workspaceUrl || '');
+                            triggerToast('Activation URL copied!');
+                          }}
+                          className="p-2 bg-slate-950 hover:bg-slate-900 border border-slate-900 rounded-xl text-zinc-400 hover:text-white transition cursor-pointer"
+                          title="Copy URL"
+                        >
+                          <Database className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2.5 pt-2">
+                    <button 
+                      onClick={() => setShowActivationModal(false)}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      Done & Close
                     </button>
                   </div>
                 </div>

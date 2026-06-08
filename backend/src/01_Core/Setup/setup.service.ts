@@ -10,6 +10,28 @@ export class SetupService {
   ) {}
 
   async getSetupStatus(institutionId: string) {
+    if (!institutionId) {
+      return {
+        setupCompleted: false,
+        currentStep: 1,
+        wizardVersion: "1.0",
+        industryPackCode: "SCHOOL_ERP",
+        steps: {
+          academicConfig: false,
+          branchConfig: false,
+        },
+        details: {
+          academicYear: null,
+          gradingSystem: null,
+          timezone: null,
+          currency: null,
+          departments: "",
+          branch: null,
+          branchesCount: 0,
+        },
+      };
+    }
+
     let status = await this.prisma.organizationSetupStatus.findUnique({
       where: { institutionId },
     });
@@ -104,6 +126,9 @@ export class SetupService {
       };
     },
   ) {
+    if (!institutionId) {
+      throw new BadRequestException('Institution context is missing.');
+    }
     const nextStep = step + 1 > 3 ? 3 : step + 1;
     await this.prisma.organizationSetupStatus.upsert({
       where: { institutionId },
@@ -219,6 +244,9 @@ export class SetupService {
       };
     },
   ) {
+    if (!institutionId) {
+      throw new BadRequestException('Institution context is missing.');
+    }
     if (!data.branch.name || !data.branch.code) {
       throw new BadRequestException('Required configuration values are missing.');
     }

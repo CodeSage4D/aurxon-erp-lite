@@ -41,8 +41,18 @@ export default function SetupWizardPage() {
 
   const verifySetup = async () => {
     try {
+      // SUPER_ADMIN bypass: skip setup wizard entirely for platform founders
+      const userStr = localStorage.getItem('aurxon_user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (user && user.role === 'SUPER_ADMIN') {
+        router.replace('/founder');
+        return;
+      }
+
       const data = await getSetupStatusApi();
       setStatus(data);
+      
+      // If setup is already completed, redirect to dashboard immediately
       if (data.setupCompleted) {
         router.replace('/dashboard');
         return;
@@ -50,11 +60,12 @@ export default function SetupWizardPage() {
       
       setIndustryPackCode(data.industryPackCode || 'SCHOOL_ERP');
       
-      // Support resuming steps
-      if (data.currentStep) {
+      // Support resuming steps: if user revisits, show the step they were on
+      if (data.currentStep && data.currentStep > 0) {
         setStep(data.currentStep);
       }
 
+      // Restore saved form data from previous session
       if (data.details) {
         setForm(prev => ({
           ...prev,
@@ -76,6 +87,8 @@ export default function SetupWizardPage() {
       }
     } catch (err) {
       console.error('Failed to verify setup wizard status:', err);
+      // On error, allow user to continue with setup
+      setError('');
     } finally {
       setLoading(false);
     }
@@ -150,13 +163,29 @@ export default function SetupWizardPage() {
     setSubmitting(true);
 
     try {
+      // Submit setup configuration to backend
       await submitSetupApi(form);
+      
+      // Wait briefly for backend to persist state
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Verify submission was successful by checking setup status
+      const verifyStatus = await getSetupStatusApi();
+      if (!verifyStatus.setupCompleted) {
+        throw new Error('Setup status was not confirmed. Please try again.');
+      }
+      
+      // Refresh context with new setup completion status
       await refreshContextApi();
+      
       setStep(3);
+      
+      // Redirect to dashboard once setup is verified complete
       setTimeout(() => {
-        router.push('/dashboard');
+        router.replace('/dashboard');
       }, 1500);
     } catch (err: any) {
+      console.error('Setup wizard submission failed:', err);
       setError(err.message || 'Setup wizard failed. Please try again.');
       setSubmitting(false);
     }
