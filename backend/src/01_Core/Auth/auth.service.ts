@@ -641,7 +641,12 @@ export class AuthService {
     }
   }
 
-  async activateWorkspaceWithKey(referenceNumber: string, activationKey: string) {
+  async activateWorkspaceWithKey(
+    referenceNumber: string,
+    activationKey: string,
+    ipAddress?: string,
+    comments?: string,
+  ) {
     const pkg = await this.validateActivationKey(referenceNumber, activationKey);
 
     const keyHash = crypto.createHash('sha256').update(activationKey.trim()).digest('hex');
@@ -722,7 +727,8 @@ export class AuthService {
         data: {
           userId: user.id,
           action: 'WORKSPACE_ACTIVATION',
-          details: `Workspace activated successfully for ${reg.orgName} using key (Ref: ${referenceNumber}).`,
+          details: `Workspace activated successfully for ${reg.orgName} using key (Ref: ${referenceNumber}). Comments: ${comments || 'No comments provided'}.`,
+          ipAddress: ipAddress || null,
         },
       });
 
@@ -730,6 +736,13 @@ export class AuthService {
         email: user.email,
         orgName: reg.orgName,
         status: 'LIVE',
+        referenceNumber: reg.referenceNumber,
+        industry: pkg.industry,
+        subscription: pkg.subscription,
+        workspaceUrl: pkg.workspaceUrl,
+        issueDate: pkg.issueDate,
+        expiryDate: pkg.expiryDate,
+        modules: pkg.modules,
       };
     });
   }

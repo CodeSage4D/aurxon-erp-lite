@@ -65,6 +65,7 @@ export default function FounderDashboardPage() {
   // Stepper UI simulations & inputs
   const [requestDocsNotes, setRequestDocsNotes] = useState('');
   const [selectedRegForDocs, setSelectedRegForDocs] = useState<string | null>(null);
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<Record<string, string>>({});
 
   // Overrides & Actions
   const [directRenewalOrgId, setDirectRenewalOrgId] = useState('');
@@ -282,10 +283,10 @@ export default function FounderDashboardPage() {
     }
   };
 
-  const handleProvisionWorkspace = async (id: string) => {
+  const handleProvisionWorkspace = async (id: string, paymentStatus: string = 'TRIAL') => {
     setSubmitting(true);
     try {
-      const result = await provisionWorkspaceApi(id);
+      const result = await provisionWorkspaceApi(id, paymentStatus);
       triggerToast(`Workspace database provisioned! Licence: ${result.licenseKey}`);
       loadDashboardData();
       fetchNotifications();
@@ -691,13 +692,12 @@ export default function FounderDashboardPage() {
                 {/* ════ OVERVIEW TAB ════ */}
                 {activeTab === 'overview' && (
                   <div className="space-y-6 animate-fade-in">
-                    
                     {/* Welcome banner center OS */}
                     <div className="glass rounded-3xl p-6 border border-border relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
                       <div className="space-y-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-primary">SaaS Command Center</span>
                         <h2 className="text-xl font-black text-foreground uppercase tracking-tight">{greeting}</h2>
-                        <p className="text-xs text-zinc-500 leading-relaxed max-w-lg font-semibold">
+                        <p className="text-xs text-zinc-550 leading-relaxed max-w-lg font-semibold">
                           Your tenant platform has <span className="text-primary font-bold">{pendingApprovalsCount} pending registrations</span> to authorize, and <span className="text-primary font-bold">{pendingRenewalsCount} renewal requests</span> outstanding.
                         </p>
                       </div>
@@ -712,6 +712,23 @@ export default function FounderDashboardPage() {
                       </div>
                     </div>
 
+                    {/* Platform Lifecycle Quick Counters */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {[
+                        { label: 'Pending Review', count: registrations.filter(r => r.status === 'PENDING_REVIEW').length, color: 'text-amber-500 bg-amber-500/5' },
+                        { label: 'Provisioning', count: registrations.filter(r => r.status === 'PROVISIONING').length, color: 'text-blue-500 bg-blue-500/5 animate-pulse' },
+                        { label: 'Failed Deploy', count: registrations.filter(r => r.status === 'PROVISIONING_FAILED').length, color: 'text-red-500 bg-red-500/5' },
+                        { label: 'Activated', count: registrations.filter(r => r.status === 'LIVE' || r.status === 'ACTIVATED').length, color: 'text-emerald-500 bg-emerald-500/5' },
+                        { label: 'Trial Mode', count: registrations.filter(r => r.status === 'PROVISIONED' && r.activationKey && r.activationKey.id.includes('TRIAL')).length, color: 'text-zinc-400 bg-zinc-500/5' },
+                        { label: 'Paid / Enterprise', count: registrations.filter(r => r.status === 'PROVISIONED' && r.activationKey && r.activationKey.id.includes('PROD')).length, color: 'text-indigo-400 bg-indigo-500/5' }
+                      ].map((c, idx) => (
+                        <div key={idx} className={`glass rounded-2xl p-4 border border-border shadow-sm flex flex-col items-center justify-center text-center ${c.color}`}>
+                          <span className="text-[20px] font-black">{c.count}</span>
+                          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500 mt-1">{c.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
                     {/* Operational KPI Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       {[
@@ -723,7 +740,7 @@ export default function FounderDashboardPage() {
                         <div key={idx} className="glass rounded-2xl p-5 border border-border shadow-md space-y-3">
                           <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">{kpi.label}</span>
                           <div className="text-xl font-black text-foreground">{kpi.val}</div>
-                          <p className="text-[10px] text-zinc-400 font-semibold">{kpi.desc}</p>
+                          <p className="text-[10px] text-zinc-450 font-semibold">{kpi.desc}</p>
                         </div>
                       ))}
                     </div>
@@ -988,13 +1005,35 @@ export default function FounderDashboardPage() {
                                   </button>
                                 )}
 
-                                {reg.status === 'READY_FOR_PROVISIONING' && (
-                                  <button
-                                    onClick={() => handleProvisionWorkspace(reg.id)}
-                                    className="px-4 py-1.5 bg-primary text-primary-text text-[10px] font-black uppercase rounded-xl shadow hover-lift transition flex items-center gap-1"
-                                  >
-                                    <Database className="h-3.5 w-3.5" /> Build Workspace Deployments
-                                  </button>
+                                {(reg.status === 'READY_FOR_PROVISIONING' || reg.status === 'PROVISIONING_FAILED') && (
+                                  <div className="flex flex-col gap-2 p-3 bg-secondary/20 border border-border rounded-2xl w-full">
+                                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Payment Status Selection</span>
+                                    <div className="flex items-center gap-3">
+                                      <select
+                                        value={selectedPaymentStatus[reg.id] || 'TRIAL'}
+                                        onChange={(e) => setSelectedPaymentStatus(prev => ({ ...prev, [reg.id]: e.target.value }))}
+                                        className="text-xs bg-input border border-border text-foreground px-3 py-1.5 rounded-xl outline-none"
+                                      >
+                                        <option value="TRIAL">Trial (30 Days)</option>
+                                        <option value="PAID">Paid / Professional (1 Year)</option>
+                                        <option value="PARTIAL">Partial Payment (1 Year)</option>
+                                        <option value="PENDING">Pending Payment (Trial)</option>
+                                        <option value="ENTERPRISE">Enterprise Contract (1 Year)</option>
+                                      </select>
+                                      <button
+                                        onClick={() => handleProvisionWorkspace(reg.id, selectedPaymentStatus[reg.id] || 'TRIAL')}
+                                        className="px-4 py-1.5 bg-primary text-primary-text text-[10px] font-black uppercase rounded-xl shadow hover-lift transition flex items-center gap-1.5"
+                                      >
+                                        <Database className="h-3.5 w-3.5" /> 
+                                        {reg.status === 'PROVISIONING_FAILED' ? 'Retry Provision Workspace' : 'Build Workspace Deployments'}
+                                      </button>
+                                    </div>
+                                    {reg.status === 'PROVISIONING_FAILED' && (
+                                      <div className="text-[10px] text-destructive font-semibold">
+                                        Last Provision Attempt Failed. You can select status and retry.
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
 
                                 {isProvisioned && reg.activationKey && (

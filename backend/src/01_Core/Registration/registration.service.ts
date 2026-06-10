@@ -294,7 +294,7 @@ Slug: ${provisionResult.slug}
   /**
    * Triggers the transactional Workspace Provisioning Engine.
    */
-  async provisionWorkspace(id: string, reviewerId: string) {
+  async provisionWorkspace(id: string, reviewerId: string, paymentStatus: string = 'TRIAL', ipAddress?: string) {
     const reg = await this.prisma.organizationRegistration.findUnique({
       where: { id },
     });
@@ -303,12 +303,98 @@ Slug: ${provisionResult.slug}
       throw new NotFoundException('Registration record not found');
     }
 
-    // Allow Founder to bypass and provision directly if APPROVED
-    if (reg.status !== 'READY_FOR_PROVISIONING' && reg.status !== 'APPROVED' && reg.status !== 'APPROVED_WITH_CONDITIONS') {
-      throw new BadRequestException('Registration is not ready for workspace provisioning');
+    // 1. Provision Lock
+    if (reg.status === 'PROVISIONING') {
+      throw new BadRequestException('Workspace provisioning is currently running. Please wait.');
     }
 
-    const provisionResult = await this.provisioningService.provisionTenant(id);
+    // 2. Idempotency Check
+    if (reg.status === 'PROVISIONED' || reg.status === 'LIVE' || reg.institutionId) {
+      const inst = await this.prisma.institution.findUnique({
+        where: { id: reg.institutionId! },
+        include: { tenant: true, license: true }
+      });
+      return {
+        alreadyProvisioned: true,
+        registrationId: id,
+        status: reg.status,
+        tenantId: inst?.tenantId,
+        institutionId: inst?.id,
+        slug: inst?.tenant?.slug,
+        licenseKey: inst?.license?.licenseKey,
+      };
+    }
+
+    // Allow Founder to bypass and provision directly if in correct lifecycle state
+    const allowedStatuses = ['READY_FOR_PROVISIONING', 'APPROVED', 'APPROVED_WITH_CONDITIONS', 'PROVISIONING_FAILED', 'PENDING_REVIEW'];
+    if (!allowedStatuses.includes(reg.status)) {
+      throw new BadRequestException(`Registration is not ready for workspace provisioning (status: ${reg.status})`);
+    }
+
+    // Acquire lock: set status to PROVISIONING
+    await this.prisma.organizationRegistration.update({
+      where: { id },
+      data: { status: 'PROVISIONING' },
+    });
+
+    // Auditing Payment Selection
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: reviewerId,
+          action: 'PAYMENT_AUDIT',
+          details: `Founder verified payment status: ${paymentStatus} for ${reg.orgName} (Ref: ${reg.referenceNumber}).`,
+          ipAddress: ipAddress || null,
+        },
+      });
+    } catch (auditErr) {
+      console.error('Failed to log payment audit:', auditErr);
+    }
+
+    let provisionResult: any;
+    try {
+      provisionResult = await this.provisioningService.provisionTenant(id, paymentStatus);
+    } catch (err: any) {
+      // Revert status to PROVISIONING_FAILED (Failed Provision Queue)
+      const errorMsg = err.message || err.toString();
+      await this.prisma.organizationRegistration.update({
+        where: { id },
+        data: {
+          status: 'PROVISIONING_FAILED',
+          reviewNotes: `Provisioning failed: ${errorMsg}`,
+        },
+      });
+      
+      // Log failure in AuditLog
+      try {
+        await this.prisma.auditLog.create({
+          data: {
+            userId: reviewerId,
+            action: 'WORKSPACE_PROVISIONING_FAILED',
+            details: `Workspace provisioning failed for ${reg.orgName}. Error: ${errorMsg}`,
+            ipAddress: ipAddress || null,
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to log failed provisioning audit:', auditErr);
+      }
+
+      throw new BadRequestException(`Workspace provisioning failed: ${errorMsg}`);
+    }
+
+    // Provision Success: Create Audit Log
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: reviewerId,
+          action: 'WORKSPACE_PROVISIONING',
+          details: `Workspace provisioned successfully for ${reg.orgName} (Slug: ${provisionResult.slug}) with plan status: ${paymentStatus}.`,
+          ipAddress: ipAddress || null,
+        },
+      });
+    } catch (auditErr) {
+      console.error('Failed to log provisioning success audit:', auditErr);
+    }
 
     try {
       await this.notifService.createSystemNotif(
@@ -320,15 +406,6 @@ Slug: ${provisionResult.slug}
     } catch (err) {
       console.error(err);
     }
-
-    // Create Audit Log
-    await this.prisma.auditLog.create({
-      data: {
-        userId: reviewerId,
-        action: 'WORKSPACE_PROVISIONING',
-        details: `Workspace provisioned for ${reg.orgName} (Slug: ${provisionResult.slug}).`,
-      },
-    });
 
     return {
       registrationId: id,

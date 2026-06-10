@@ -84,9 +84,16 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('activate/verify')
   async activateWithKey(
-    @Body() body: { referenceNumber: string; activationKey: string },
+    @Request() req: any,
+    @Body() body: { referenceNumber: string; activationKey: string; comments?: string },
   ) {
-    return this.authService.activateWorkspaceWithKey(body.referenceNumber, body.activationKey);
+    const ipAddress = req.ip || (req.headers && req.headers['x-forwarded-for']) || null;
+    return this.authService.activateWorkspaceWithKey(
+      body.referenceNumber,
+      body.activationKey,
+      ipAddress,
+      body.comments
+    );
   }
 
   @HttpCode(HttpStatus.OK)

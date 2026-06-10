@@ -92,10 +92,13 @@ export class RegistrationController {
   async provision(
     @Request() req,
     @Param('id') id: string,
+    @Body() body: { paymentStatus?: string },
   ) {
     if (req.user.role !== 'SUPER_ADMIN') {
       await this.checkTeamRole(req.user.id, ['FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR']);
     }
-    return this.registrationService.provisionWorkspace(id, req.user.id);
+    const paymentStatus = body.paymentStatus || 'TRIAL';
+    const ipAddress = req.ip || (req.headers && req.headers['x-forwarded-for']) || null;
+    return this.registrationService.provisionWorkspace(id, req.user.id, paymentStatus, ipAddress);
   }
 }

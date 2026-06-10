@@ -13,11 +13,22 @@ export default function ActivatePage() {
 
   const [referenceNumber, setReferenceNumber] = useState('');
   const [activationKey, setActivationKey] = useState('');
+  const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [activationData, setActivationData] = useState<any>(null);
   const [copied, setCopied] = useState('');
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        setReferenceNumber(ref.toUpperCase());
+      }
+    }
+  }, []);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +45,11 @@ export default function ActivatePage() {
 
     setLoading(true);
     try {
-      const data = await verifyActivationKeyApi(referenceNumber.trim(), activationKey.trim());
+      const data = await verifyActivationKeyApi(
+        referenceNumber.trim(),
+        activationKey.trim(),
+        comments.trim() || undefined
+      );
       setActivationData(data);
       setSuccess(true);
     } catch (err: any) {
@@ -229,6 +244,21 @@ export default function ActivatePage() {
               className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-mono font-bold text-gray-800 placeholder-gray-300 focus:outline-none focus:border-indigo-400 focus:bg-white transition"
               disabled={loading}
               autoComplete="off"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-black uppercase tracking-wider text-gray-500">
+              Comments / Notes (Optional)
+            </label>
+            <textarea
+              id="activation-comments-input"
+              value={comments}
+              onChange={e => setComments(e.target.value)}
+              placeholder="e.g. Activated by Principal Karan for School deployment."
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-semibold text-gray-800 placeholder-gray-300 focus:outline-none focus:border-indigo-400 focus:bg-white transition resize-none font-sans"
+              disabled={loading}
             />
           </div>
 

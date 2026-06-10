@@ -34,7 +34,7 @@ export class ProvisioningService {
   /**
    * Transactionally provisions a new Tenant and its associated resources.
    */
-  async provisionTenant(registrationId: string) {
+  async provisionTenant(registrationId: string, paymentStatus: string = 'TRIAL') {
     const registration = await this.prisma.organizationRegistration.findUnique({
       where: { id: registrationId },
     });
@@ -43,8 +43,9 @@ export class ProvisioningService {
       throw new BadRequestException('Registration record not found');
     }
 
-    if (registration.status !== 'APPROVED' && registration.status !== 'READY_FOR_PROVISIONING') {
-      throw new BadRequestException('Registration must be approved or ready before provisioning');
+    const allowedStatuses = ['READY_FOR_PROVISIONING', 'APPROVED', 'APPROVED_WITH_CONDITIONS', 'PROVISIONING_FAILED', 'PENDING_REVIEW', 'PROVISIONING'];
+    if (!allowedStatuses.includes(registration.status)) {
+      throw new BadRequestException(`Registration is not ready for workspace provisioning (status: ${registration.status})`);
     }
 
     if (registration.institutionId) {
@@ -61,26 +62,41 @@ export class ProvisioningService {
     }
 
     const slug = await this.generateUniqueSlug(registration.orgName);
+    
+    // Resolve plan structure based on paymentStatus
+    const isProd = ['PAID', 'PARTIAL', 'ENTERPRISE'].includes(paymentStatus.toUpperCase());
+    const isEnterprise = paymentStatus.toUpperCase() === 'ENTERPRISE';
+    const planCode = isEnterprise ? 'ENTERPRISE' : (isProd ? 'PROFESSIONAL' : 'TRIAL');
+    const licenseType = isProd ? 'PRODUCTION' : 'TRIAL';
+    const expiresDurationDays = isProd ? 365 : 30;
+
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + expiresDurationDays * 24 * 60 * 60 * 1000);
+
+    console.log(`[PROVISIONING] Transaction Started for registration ID: ${registrationId}`);
 
     return await this.prisma.$transaction(async (tx) => {
       // 1. Create Tenant
+      console.log(`[PROVISIONING] Step 1: Creating Tenant (Slug: ${slug}, Plan: ${planCode})...`);
       const tenant = await tx.tenant.create({
         data: {
           name: registration.orgName,
           slug,
           status: 'ACTIVE',
-          plan: 'TRIAL',
+          plan: planCode,
         },
       });
+      console.log(`[PROVISIONING] Step 1: Tenant created (ID: ${tenant.id}).`);
 
       // 2. Create Institution
+      console.log(`[PROVISIONING] Step 2: Creating Institution and Custom Branding...`);
       const institution = await tx.institution.create({
         data: {
           name: registration.orgName,
           tenantId: tenant.id,
           orgType: registration.orgType,
-          status: 'ACTIVE', // Kept active for seamless setup, status mapped to LIVE upon activation
-          primaryColor: registration.primaryColor || '#0284c7', // Sky-600 or custom primary color
+          status: 'ACTIVE', // Kept active for seamless setup
+          primaryColor: registration.primaryColor || '#0284c7',
           logoUrl: registration.logoUrl || null,
           industryPackCode: pack.code,
         },
@@ -94,20 +110,23 @@ export class ProvisioningService {
           primaryColor: registration.primaryColor || '#0284c7',
         }
       });
+      console.log(`[PROVISIONING] Step 2: Institution and Branding resolved.`);
 
       // 3. Link Institution to Registration
+      console.log(`[PROVISIONING] Step 3: Linking Institution to Registration record...`);
       await tx.organizationRegistration.update({
         where: { id: registrationId },
         data: { institutionId: institution.id },
       });
+      console.log(`[PROVISIONING] Step 3: Link updated.`);
 
       // 4. Create default Roles
+      console.log(`[PROVISIONING] Step 4: Seeding default roles...`);
       let defaultRoles = (pack.defaultRoles as any[]) || [
         { roleCode: 'SUPER_ADMIN', roleName: 'Super Admin' },
         { roleCode: 'INSTITUTE_ADMIN', roleName: 'Institute Admin' }
       ];
 
-      // Merge and auto-create all roles as per Production Implementation Plan V2.1
       if (packCode === 'SCHOOL_ERP') {
         const schoolRoles = [
           { roleCode: 'CHAIRMAN', roleName: 'Chairman' },
@@ -148,11 +167,12 @@ export class ProvisioningService {
         });
         roles[roleDef.roleCode] = role.id;
       }
+      console.log(`[PROVISIONING] Step 4: Roles seeded successfully.`);
 
       // 5. Seed default permissions for roles
+      console.log(`[PROVISIONING] Step 5: Seeding default permissions...`);
       const permissionsTemplate = (pack.defaultPermissions as Record<string, any[]>) || {};
       
-      // Auto-assign default permission packs for V2.1
       if (packCode === 'SCHOOL_ERP') {
         const schoolPermissions: Record<string, any[]> = {
           INSTITUTE_ADMIN: [
@@ -242,8 +262,10 @@ export class ProvisioningService {
           data: permissionDataList,
         });
       }
+      console.log(`[PROVISIONING] Step 5: Default permissions seeded.`);
 
       // 6. Activate default modules for pack + requested modules
+      console.log(`[PROVISIONING] Step 6: Enabling pack modules & features...`);
       const modulesToEnable = Array.from(
         new Set([...(pack.defaultModules || []), ...(registration.requestedModules || [])]),
       );
@@ -265,7 +287,7 @@ export class ProvisioningService {
         }
       }
 
-      // 6.5 Activate requested features
+      // Enable requested features
       const featuresToEnable = registration.requestedFeatures || [];
       if (featuresToEnable.length > 0) {
         const featuresInDb = await tx.feature.findMany({
@@ -283,37 +305,39 @@ export class ProvisioningService {
           });
         }
       }
+      console.log(`[PROVISIONING] Step 6: Modules and features configuration committed.`);
 
-      // 7. Create Trial Subscription
-      const trialDurationDays = 30;
-      const startDate = new Date();
-      const endDate = new Date(startDate.getTime() + trialDurationDays * 24 * 60 * 60 * 1000);
-
+      // 7. Create Subscription (Plan matches payment selection)
+      console.log(`[PROVISIONING] Step 7: Creating Subscription (Plan: ${planCode}, Duration: ${expiresDurationDays} days)...`);
       await tx.subscription.create({
         data: {
           organizationId: institution.id,
-          planCode: 'TRIAL',
+          planCode,
           status: 'ACTIVE',
-          studentLimit: 500,
-          storageLimitGb: 10.0,
+          studentLimit: planCode === 'ENTERPRISE' ? 10000 : (planCode === 'PROFESSIONAL' ? 2000 : 500),
+          storageLimitGb: planCode === 'ENTERPRISE' ? 500.0 : (planCode === 'PROFESSIONAL' ? 50.0 : 10.0),
           startDate,
           endDate,
         },
       });
+      console.log(`[PROVISIONING] Step 7: Subscription created.`);
 
-      // 8. Create Trial License
-      const licenseKey = `LIC-TRIAL-${slug.toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-
+      // 8. Create License (Using LIC-PROD / LIC-TRIAL prefixes)
+      const licensePrefix = isProd ? 'LIC-PROD' : 'LIC-TRIAL';
+      const licenseKey = `${licensePrefix}-${slug.toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      
+      console.log(`[PROVISIONING] Step 8: Creating License (Key: ${licenseKey}, Type: ${licenseType})...`);
       await tx.license.create({
         data: {
           organizationId: institution.id,
           licenseKey,
-          licenseType: 'TRIAL',
+          licenseType,
           status: 'ACTIVE',
           expiresAt: endDate,
           gracePeriodDays: 14,
         },
       });
+      console.log(`[PROVISIONING] Step 8: License created.`);
 
       // 8.5 Create Activation Key
       let activationKey = '';
@@ -322,17 +346,19 @@ export class ProvisioningService {
         const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
         const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
         const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
-        activationKey = `AURX-ACT-${part1}-${part2}-${part3}`;
+        const actPrefix = isProd ? 'AURX-PROD' : 'AURX-TRIAL';
+        activationKey = `${actPrefix}-${part1}-${part2}-${part3}`;
         const keyHash = crypto.createHash('sha256').update(activationKey).digest('hex');
 
         activationToken = crypto.randomBytes(48).toString('hex');
         const tokenHash = crypto.createHash('sha256').update(activationToken).digest('hex');
 
+        console.log(`[PROVISIONING] Step 8.5: Storing Activation Key (Key: ${activationKey})...`);
         const pkg = {
           referenceNumber: registration.referenceNumber,
           orgName: registration.orgName,
           industry: packCode,
-          subscription: 'TRIAL',
+          subscription: planCode,
           modules: modulesToEnable,
           features: featuresToEnable,
           activationToken,
@@ -364,6 +390,7 @@ export class ProvisioningService {
             activationTokenId: tokenHash,
           },
         });
+        console.log(`[PROVISIONING] Step 8.5: Activation Key structure seeded.`);
       } else {
         await tx.organizationRegistration.update({
           where: { id: registration.id },
@@ -374,6 +401,7 @@ export class ProvisioningService {
       }
 
       // 9. Create Default Settings
+      console.log(`[PROVISIONING] Step 9: Seeding Default Settings...`);
       const setting = await tx.organizationSetting.create({
         data: {
           organizationId: institution.id,
@@ -390,7 +418,7 @@ export class ProvisioningService {
         ],
       });
 
-      // 9.5 Create Default Settings table entry (Silent Auto Configuration)
+      // Create Default Settings table entry (Silent Auto Configuration)
       await tx.settings.create({
         data: {
           institutionId: institution.id,
@@ -401,7 +429,7 @@ export class ProvisioningService {
         },
       });
 
-      // 9.6 Create Default Branch (Main branch)
+      // Create Default Branch (Main branch)
       await tx.branch.create({
         data: {
           institutionId: institution.id,
@@ -415,7 +443,7 @@ export class ProvisioningService {
         },
       });
 
-      // 9.7 Create Default Academic Session (AcademicYear table)
+      // Create Default Academic Session (AcademicYear table)
       await tx.academicYear.create({
         data: {
           institutionId: institution.id,
@@ -427,7 +455,7 @@ export class ProvisioningService {
         },
       });
 
-      // 9.8 Create Organization Setup Status (marked setupCompleted = true, version 2.0 to bypass wizard)
+      // Create Organization Setup Status (marked setupCompleted = true to bypass wizard)
       await tx.organizationSetupStatus.create({
         data: {
           institutionId: institution.id,
@@ -438,6 +466,8 @@ export class ProvisioningService {
           wizardVersion: '2.0',
         },
       });
+      console.log(`[PROVISIONING] Step 9: Default configuration completed.`);
+      console.log(`[PROVISIONING] Transaction Committed successfully for registration ID: ${registrationId}`);
 
       return {
         tenantId: tenant.id,

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Building2, ArrowRight, ArrowLeft, Check, CheckCircle2, AlertCircle, Sparkles, 
-  GraduationCap, Stethoscope, Briefcase, KeyRound, User, Eye, EyeOff, Copy
+  GraduationCap, Stethoscope, Briefcase, KeyRound, User, Eye, EyeOff, Copy, Loader2
 } from 'lucide-react';
 import { registerOrganizationWithAdminApi } from '@/lib/api';
 
@@ -92,6 +92,9 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  const [submitAttempts, setSubmitAttempts] = useState(0);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   // Form State
   const [form, setForm] = useState({
@@ -113,6 +116,45 @@ export default function RegisterPage() {
     primaryColor: '#6366f1',
     logoUrl: '',
   });
+
+  // Load draft on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('aurxon_registration_draft');
+        if (raw) {
+          const draft = JSON.parse(raw);
+          const age = Date.now() - (draft.timestamp || 0);
+          const twentyFourHours = 24 * 60 * 60 * 1000;
+          if (age < twentyFourHours) {
+            if (draft.form) setForm(draft.form);
+            if (draft.step) setStep(draft.step);
+          } else {
+            localStorage.removeItem('aurxon_registration_draft');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load registration draft:', err);
+      }
+      setDraftLoaded(true);
+    }
+  }, []);
+
+  // Save draft on form or step change
+  React.useEffect(() => {
+    if (draftLoaded && typeof window !== 'undefined') {
+      try {
+        const draft = {
+          form,
+          step,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('aurxon_registration_draft', JSON.stringify(draft));
+      } catch (err) {
+        console.error('Failed to save registration draft:', err);
+      }
+    }
+  }, [form, step, draftLoaded]);
 
   const activePack = INDUSTRY_PACKS.find(p => p.id === form.industryPackCode) || INDUSTRY_PACKS[0];
 
@@ -185,10 +227,18 @@ export default function RegisterPage() {
     setStep(prev => prev - 1);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (loading) return; // Prevent duplicate submissions
+
+    if (submitAttempts >= 3) {
+      setError('You have reached the maximum of 3 registration submission attempts. Please refresh the page or contact support.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+    setSubmitAttempts(prev => prev + 1);
 
     let usersCount = 50;
     if (form.orgSize === 'SMALL') usersCount = 50;
@@ -215,6 +265,12 @@ export default function RegisterPage() {
         primaryColor: form.primaryColor || '#6366f1',
         logoUrl: form.logoUrl || undefined,
       });
+
+      // Clear local storage draft upon success
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('aurxon_registration_draft');
+      }
+
       setReferenceNumber(result.referenceNumber || '');
       setSuccess(true);
     } catch (err: any) {
@@ -349,9 +405,34 @@ export default function RegisterPage() {
           </div>
 
           {error && (
-            <div className="mb-6 rounded-2xl bg-rose-50 border border-rose-100 p-4 flex gap-3 text-xs text-rose-600 font-semibold animate-fade-in">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="mb-6 rounded-2xl bg-rose-50 border border-rose-100 p-4 flex flex-col gap-3 text-xs text-rose-650 font-semibold animate-fade-in">
+              <div className="flex gap-3">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
+                <div className="space-y-1 flex-1">
+                  <span className="font-extrabold uppercase tracking-wide">
+                    {error.includes('Failed to fetch') || error.toLowerCase().includes('network') 
+                      ? 'Network Connection Failure' 
+                      : 'Submission Error'}
+                  </span>
+                  <p className="text-gray-500 font-medium leading-relaxed mt-0.5">
+                    {error.includes('Failed to fetch') || error.toLowerCase().includes('network')
+                      ? 'Unable to connect to the AURXON registration server. Please verify your internet connection or try again shortly.'
+                      : error}
+                  </p>
+                </div>
+              </div>
+              {(error.includes('Failed to fetch') || error.toLowerCase().includes('network')) && (
+                <div className="flex justify-end border-t border-rose-100/50 pt-2.5 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSubmit()}
+                    disabled={loading}
+                    className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black uppercase text-[9px] tracking-wider transition shadow-sm"
+                  >
+                    Retry Submission
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -785,9 +866,16 @@ export default function RegisterPage() {
                   type="submit"
                   id="submit-registration-btn"
                   disabled={loading}
-                  className="flex items-center gap-1.5 px-8 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-650 hover:from-indigo-600 hover:to-indigo-700 text-xs font-black uppercase tracking-wider text-white shadow-lg transition-all duration-300 disabled:opacity-60"
+                  className="flex items-center gap-1.5 px-8 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-650 hover:from-indigo-600 hover:to-indigo-700 text-xs font-black uppercase tracking-wider text-white shadow-lg transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Submitting…' : 'Submit Registration'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Submitting…
+                    </>
+                  ) : (
+                    'Submit Registration'
+                  )}
                 </button>
               )}
             </div>

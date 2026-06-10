@@ -4621,11 +4621,11 @@ export async function regenerateActivationKeyApi(id: string) {
 
 // ─── Workspace Activation with Key ───────────────────────────────────────────
 
-export async function verifyActivationKeyApi(referenceNumber: string, activationKey: string) {
+export async function verifyActivationKeyApi(referenceNumber: string, activationKey: string, comments?: string) {
   const res = await fetch(`${API_URL}/auth/activate/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ referenceNumber, activationKey }),
+    body: JSON.stringify({ referenceNumber, activationKey, comments }),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
@@ -4679,10 +4679,11 @@ export async function technicalReviewRegistrationApi(id: string, notes?: string)
   return await res.json();
 }
 
-export async function provisionWorkspaceApi(id: string) {
+export async function provisionWorkspaceApi(id: string, paymentStatus: string = 'TRIAL') {
   const res = await fetch(`${API_URL}/registrations/${id}/provision`, {
     method: 'POST',
     headers: getHeaders(),
+    body: JSON.stringify({ paymentStatus }),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
