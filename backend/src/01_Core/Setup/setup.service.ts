@@ -4,6 +4,8 @@ import { AuditLogService } from '../AuditLogs/audit-log.service';
 
 @Injectable()
 export class SetupService {
+  private verifiedInstitutions = new Set<string>();
+
   constructor(
     private prisma: PrismaService,
     private auditLogService: AuditLogService,
@@ -11,6 +13,7 @@ export class SetupService {
 
   async ensureInstitutionConfig(institutionId: string) {
     if (!institutionId) return;
+    if (this.verifiedInstitutions.has(institutionId)) return;
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -124,13 +127,17 @@ export class SetupService {
           { roleCode: 'IT_ADMIN', roleName: 'IT Admin' },
         ];
 
+        const existingRolesList = await tx.role.findMany({
+          where: { institutionId, code: { in: defaultRoles.map(r => r.roleCode) } },
+        });
+
+        const existingRolesMap = new Map(existingRolesList.map(r => [r.code, r.id]));
         const roles: Record<string, string> = {};
+
         for (const roleDef of defaultRoles) {
-          let role = await tx.role.findFirst({
-            where: { institutionId, code: roleDef.roleCode },
-          });
-          if (!role) {
-            role = await tx.role.create({
+          let roleId = existingRolesMap.get(roleDef.roleCode);
+          if (!roleId) {
+            const newRole = await tx.role.create({
               data: {
                 name: roleDef.roleName,
                 code: roleDef.roleCode,
@@ -138,8 +145,9 @@ export class SetupService {
                 institutionId,
               },
             });
+            roleId = newRole.id;
           }
-          roles[roleDef.roleCode] = role.id;
+          roles[roleDef.roleCode] = roleId;
         }
 
         // Seed default permissions for roles (Production Implementation Plan V2.1)
@@ -209,14 +217,21 @@ export class SetupService {
           ]
         };
 
+        const roleIds = Object.values(roles);
+        const existingPermissions = await tx.permission.findMany({
+          where: { roleId: { in: roleIds } },
+        });
+
+        const permSet = new Set(
+          existingPermissions.map(p => `${p.roleId}:${p.resource}:${p.action}`)
+        );
+
         for (const [roleCode, perms] of Object.entries(permissionsTemplate)) {
           const roleId = roles[roleCode];
           if (roleId && Array.isArray(perms)) {
             for (const p of perms) {
-              const existingPermission = await tx.permission.findFirst({
-                where: { roleId, resource: p.resource, action: p.action },
-              });
-              if (!existingPermission) {
+              const key = `${roleId}:${p.resource}:${p.action}`;
+              if (!permSet.has(key)) {
                 await tx.permission.create({
                   data: {
                     roleId,
@@ -248,7 +263,8 @@ export class SetupService {
             wizardVersion: '2.0',
           },
         });
-      }, { timeout: 20000 });
+      }, { maxWait: 120000, timeout: 120000 });
+      this.verifiedInstitutions.add(institutionId);
     } catch (err) {
       console.error(`Silent self-healing failed for institution ${institutionId}:`, err);
     }

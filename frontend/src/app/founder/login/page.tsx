@@ -86,7 +86,7 @@ export default function FounderLoginPage() {
           <h2 className="mt-6 text-3xl font-black tracking-tight text-white uppercase bg-clip-text bg-gradient-to-r from-zinc-100 via-zinc-200 to-zinc-400">
             AURXON OS
           </h2>
-          <p className="mt-2 text-xs font-bold text-cyan-450 uppercase tracking-widest flex items-center justify-center gap-1.5">
+          <p className="mt-2 text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center justify-center gap-1.5">
             <Terminal className="h-3.5 w-3.5 text-cyan-500" />
             Founder Command Cockpit
           </p>
@@ -100,7 +100,7 @@ export default function FounderLoginPage() {
           <form className="space-y-6" onSubmit={handleFounderLogin}>
             
             {/* Warning Message Banner */}
-            <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-450 font-medium flex gap-2 items-start leading-relaxed">
+            <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-400 font-medium flex gap-2 items-start leading-relaxed">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
               <div>
                 <span className="uppercase text-[9px] font-bold block text-amber-500 tracking-wider">Restricted Channel</span>
@@ -129,7 +129,8 @@ export default function FounderLoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-3 pl-10 pr-3 text-xs font-medium text-white placeholder-zinc-550 focus:border-cyan-550 focus:ring-1 focus:ring-cyan-550 transition-all outline-none"
+                    style={{ backgroundColor: '#09090b9a', color: '#ffffff', borderColor: '#27272a' }}
+                    className="block w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-3 pl-10 pr-3 text-xs font-medium text-white placeholder-zinc-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all outline-none"
                     placeholder="name@aurxon.com"
                   />
                 </div>
@@ -150,7 +151,8 @@ export default function FounderLoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-3 pl-10 pr-10 text-xs font-medium text-white placeholder-zinc-550 focus:border-cyan-550 focus:ring-1 focus:ring-cyan-550 transition-all outline-none"
+                    style={{ backgroundColor: '#09090b9a', color: '#ffffff', borderColor: '#27272a' }}
+                    className="block w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-3 pl-10 pr-10 text-xs font-medium text-white placeholder-zinc-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all outline-none"
                     placeholder="••••••••••••"
                   />
                   <button
@@ -186,10 +188,10 @@ export default function FounderLoginPage() {
 
         {/* Footer info */}
         <div className="text-center space-y-1">
-          <p className="text-[10px] text-zinc-650 font-mono">
+          <p className="text-[10px] text-zinc-500 font-mono">
             AURXON OS Control-Plane Layer V4.0
           </p>
-          <p className="text-[9px] text-zinc-700">
+          <p className="text-[9px] text-zinc-650">
             Authorized connection. Handshakes are authenticated via asymmetric RSA certificates.
           </p>
         </div>

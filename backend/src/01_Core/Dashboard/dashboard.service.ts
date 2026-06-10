@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const layoutCache = new Map<string, { data: any; timestamp: number }>();
+const dashboardPackCache = new Map<string, any>();
+const instPackCodeCache = new Map<string, string>();
 
 @Injectable()
 export class DashboardService {
@@ -199,25 +201,34 @@ export class DashboardService {
   async getLayout(institutionId: string, role: string, enabledModules: string[]) {
     const cacheKey = `${institutionId}-${role}-${(enabledModules || []).join(',')}`;
     const cached = layoutCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < 5000) {
+    if (cached && (Date.now() - cached.timestamp) < 600000) {
       return cached.data;
     }
 
-    const inst = await this.prisma.institution.findUnique({
-      where: { id: institutionId },
-      select: { industryPackCode: true },
-    });
-
-    const packCode = inst?.industryPackCode || 'SCHOOL_ERP';
-    let pack = await this.prisma.industryPack.findUnique({
-      where: { code: packCode },
-    });
-
-    if (!pack) {
-      // Fallback
-      pack = await this.prisma.industryPack.findUnique({
-        where: { code: 'SCHOOL_ERP' },
+    let packCode = instPackCodeCache.get(institutionId);
+    if (!packCode) {
+      const inst = await this.prisma.institution.findUnique({
+        where: { id: institutionId },
+        select: { industryPackCode: true },
       });
+      packCode = inst?.industryPackCode || 'SCHOOL_ERP';
+      instPackCodeCache.set(institutionId, packCode);
+    }
+
+    let pack = dashboardPackCache.get(packCode);
+    if (!pack) {
+      pack = await this.prisma.industryPack.findUnique({
+        where: { code: packCode },
+      });
+      if (!pack) {
+        // Fallback
+        pack = await this.prisma.industryPack.findUnique({
+          where: { code: 'SCHOOL_ERP' },
+        });
+      }
+      if (pack) {
+        dashboardPackCache.set(packCode, pack);
+      }
     }
 
     if (!pack || !pack.defaultDashboard) {

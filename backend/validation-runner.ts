@@ -3,10 +3,12 @@ import { randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = 'http://127.0.0.1:5000';
 
 async function logIn(email: string, pass: string) {
-  const res = await fetch(`${BACKEND_URL}/auth/login`, {
+  const isFounderOrTeam = email === 'founder@aurxon.com' || email.includes('finance-test');
+  const url = isFounderOrTeam ? `${BACKEND_URL}/auth/founder/login` : `${BACKEND_URL}/auth/login`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, pass }),
@@ -169,6 +171,13 @@ async function runValidations() {
 
   // --- Scenario 3 & 4: Org Lifecycle & Registration Approval Workflow ---
   try {
+    // Pre-verify phone number via OTP for validation-runner
+    await prisma.otpVerification.upsert({
+      where: { phone: '9876543210' },
+      create: { phone: '9876543210', otpCode: '123456', expiresAt: new Date(Date.now() + 600000), verified: true },
+      update: { verified: true },
+    });
+
     const regEmail = `test-org-${Date.now()}@lifecycle.com`;
     // 1. Submit Registration
     const regRes = await fetch(`${BACKEND_URL}/registrations/register`, {
@@ -183,12 +192,16 @@ async function runValidations() {
         requestedModules: ['STUDENT_MANAGEMENT', 'ATTENDANCE'],
       }),
     });
+    let regData: any;
     if (!regRes.ok) {
+      const errText = await regRes.text();
       console.log('--- DEBUG REGISTRATION FAILURE ---');
       console.log('Status:', regRes.status);
-      console.log('Body:', await regRes.text());
+      console.log('Body:', errText);
+      throw new Error(`Registration failed: ${errText}`);
+    } else {
+      regData = await regRes.json();
     }
-    const regData = await regRes.json();
 
     // 2. Reject Case First
     const rejectEmail = `reject-org-${Date.now()}@lifecycle.com`;
@@ -203,7 +216,16 @@ async function runValidations() {
         industryPackCode: 'SCHOOL_ERP',
       }),
     });
-    const rejectData = await regRejectRes.json();
+    let rejectData: any;
+    if (!regRejectRes.ok) {
+      const errText = await regRejectRes.text();
+      console.log('--- DEBUG REGISTRATION REJECT FAILURE ---');
+      console.log('Status:', regRejectRes.status);
+      console.log('Body:', errText);
+      throw new Error(`Rejected registration failed: ${errText}`);
+    } else {
+      rejectData = await regRejectRes.json();
+    }
 
     // Reject it
     await fetch(`${BACKEND_URL}/registrations/${rejectData.id}/review`, {

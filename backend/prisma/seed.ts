@@ -362,7 +362,7 @@ async function main() {
 
   console.log('Aurxon Operations Team seeded.');
 
-  // 6. Seed the 4 Demo Organizations
+  // 6. Seed the 4 Demo Organizations + 2 Validation Organizations
   const demoOrgs = [
     {
       name: 'Green Valley International School',
@@ -374,7 +374,8 @@ async function main() {
       phone: '+91 9876543210',
       city: 'Bhopal',
       state: 'Madhya Pradesh',
-      board: 'CBSE'
+      board: 'CBSE',
+      primaryColor: '#0284c7'
     },
     {
       name: 'Bright Future Academy',
@@ -386,7 +387,8 @@ async function main() {
       phone: '+91 9988776655',
       city: 'Delhi',
       state: 'Delhi',
-      board: 'CBSE'
+      board: 'CBSE',
+      primaryColor: '#0284c7'
     },
     {
       name: 'Delhi Heights Public School',
@@ -398,7 +400,8 @@ async function main() {
       phone: '+91 8877665544',
       city: 'Delhi',
       state: 'Delhi',
-      board: 'CBSE'
+      board: 'CBSE',
+      primaryColor: '#0284c7'
     },
     {
       name: 'Scholars World School',
@@ -410,7 +413,34 @@ async function main() {
       phone: '+91 7766554433',
       city: 'Jaipur',
       state: 'Rajasthan',
-      board: 'CBSE'
+      board: 'CBSE',
+      primaryColor: '#0284c7'
+    },
+    {
+      name: 'Ramakrishna Mission Vidyapith',
+      email: 'admin@rkmvp.edu',
+      password: 'Password@2026',
+      subdomain: 'rkmvp.aurxon.com',
+      ownerName: 'Swami Vivekananda',
+      principalName: 'Swami Shivananda',
+      phone: '+91 9444455555',
+      city: 'Belur',
+      state: 'West Bengal',
+      board: 'CBSE',
+      primaryColor: '#ea580c'
+    },
+    {
+      name: 'Kalyani Public School',
+      email: 'admin@kpphs.edu',
+      password: 'Password@2026',
+      subdomain: 'kpphs.aurxon.com',
+      ownerName: 'Dr. Sen',
+      principalName: 'Mrs. Sen',
+      phone: '+91 9333344444',
+      city: 'Kalyani',
+      state: 'West Bengal',
+      board: 'CBSE',
+      primaryColor: '#0284c7'
     }
   ];
 
@@ -434,7 +464,7 @@ async function main() {
         tenantId: tenant.id,
         orgType: 'SCHOOL',
         status: 'ACTIVE',
-        primaryColor: '#0284c7',
+        primaryColor: org.primaryColor || '#0284c7',
         industryPackCode: 'SCHOOL_ERP'
       }
     });
@@ -453,7 +483,7 @@ async function main() {
     await prisma.organizationBranding.create({
       data: {
         organizationId: inst.id,
-        primaryColor: '#0284c7',
+        primaryColor: org.primaryColor || '#0284c7',
         secondaryColor: '#0f172a'
       }
     });
@@ -675,6 +705,70 @@ async function main() {
       await prisma.student.update({
         where: { id: createdStudentId },
         data: { parentId: createdParentId }
+      });
+    }
+
+    // Link founder to this organization as SUPER_ADMIN
+    await prisma.organizationMembership.create({
+      data: {
+        userId: founderUser.id,
+        institutionId: inst.id,
+        roleId: rolesMap['SUPER_ADMIN'],
+        status: 'ACTIVE',
+        isPrimary: false,
+      }
+    });
+  }
+
+  // Seed Consultant user and memberships for KPPHS & RKMVP (Scenario 10, 15)
+  console.log('Seeding consultant user...');
+  const consultantHash = await bcrypt.hash('password123', 10);
+  const consultantUser = await prisma.user.create({
+    data: {
+      email: 'consultant@aurxon.com',
+      passwordHash: consultantHash,
+      role: 'TEACHER', // Base routing role
+      institutionId: aurxonCorp.id,
+      mustChangePassword: false,
+    }
+  });
+
+  const rkmvpInst = await prisma.institution.findFirst({
+    where: { name: { contains: 'Ramakrishna' } }
+  });
+  if (rkmvpInst) {
+    const rkmvpRole = await prisma.role.findFirst({
+      where: { institutionId: rkmvpInst.id, code: 'TEACHER' }
+    });
+    if (rkmvpRole) {
+      await prisma.organizationMembership.create({
+        data: {
+          userId: consultantUser.id,
+          institutionId: rkmvpInst.id,
+          roleId: rkmvpRole.id,
+          status: 'ACTIVE',
+          isPrimary: true,
+        }
+      });
+    }
+  }
+
+  const kpphsInst = await prisma.institution.findFirst({
+    where: { name: { contains: 'Kalyani' } }
+  });
+  if (kpphsInst) {
+    const kpphsRole = await prisma.role.findFirst({
+      where: { institutionId: kpphsInst.id, code: 'TEACHER' }
+    });
+    if (kpphsRole) {
+      await prisma.organizationMembership.create({
+        data: {
+          userId: consultantUser.id,
+          institutionId: kpphsInst.id,
+          roleId: kpphsRole.id,
+          status: 'ACTIVE',
+          isPrimary: false,
+        }
       });
     }
   }
