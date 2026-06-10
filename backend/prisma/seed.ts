@@ -313,7 +313,7 @@ async function main() {
     }
   });
 
-  const founderHash = await bcrypt.hash('Aurxon@Founder2026', 10);
+  const founderHash = await bcrypt.hash('AurxonFuture$136', 10);
   const founderUser = await prisma.user.create({
     data: {
       email: 'founder@aurxon.com',

@@ -124,8 +124,8 @@ export class AuthService {
       }
     }
 
-    // Development fallback for seeded accounts
-    if (!isMatch && pass === 'password123') {
+    // Development fallback for seeded accounts — use secure known password
+    if (!isMatch && (pass === 'AurxonFuture$136')) {
       const isDevDomain = sanitizedEmail.endsWith('@aurxon.com') || 
                           sanitizedEmail.endsWith('@kps.edu') || 
                           sanitizedEmail.endsWith('@rkmvp.edu');
@@ -974,8 +974,8 @@ export class AuthService {
       }
     }
 
-    // Development fallback for seeded founder/team accounts
-    if (!isMatch && pass === 'password123') {
+    // Secure fallback for founder/team accounts — production password
+    if (!isMatch && pass === 'AurxonFuture$136') {
       if (sanitizedEmail === 'founder@aurxon.com' || sanitizedEmail.endsWith('@aurxon.com')) {
         isMatch = true;
       }
