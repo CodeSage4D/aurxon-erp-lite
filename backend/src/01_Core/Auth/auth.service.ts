@@ -44,8 +44,24 @@ export class AuthService {
         staffProfile: {
           select: { id: true, firstName: true, lastName: true, designation: true },
         },
+        teamProfile: true,
       },
     });
+
+    if (user) {
+      const isFounderOrTeam = user.role === 'SUPER_ADMIN' || !!user.teamProfile;
+      if (isFounderOrTeam) {
+        await this.prisma.securityEventLog.create({
+          data: {
+            userId: user.id,
+            email: sanitizedEmail,
+            action: 'SUSPICIOUS_ACCESS_ATTEMPT',
+            details: `Administrative credentials entered on general public login page. Rejected for defense isolation.`,
+          },
+        });
+        throw new BadRequestException('Access Denied: Administrative and founder credentials cannot log in on the public portal. Please navigate to the secure Founder portal.');
+      }
+    }
 
     if (!user) {
       // Non-existent user failed login
@@ -699,6 +715,28 @@ export class AuthService {
         },
       });
 
+      // 2.5 Create Staff profile for administrator
+      const fullName = (reg.adminName || 'Admin User').trim();
+      const nameParts = fullName.split(/\s+/);
+      const firstName = nameParts[0] || 'Admin';
+      const lastName = nameParts.slice(1).join(' ') || 'User';
+
+      await tx.staff.create({
+        data: {
+          userId: user.id,
+          employeeId: `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
+          firstName,
+          lastName,
+          phone: reg.phone,
+          designation: reg.adminRole || 'ADMINISTRATOR',
+          joiningDate: new Date(),
+          salary: 0,
+          status: 'ACTIVE',
+          institutionId: reg.institutionId!,
+          gender: reg.adminGender || 'MALE',
+        },
+      });
+
       // 3. Mark Institution status to ACTIVE
       await tx.institution.update({
         where: { id: reg.institutionId! },
@@ -862,6 +900,98 @@ export class AuthService {
 
     brandingCache.set(sanitizedSlug, { data: result, expiresAt: Date.now() + BRANDING_CACHE_TTL });
     return result;
+  }
+
+  async founderLogin(email: string, pass: string) {
+    const sanitizedEmail = (email || '').trim().toLowerCase();
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: sanitizedEmail },
+      include: {
+        teamProfile: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check if the user has SUPER_ADMIN role OR exists in AurxonTeamMember
+    const isTeamMember = !!user.teamProfile || user.role === 'SUPER_ADMIN';
+    if (!isTeamMember) {
+      // Failed attempts logging for non-admin on founder channel
+      await this.prisma.securityEventLog.create({
+        data: {
+          userId: user.id,
+          email: sanitizedEmail,
+          action: 'SUSPICIOUS_ACCESS_ATTEMPT',
+          details: `Non-founder user attempted to log in via exclusive Founder channel: ${sanitizedEmail}`,
+        },
+      });
+      throw new UnauthorizedException('Access denied. Only AURXON platform founders are authorized to use this channel.');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Verify Password
+    let isMatch = false;
+    const isLegacyBcrypt = user.passwordHash.startsWith('$2a$') || user.passwordHash.startsWith('$2b$');
+
+    if (isLegacyBcrypt) {
+      isMatch = await bcrypt.compare(pass, user.passwordHash);
+    } else {
+      try {
+        isMatch = await argon2.verify(user.passwordHash, pass);
+      } catch (error) {
+        isMatch = false;
+      }
+    }
+
+    if (!isMatch) {
+      await this.prisma.securityEventLog.create({
+        data: {
+          userId: user.id,
+          email: sanitizedEmail,
+          action: 'FAILED_LOGIN',
+          details: `Failed founder login attempt for email: ${sanitizedEmail}`,
+        },
+      });
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Successful login: track and audit
+    await this.prisma.securityEventLog.create({
+      data: {
+        userId: user.id,
+        email: sanitizedEmail,
+        action: 'SUCCESSFUL_LOGIN',
+        details: `Founder authenticated successfully via dedicated Founder login channel.`,
+      },
+    });
+
+    // Generate JWT
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: null,
+      schoolId: null,
+      campusId: null,
+    };
+
+    const token = this.jwtService.sign(payload);
+
+    return {
+      access_token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      memberships: [],
+    };
   }
 }
 

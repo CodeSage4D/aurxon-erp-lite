@@ -1195,8 +1195,11 @@ model OrganizationRegistration {
   address           String?
   city              String?
   state             String?
+  country           String?          @default("India")
   expectedUsers     Int              @default(50)
   requestedModules  String[]         // array of module codes
+  adminGender       String?
+  adminRole         String?
   status            String           @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED, CHANGES_REQUESTED, APPROVED_WITH_CONDITIONS, READY_FOR_PROVISIONING, PROVISIONED, ACTIVATED, LIVE
   reviewNotes       String?
   reviewedById      String?
@@ -1448,6 +1451,15 @@ model OrganizationSetupStatus {
   wizardVersion      String       @default("1.0")
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
+}
+
+model OtpVerification {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  otpCode   String
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 

@@ -101,4 +101,20 @@ export class RegistrationController {
     const ipAddress = req.ip || (req.headers && req.headers['x-forwarded-for']) || null;
     return this.registrationService.provisionWorkspace(id, req.user.id, paymentStatus, ipAddress);
   }
+
+  /**
+   * Public endpoint to request an SMS OTP code.
+   */
+  @Post('send-otp')
+  async sendOtp(@Body() body: { phone: string }) {
+    return this.registrationService.sendOtp(body.phone);
+  }
+
+  /**
+   * Public endpoint to verify SMS OTP code.
+   */
+  @Post('verify-otp')
+  async verifyOtp(@Body() body: { phone: string; otp: string }) {
+    return this.registrationService.verifyOtp(body.phone, body.otp);
+  }
 }

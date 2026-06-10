@@ -4634,6 +4634,45 @@ export async function verifyActivationKeyApi(referenceNumber: string, activation
   return await res.json();
 }
 
+export async function sendOtpApi(phone: string) {
+  const res = await fetch(`${API_URL}/registrations/send-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to send verification code');
+  }
+  return await res.json();
+}
+
+export async function verifyOtpApi(phone: string, otp: string) {
+  const res = await fetch(`${API_URL}/registrations/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, otp }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Incorrect verification code');
+  }
+  return await res.json();
+}
+
+export async function founderLoginApi(email: string, pass: string) {
+  const res = await fetch(`${API_URL}/auth/founder/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, pass }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Founder authentication failed');
+  }
+  return await res.json();
+}
+
 // ─── Registration Workflow Extensions ────────────────────────────────────────
 
 export async function registerOrganizationWithAdminApi(data: {
@@ -4653,6 +4692,9 @@ export async function registerOrganizationWithAdminApi(data: {
   adminPassword: string;
   logoUrl?: string;
   primaryColor?: string;
+  country?: string;
+  adminGender?: string;
+  adminRole?: string;
 }) {
   const res = await fetch(`${API_URL}/registrations/register`, {
     method: 'POST',

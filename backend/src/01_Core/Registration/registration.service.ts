@@ -29,15 +29,28 @@ export class RegistrationService {
       throw new BadRequestException('Email is already registered as an active account');
     }
 
-    // Check if email has a pending registration
-    const pendingReg = await this.prisma.organizationRegistration.findFirst({
-      where: {
-        email: emailLower,
-        status: { in: ['PENDING_REVIEW', 'PENDING', 'APPROVED', 'APPROVED_WITH_CONDITIONS', 'READY_FOR_PROVISIONING'] },
-      },
+    // Check if a registration request already exists for this email address
+    const registrationExists = await this.prisma.organizationRegistration.findUnique({
+      where: { email: emailLower },
     });
-    if (pendingReg) {
-      throw new BadRequestException('A registration request is already active or pending for this email address');
+    if (registrationExists) {
+      throw new BadRequestException('A registration request already exists for this email address.');
+    }
+
+    // Enforce Password Complexity Check
+    if (dto.adminPassword) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!passwordRegex.test(dto.adminPassword)) {
+        throw new BadRequestException('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
+      }
+    }
+
+    // Enforce Mobile Phone Verification via OTP
+    const otpVerification = await this.prisma.otpVerification.findUnique({
+      where: { phone: dto.phone.trim() },
+    });
+    if (!otpVerification || !otpVerification.verified) {
+      throw new BadRequestException('Mobile number has not been verified via OTP. Please verify before submitting.');
     }
 
     // Generate formatted Reference Number: AURX-YYYY-IND-SEQ
@@ -77,12 +90,15 @@ export class RegistrationService {
         address: dto.address || null,
         city: dto.city || null,
         state: dto.state || null,
+        country: dto.country || 'India',
         expectedUsers: dto.expectedUsers || 50,
         requestedModules: dto.requestedModules || [],
         industryPackCode: dto.industryPackCode || 'SCHOOL_ERP',
         orgSize: dto.orgSize || 'SMALL',
         requestedFeatures: dto.requestedFeatures || [],
         adminName: dto.adminName || null,
+        adminGender: dto.adminGender || null,
+        adminRole: dto.adminRole || null,
         adminPasswordHash,
         logoUrl: dto.logoUrl || null,
         primaryColor: dto.primaryColor || '#0284c7',
@@ -412,5 +428,81 @@ Slug: ${provisionResult.slug}
       status: 'PROVISIONED',
       ...provisionResult,
     };
+  }
+
+  async sendOtp(phone: string) {
+    const cleanPhone = (phone || '').trim();
+    if (!cleanPhone || cleanPhone.length < 10) {
+      throw new BadRequestException('Please enter a valid mobile number');
+    }
+
+    // Generate secure 6-digit OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
+
+    // Save/Upsert in OtpVerification
+    await this.prisma.otpVerification.upsert({
+      where: { phone: cleanPhone },
+      create: {
+        phone: cleanPhone,
+        otpCode,
+        expiresAt,
+        verified: false,
+      },
+      update: {
+        otpCode,
+        expiresAt,
+        verified: false,
+      },
+    });
+
+    // Logger & Notification trigger
+    console.log(`[VERIFICATION OTP] Generated OTP Code: ${otpCode} for phone: ${cleanPhone}`);
+    
+    try {
+      await this.notifService.createSystemNotif(
+        'SUPER_ADMIN',
+        'SMS Verification OTP Generated',
+        `Simulated SMS: Your verification code is ${otpCode} for mobile number: ${cleanPhone}`,
+        NotificationCategory.SYSTEM,
+      );
+    } catch (err) {
+      console.error('Failed to log simulated OTP notification:', err);
+    }
+
+    return { success: true, message: 'OTP sent successfully. (Dev-code logged in system notifications)', phone: cleanPhone };
+  }
+
+  async verifyOtp(phone: string, otp: string) {
+    const cleanPhone = (phone || '').trim();
+    const cleanOtp = (otp || '').trim();
+
+    if (!cleanPhone || !cleanOtp) {
+      throw new BadRequestException('Phone number and OTP code are required.');
+    }
+
+    const verification = await this.prisma.otpVerification.findUnique({
+      where: { phone: cleanPhone },
+    });
+
+    if (!verification) {
+      throw new BadRequestException('No verification request found for this phone number.');
+    }
+
+    if (verification.otpCode !== cleanOtp) {
+      throw new BadRequestException('Incorrect verification code. Please try again.');
+    }
+
+    if (new Date() > verification.expiresAt) {
+      throw new BadRequestException('Verification code has expired. Please request a new one.');
+    }
+
+    // Update state to verified
+    await this.prisma.otpVerification.update({
+      where: { phone: cleanPhone },
+      data: { verified: true },
+    });
+
+    return { success: true, verified: true, message: 'Mobile number verified successfully.' };
   }
 }

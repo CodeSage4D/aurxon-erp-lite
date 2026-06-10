@@ -13,6 +13,13 @@ export class AuthController {
     return this.authService.login(body.email, password);
   }
 
+  @HttpCode(HttpStatus.OK)
+  @Post('founder/login')
+  async founderLogin(@Body() body: { email: string; pass?: string; password?: string }) {
+    const password = body.password || body.pass || '';
+    return this.authService.founderLogin(body.email, password);
+  }
+
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('change-password')

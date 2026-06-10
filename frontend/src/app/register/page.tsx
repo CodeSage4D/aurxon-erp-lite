@@ -6,7 +6,7 @@ import {
   Building2, ArrowRight, ArrowLeft, Check, CheckCircle2, AlertCircle, Sparkles, 
   GraduationCap, Stethoscope, Briefcase, KeyRound, User, Eye, EyeOff, Copy, Loader2
 } from 'lucide-react';
-import { registerOrganizationWithAdminApi } from '@/lib/api';
+import { registerOrganizationWithAdminApi, sendOtpApi, verifyOtpApi } from '@/lib/api';
 
 const INDUSTRY_PACKS = [
   { 
@@ -82,6 +82,22 @@ const OPTIONAL_FEATURES: Record<string, { code: string; label: string; desc: str
 
 const TOTAL_STEPS = 8;
 
+const COUNTRIES = ['India', 'United States', 'United Arab Emirates', 'United Kingdom'];
+
+const INDIA_STATES: Record<string, string[]> = {
+  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Thane', 'Nashik'],
+  'Delhi': ['New Delhi', 'Dwarka', 'Rohini', 'Saket'],
+  'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi']
+};
+
+const BUSINESS_CATEGORIES = [
+  { value: 'SCHOOL', label: 'School / K-12' },
+  { value: 'HOSPITAL', label: 'Hospital / Clinic' },
+  { value: 'UNIVERSITY', label: 'University / College' },
+  { value: 'COMPANY', label: 'Corporate Company' },
+  { value: 'NGO', label: 'Non-Governmental Org (NGO)' }
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -105,8 +121,8 @@ export default function RegisterPage() {
     email: '',
     phone: '',
     address: '',
-    city: '',
-    state: '',
+    city: 'Mumbai',
+    state: 'Maharashtra',
     expectedUsers: 50,
     requestedModules: ['STUDENT_MANAGEMENT'],
     requestedFeatures: [] as string[],
@@ -115,6 +131,9 @@ export default function RegisterPage() {
     adminPasswordConfirm: '',
     primaryColor: '#6366f1',
     logoUrl: '',
+    country: 'India',
+    adminGender: 'Male',
+    adminRole: 'Principal',
   });
 
   // Load draft on mount
@@ -127,7 +146,17 @@ export default function RegisterPage() {
           const age = Date.now() - (draft.timestamp || 0);
           const twentyFourHours = 24 * 60 * 60 * 1000;
           if (age < twentyFourHours) {
-            if (draft.form) setForm(draft.form);
+            if (draft.form) {
+              setForm(prev => ({
+                ...prev,
+                ...draft.form,
+                country: draft.form.country || 'India',
+                adminGender: draft.form.adminGender || 'Male',
+                adminRole: draft.form.adminRole || 'Principal',
+                state: draft.form.state || 'Maharashtra',
+                city: draft.form.city || 'Mumbai'
+              }));
+            }
             if (draft.step) setStep(draft.step);
           } else {
             localStorage.removeItem('aurxon_registration_draft');
@@ -155,6 +184,74 @@ export default function RegisterPage() {
       }
     }
   }, [form, step, draftLoaded]);
+
+  // OTP Verification States
+  const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState('');
+
+  const checkPasswordComplexity = (pass: string) => {
+    return {
+      length: pass.length >= 8,
+      uppercase: /[A-Z]/.test(pass),
+      lowercase: /[a-z]/.test(pass),
+      number: /\d/.test(pass),
+      special: /[@$!%*?&]/.test(pass)
+    };
+  };
+
+  const handleSendOtp = async () => {
+    setOtpError('');
+    setOtpSuccess('');
+    if (!form.phone.trim()) {
+      setOtpError('Phone number is required to send OTP.');
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      await sendOtpApi(form.phone.trim());
+      setOtpSent(true);
+      setOtpSuccess('OTP code dispatched! For local development, check system notifications or database.');
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to dispatch OTP verification code.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setOtpError('');
+    setOtpSuccess('');
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setOtpError('Please input a complete 6-digit OTP code.');
+      return;
+    }
+    setVerifyingOtp(true);
+    try {
+      await verifyOtpApi(form.phone.trim(), otpCode.trim());
+      setIsOtpVerified(true);
+      setOtpSuccess('Mobile phone verified successfully!');
+    } catch (err: any) {
+      setOtpError(err.message || 'Incorrect verification code. Please request a new code.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handlePhoneChange = (val: string) => {
+    updateField('phone', val);
+    if (isOtpVerified || otpSent) {
+      setIsOtpVerified(false);
+      setOtpSent(false);
+      setOtpCode('');
+      setOtpError('');
+      setOtpSuccess('');
+    }
+  };
 
   const activePack = INDUSTRY_PACKS.find(p => p.id === form.industryPackCode) || INDUSTRY_PACKS[0];
 
@@ -214,9 +311,16 @@ export default function RegisterPage() {
     } else if (step === 4) {
       if (!form.email.trim() || !form.phone.trim()) { setError('Official Email and Phone number are required'); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setError('Please enter a valid email address'); return; }
+      if (!isOtpVerified) { setError('Phone number must be verified via OTP code before proceeding.'); return; }
     } else if (step === 7) {
       if (!form.adminName.trim()) { setError('Administrator full name is required'); return; }
-      if (!form.adminPassword || form.adminPassword.length < 8) { setError('Password must be at least 8 characters long'); return; }
+      
+      const pwdComplexity = checkPasswordComplexity(form.adminPassword);
+      const isPwdSecure = Object.values(pwdComplexity).every(Boolean);
+      if (!isPwdSecure) {
+        setError('Password does not meet the complexity requirements.');
+        return;
+      }
       if (form.adminPassword !== form.adminPasswordConfirm) { setError('Passwords do not match'); return; }
     }
     setStep(prev => prev + 1);
@@ -264,6 +368,9 @@ export default function RegisterPage() {
         adminPassword: form.adminPassword,
         primaryColor: form.primaryColor || '#6366f1',
         logoUrl: form.logoUrl || undefined,
+        country: form.country,
+        adminGender: form.adminGender,
+        adminRole: form.adminRole,
       });
 
       // Clear local storage draft upon success
@@ -524,28 +631,93 @@ export default function RegisterPage() {
                     className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
                   />
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">City *</label>
-                    <input
-                      type="text" required
-                      placeholder="e.g. New Delhi"
-                      value={form.city}
-                      onChange={e => updateField('city', e.target.value)}
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Country *</label>
+                    <select
+                      value={form.country}
+                      onChange={e => {
+                        const selectedCountry = e.target.value;
+                        setForm(prev => ({
+                          ...prev,
+                          country: selectedCountry,
+                          state: selectedCountry === 'India' ? 'Maharashtra' : '',
+                          city: selectedCountry === 'India' ? 'Mumbai' : ''
+                        }));
+                      }}
                       className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
-                    />
+                    >
+                      {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">State *</label>
-                    <input
-                      type="text" required
-                      placeholder="e.g. Delhi"
-                      value={form.state}
-                      onChange={e => updateField('state', e.target.value)}
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Business Category *</label>
+                    <select
+                      value={form.orgType}
+                      onChange={e => updateField('orgType', e.target.value)}
                       className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
-                    />
+                    >
+                      {BUSINESS_CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
+                    </select>
                   </div>
                 </div>
+
+                {form.country === 'India' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">State *</label>
+                      <select
+                        value={form.state}
+                        onChange={e => {
+                          const selectedState = e.target.value;
+                          setForm(prev => ({
+                            ...prev,
+                            state: selectedState,
+                            city: INDIA_STATES[selectedState]?.[0] || ''
+                          }));
+                        }}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      >
+                        {Object.keys(INDIA_STATES).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">City *</label>
+                      <select
+                        value={form.city}
+                        onChange={e => updateField('city', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      >
+                        {(INDIA_STATES[form.state] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">State / Province *</label>
+                      <input
+                        type="text" required
+                        placeholder="e.g. California"
+                        value={form.state}
+                        onChange={e => updateField('state', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">City *</label>
+                      <input
+                        type="text" required
+                        placeholder="e.g. San Francisco"
+                        value={form.city}
+                        onChange={e => updateField('city', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Physical Address</label>
                   <input
@@ -573,16 +745,66 @@ export default function RegisterPage() {
                   />
                   <p className="text-[10px] text-gray-400 font-semibold">The workspace approval keys and instructions will be sent here.</p>
                 </div>
+
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Official Phone / Mobile *</label>
-                  <input
-                    type="text" required
-                    placeholder="e.g. +91 98765 43210"
-                    value={form.phone}
-                    onChange={e => updateField('phone', e.target.value)}
-                    className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text" required
+                      placeholder="e.g. +919876543210"
+                      value={form.phone}
+                      onChange={e => handlePhoneChange(e.target.value)}
+                      disabled={isOtpVerified}
+                      className="flex-1 rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                    {!isOtpVerified && (
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={sendingOtp || !form.phone.trim()}
+                        className="px-4 py-2.5 rounded-2xl bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-200 text-white disabled:text-gray-400 font-bold text-[10px] uppercase tracking-wider transition cursor-pointer"
+                      >
+                        {sendingOtp ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}
+                      </button>
+                    )}
+                  </div>
+                  {isOtpVerified && (
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Mobile number verified successfully.
+                    </div>
+                  )}
                 </div>
+
+                {otpSent && !isOtpVerified && (
+                  <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-3 animate-fade-in">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-500">Enter 6-Digit OTP Code</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="e.g. 123456"
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        className="flex-1 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-center outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={verifyingOtp || otpCode.length !== 6}
+                        className="px-5 py-2.5 rounded-xl bg-indigo-650 hover:bg-indigo-750 text-white font-bold text-[10px] uppercase tracking-wider transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {verifyingOtp ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {otpError && (
+                  <p className="text-[10px] font-bold text-rose-600 animate-fade-in">{otpError}</p>
+                )}
+                {otpSuccess && !otpError && (
+                  <p className="text-[10px] font-bold text-indigo-600 animate-fade-in">{otpSuccess}</p>
+                )}
               </div>
             )}
 
@@ -668,95 +890,194 @@ export default function RegisterPage() {
             )}
 
             {/* STEP 7: ADMIN CREDENTIALS */}
-            {step === 7 && (
-              <div className="space-y-5 animate-fade-in">
-                <div className="flex items-start gap-3 p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl">
-                  <KeyRound className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-indigo-700 font-semibold leading-relaxed">
-                    Set up your workspace administrator credentials. These will be used to access your organization's workspace after activation.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">
-                    <User className="h-3 w-3 inline mr-1" />
-                    Administrator Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dr. Rajesh Kumar"
-                    value={form.adminName}
-                    onChange={e => updateField('adminName', e.target.value)}
-                    className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Admin Password *</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Min. 8 characters"
-                      value={form.adminPassword}
-                      onChange={e => updateField('adminPassword', e.target.value)}
-                      className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition pr-12"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(p => !p)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500 transition"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+            {step === 7 && (() => {
+              const passChecks = checkPasswordComplexity(form.adminPassword);
+              const score = Object.values(passChecks).filter(Boolean).length;
+              return (
+                <div className="space-y-5 animate-fade-in">
+                  <div className="flex items-start gap-3 p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl">
+                    <KeyRound className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-indigo-700 font-semibold leading-relaxed">
+                      Set up your workspace administrator credentials. These will be used to access your organization's workspace after activation.
+                    </p>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Confirm Password *</label>
-                  <div className="relative">
-                    <input
-                      type={showConfirm ? 'text' : 'password'}
-                      placeholder="Re-enter password"
-                      value={form.adminPasswordConfirm}
-                      onChange={e => updateField('adminPasswordConfirm', e.target.value)}
-                      className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition pr-12"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm(p => !p)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500 transition"
-                    >
-                      {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Primary Brand Color</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={form.primaryColor}
-                        onChange={e => updateField('primaryColor', e.target.value)}
-                        className="h-10 w-10 rounded-xl border border-gray-200 cursor-pointer"
-                      />
-                      <span className="text-xs font-mono font-bold text-gray-600">{form.primaryColor}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Logo URL (Optional)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">
+                      <User className="h-3 w-3 inline mr-1" />
+                      Administrator Full Name *
+                    </label>
                     <input
-                      type="url"
-                      placeholder="https://example.com/logo.png"
-                      value={form.logoUrl}
-                      onChange={e => updateField('logoUrl', e.target.value)}
+                      type="text"
+                      placeholder="e.g. Dr. Rajesh Kumar"
+                      value={form.adminName}
+                      onChange={e => updateField('adminName', e.target.value)}
                       className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
                     />
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Admin Role / Designation *</label>
+                      <select
+                        value={form.adminRole}
+                        onChange={e => updateField('adminRole', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      >
+                        <option value="Principal">Principal</option>
+                        <option value="Director">Director</option>
+                        <option value="IT Administrator">IT Administrator</option>
+                        <option value="Owner">Owner</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Admin Gender *</label>
+                      <select
+                        value={form.adminGender}
+                        onChange={e => updateField('adminGender', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Admin Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Min. 8 characters"
+                        value={form.adminPassword}
+                        onChange={e => updateField('adminPassword', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(p => !p)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500 transition"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+
+                    {/* Password Strength Meter & Real-time validation list */}
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-gray-450">
+                        <span>Password Strength:</span>
+                        <span className={
+                          score <= 1 ? 'text-red-500' :
+                          score <= 3 ? 'text-orange-500' :
+                          score === 4 ? 'text-yellow-500' : 'text-emerald-600'
+                        }>
+                          {score <= 1 ? 'Very Weak' :
+                           score <= 3 ? 'Weak' :
+                           score === 4 ? 'Medium' : 'Strong & Secure'}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                        <div
+                          className={`h-full transition-all duration-305 ${
+                            score <= 1 ? 'bg-red-500 w-1/5' :
+                            score <= 3 ? 'bg-orange-500 w-3/5' :
+                            score === 4 ? 'bg-yellow-500 w-4/5' : 'bg-emerald-500 w-full'
+                          }`}
+                        />
+                      </div>
+                      <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 text-[10px] font-bold text-gray-500">
+                        <li className="flex items-center gap-1.5">
+                          <div className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            passChecks.length ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 bg-transparent'
+                          }`}>
+                            {passChecks.length && <Check className="h-2 w-2" />}
+                          </div>
+                          <span className={passChecks.length ? 'text-emerald-600' : ''}>8+ Characters</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <div className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            passChecks.uppercase ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 bg-transparent'
+                          }`}>
+                            {passChecks.uppercase && <Check className="h-2 w-2" />}
+                          </div>
+                          <span className={passChecks.uppercase ? 'text-emerald-600' : ''}>1 Uppercase Letter</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <div className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            passChecks.lowercase ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 bg-transparent'
+                          }`}>
+                            {passChecks.lowercase && <Check className="h-2 w-2" />}
+                          </div>
+                          <span className={passChecks.lowercase ? 'text-emerald-600' : ''}>1 Lowercase Letter</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <div className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            passChecks.number ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 bg-transparent'
+                          }`}>
+                            {passChecks.number && <Check className="h-2 w-2" />}
+                          </div>
+                          <span className={passChecks.number ? 'text-emerald-600' : ''}>1 Digit (0-9)</span>
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <div className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                            passChecks.special ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 bg-transparent'
+                          }`}>
+                            {passChecks.special && <Check className="h-2 w-2" />}
+                          </div>
+                          <span className={passChecks.special ? 'text-emerald-600' : ''}>1 Special Symbol</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Confirm Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirm ? 'text' : 'password'}
+                        placeholder="Re-enter password"
+                        value={form.adminPasswordConfirm}
+                        onChange={e => updateField('adminPasswordConfirm', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm(p => !p)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500 transition"
+                      >
+                        {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Primary Brand Color</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={form.primaryColor}
+                          onChange={e => updateField('primaryColor', e.target.value)}
+                          className="h-10 w-10 rounded-xl border border-gray-200 cursor-pointer"
+                        />
+                        <span className="text-xs font-mono font-bold text-gray-600">{form.primaryColor}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Logo URL (Optional)</label>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/logo.png"
+                        value={form.logoUrl}
+                        onChange={e => updateField('logoUrl', e.target.value)}
+                        className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* STEP 8: REVIEW & SUBMIT */}
             {step === 8 && (
@@ -786,11 +1107,11 @@ export default function RegisterPage() {
                   <div className="grid grid-cols-2 gap-5">
                     <div>
                       <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider">Administrator</span>
-                      <p className="text-gray-800 mt-1 font-bold">{form.adminName || '—'}</p>
+                      <p className="text-gray-800 mt-1 font-bold">{form.adminName || '—'} ({form.adminRole} / {form.adminGender})</p>
                     </div>
                     <div>
-                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider">City / State</span>
-                      <p className="text-gray-800 mt-1 font-bold">{form.city}{form.state ? `, ${form.state}` : ''}</p>
+                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider">City / State / Country</span>
+                      <p className="text-gray-800 mt-1 font-bold">{form.city}{form.state ? `, ${form.state}` : ''} ({form.country})</p>
                     </div>
                   </div>
 

@@ -252,8 +252,17 @@ export default function LoginPage() {
             )}
 
             {error && (
-              <div className="rounded-xl border border-red-500/30 bg-red-550/10 p-3 text-xs font-semibold text-red-650 backdrop-blur-sm">
-                {error}
+              <div className="rounded-xl border border-red-500/30 bg-red-550/10 p-3 text-xs font-semibold text-red-650 backdrop-blur-sm space-y-2">
+                <p>{error}</p>
+                {(error.toLowerCase().includes('founder') || email.trim().toLowerCase() === 'founder@aurxon.com') && (
+                  <button
+                    type="button"
+                    onClick={() => router.push('/founder/login')}
+                    className="w-full mt-1.5 py-2 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] uppercase tracking-wider transition cursor-pointer"
+                  >
+                    Go to Founder Portal Login
+                  </button>
+                )}
               </div>
             )}
 
@@ -309,13 +318,21 @@ export default function LoginPage() {
               )}
             </button>
 
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between pt-2 text-xs font-semibold text-zinc-500">
+            <div className="flex flex-col sm:flex-row gap-2 items-center justify-between pt-2 text-[11px] font-semibold text-zinc-500">
               <button
                 type="button"
                 onClick={() => router.push('/register')}
                 className="hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0"
               >
                 Register School
+              </button>
+              <span className="hidden sm:inline text-border">•</span>
+              <button
+                type="button"
+                onClick={() => router.push('/founder/login')}
+                className="hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0 font-bold"
+              >
+                Founder Portal
               </button>
               <span className="hidden sm:inline text-border">•</span>
               <button

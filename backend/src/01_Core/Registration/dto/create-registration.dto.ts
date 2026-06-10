@@ -74,5 +74,17 @@ export class CreateRegistrationDto {
   @IsString()
   @IsOptional()
   primaryColor?: string;
+
+  @IsString()
+  @IsOptional()
+  country?: string;
+
+  @IsString()
+  @IsOptional()
+  adminGender?: string;
+
+  @IsString()
+  @IsOptional()
+  adminRole?: string;
 }
 
