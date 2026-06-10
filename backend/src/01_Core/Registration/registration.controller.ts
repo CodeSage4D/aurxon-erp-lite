@@ -103,18 +103,48 @@ export class RegistrationController {
   }
 
   /**
-   * Public endpoint to request an SMS OTP code.
+   * Public endpoint to request an OTP code (email or phone).
    */
   @Post('send-otp')
-  async sendOtp(@Body() body: { phone: string }) {
-    return this.registrationService.sendOtp(body.phone);
+  async sendOtp(@Body() body: { phone?: string; email?: string }) {
+    return this.registrationService.sendOtp(body.phone, body.email);
   }
 
   /**
-   * Public endpoint to verify SMS OTP code.
+   * Public endpoint to verify OTP code.
    */
   @Post('verify-otp')
-  async verifyOtp(@Body() body: { phone: string; otp: string }) {
-    return this.registrationService.verifyOtp(body.phone, body.otp);
+  async verifyOtp(@Body() body: { phone?: string; email?: string; otp: string }) {
+    return this.registrationService.verifyOtp(body.phone, body.email, body.otp);
+  }
+
+  /**
+   * Founder Manual Override: Force verification status of email and phone to Verified.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/verify-manual')
+  async verifyManual(
+    @Request() req,
+    @Param('id') id: string,
+  ) {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      await this.checkTeamRole(req.user.id, ['FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR']);
+    }
+    return this.registrationService.verifyManual(id, req.user.id);
+  }
+
+  /**
+   * Founder Resend: Resend verification code OTPs to official email & mobile.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/resend-verification-otp')
+  async resendVerificationOtp(
+    @Request() req,
+    @Param('id') id: string,
+  ) {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      await this.checkTeamRole(req.user.id, ['FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR']);
+    }
+    return this.registrationService.resendVerificationOtp(id);
   }
 }

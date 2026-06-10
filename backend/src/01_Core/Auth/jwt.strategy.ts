@@ -34,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const cached = userCache.get(cacheKey);
     let user: any;
 
-    if (cached && (Date.now() - cached.timestamp) < 3000) {
+    if (cached && (Date.now() - cached.timestamp) < 60000) {
       user = cached.data;
     } else {
       user = await this.prisma.user.findUnique({

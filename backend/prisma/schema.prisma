@@ -1217,6 +1217,8 @@ model OrganizationRegistration {
   adminPasswordHash String?
   logoUrl           String?
   primaryColor      String?
+  emailVerified     Boolean          @default(false)
+  phoneVerified     Boolean          @default(false)
   activationKey     ActivationKey?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
@@ -1455,11 +1457,14 @@ model OrganizationSetupStatus {
 
 model OtpVerification {
   id        String   @id @default(uuid())
-  phone     String   @unique
+  phone     String?  @unique
+  email     String?  @unique
   otpCode   String
   verified  Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  attempts  Int      @default(0)
+  userId    String?
 }
 
 

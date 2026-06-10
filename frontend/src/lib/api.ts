@@ -4634,30 +4634,82 @@ export async function verifyActivationKeyApi(referenceNumber: string, activation
   return await res.json();
 }
 
-export async function sendOtpApi(phone: string) {
-  const res = await fetch(`${API_URL}/registrations/send-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone }),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Failed to send verification code');
+export async function sendOtpApi(phone?: string, email?: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, email }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to send verification code');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
   }
-  return await res.json();
 }
 
-export async function verifyOtpApi(phone: string, otp: string) {
-  const res = await fetch(`${API_URL}/registrations/verify-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, otp }),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Incorrect verification code');
+export async function verifyOtpApi(phone?: string, email?: string, otp?: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, email, otp }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Incorrect verification code');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
   }
-  return await res.json();
+}
+
+export async function verifyRegistrationManualApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/${id}/verify-manual`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to manually verify registration');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
+}
+
+export async function resendVerificationOtpApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/${id}/resend-verification-otp`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to resend verification requests');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
 }
 
 export async function founderLoginApi(email: string, pass: string) {
@@ -4695,17 +4747,25 @@ export async function registerOrganizationWithAdminApi(data: {
   country?: string;
   adminGender?: string;
   adminRole?: string;
+  requestManualApproval?: boolean;
 }) {
-  const res = await fetch(`${API_URL}/registrations/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Registration failed. Please try again.');
+  try {
+    const res = await fetch(`${API_URL}/registrations/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Registration failed. Please try again.');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
   }
-  return await res.json();
 }
 
 export async function technicalReviewRegistrationApi(id: string, notes?: string) {

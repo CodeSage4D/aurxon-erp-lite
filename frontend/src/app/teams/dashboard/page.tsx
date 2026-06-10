@@ -391,7 +391,7 @@ export default function TeamsDashboardPage() {
       <main className="flex-1 overflow-y-auto p-8 space-y-6 relative z-10 flex flex-col">
         
         {/* Header bar */}
-        <header className="flex justify-between items-center border-b border-slate-200 pb-5">
+        <header className="relative z-40 flex justify-between items-center border-b border-slate-200 pb-5">
           <div>
             <span className="text-[9px] font-black uppercase text-pink-500 tracking-wider">Console Security Workspace</span>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Teams Dashboard</h1>

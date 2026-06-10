@@ -134,6 +134,7 @@ export default function RegisterPage() {
     country: 'India',
     adminGender: 'Male',
     adminRole: 'Principal',
+    requestManualApproval: false,
   });
 
   // Load draft on mount
@@ -185,14 +186,43 @@ export default function RegisterPage() {
     }
   }, [form, step, draftLoaded]);
 
-  // OTP Verification States
-  const [isOtpVerified, setIsOtpVerified] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [otpSuccess, setOtpSuccess] = useState('');
+  // Email OTP States
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+  const [verifyingEmailOtp, setVerifyingEmailOtp] = useState(false);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [emailOtpError, setEmailOtpError] = useState('');
+  const [emailOtpSuccess, setEmailOtpSuccess] = useState('');
+  const [emailCooldown, setEmailCooldown] = useState(0);
+
+  // Mobile OTP States
+  const [isMobileVerified, setIsMobileVerified] = useState(false);
+  const [sendingMobileOtp, setSendingMobileOtp] = useState(false);
+  const [verifyingMobileOtp, setVerifyingMobileOtp] = useState(false);
+  const [mobileOtpSent, setMobileOtpSent] = useState(false);
+  const [mobileOtpCode, setMobileOtpCode] = useState('');
+  const [mobileOtpError, setMobileOtpError] = useState('');
+  const [mobileOtpSuccess, setMobileOtpSuccess] = useState('');
+  const [mobileCooldown, setMobileCooldown] = useState(0);
+
+  // Cooldown effect for Email
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (emailCooldown > 0) {
+      timer = setTimeout(() => setEmailCooldown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [emailCooldown]);
+
+  // Cooldown effect for Mobile
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (mobileCooldown > 0) {
+      timer = setTimeout(() => setMobileCooldown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [mobileCooldown]);
 
   const checkPasswordComplexity = (pass: string) => {
     return {
@@ -204,52 +234,103 @@ export default function RegisterPage() {
     };
   };
 
-  const handleSendOtp = async () => {
-    setOtpError('');
-    setOtpSuccess('');
+  const handleSendEmailOtp = async () => {
+    setEmailOtpError('');
+    setEmailOtpSuccess('');
+    if (!form.email.trim()) {
+      setEmailOtpError('Email address is required.');
+      return;
+    }
+    setSendingEmailOtp(true);
+    try {
+      await sendOtpApi(undefined, form.email.trim().toLowerCase());
+      setEmailOtpSent(true);
+      setEmailCooldown(60);
+      setEmailOtpSuccess('OTP code dispatched! Check your email (or system notifications in dev mode).');
+    } catch (err: any) {
+      setEmailOtpError(err.message || 'Failed to dispatch email verification code.');
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    setEmailOtpError('');
+    setEmailOtpSuccess('');
+    if (!emailOtpCode.trim() || emailOtpCode.trim().length !== 6) {
+      setEmailOtpError('Please input a complete 6-digit OTP code.');
+      return;
+    }
+    setVerifyingEmailOtp(true);
+    try {
+      await verifyOtpApi(undefined, form.email.trim().toLowerCase(), emailOtpCode.trim());
+      setIsEmailVerified(true);
+      setEmailOtpSuccess('Email address verified successfully!');
+    } catch (err: any) {
+      setEmailOtpError(err.message || 'Incorrect verification code. Please try again.');
+    } finally {
+      setVerifyingEmailOtp(false);
+    }
+  };
+
+  const handleSendMobileOtp = async () => {
+    setMobileOtpError('');
+    setMobileOtpSuccess('');
     if (!form.phone.trim()) {
-      setOtpError('Phone number is required to send OTP.');
+      setMobileOtpError('Phone number is required.');
       return;
     }
-    setSendingOtp(true);
+    setSendingMobileOtp(true);
     try {
-      await sendOtpApi(form.phone.trim());
-      setOtpSent(true);
-      setOtpSuccess('OTP code dispatched! For local development, check system notifications or database.');
+      await sendOtpApi(form.phone.trim(), undefined);
+      setMobileOtpSent(true);
+      setMobileCooldown(60);
+      setMobileOtpSuccess('OTP code dispatched! Check your mobile (or system notifications in dev mode).');
     } catch (err: any) {
-      setOtpError(err.message || 'Failed to dispatch OTP verification code.');
+      setMobileOtpError(err.message || 'Failed to dispatch mobile verification code.');
     } finally {
-      setSendingOtp(false);
+      setSendingMobileOtp(false);
     }
   };
 
-  const handleVerifyOtp = async () => {
-    setOtpError('');
-    setOtpSuccess('');
-    if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setOtpError('Please input a complete 6-digit OTP code.');
+  const handleVerifyMobileOtp = async () => {
+    setMobileOtpError('');
+    setMobileOtpSuccess('');
+    if (!mobileOtpCode.trim() || mobileOtpCode.trim().length !== 6) {
+      setMobileOtpError('Please input a complete 6-digit OTP code.');
       return;
     }
-    setVerifyingOtp(true);
+    setVerifyingMobileOtp(true);
     try {
-      await verifyOtpApi(form.phone.trim(), otpCode.trim());
-      setIsOtpVerified(true);
-      setOtpSuccess('Mobile phone verified successfully!');
+      await verifyOtpApi(form.phone.trim(), undefined, mobileOtpCode.trim());
+      setIsMobileVerified(true);
+      setMobileOtpSuccess('Mobile phone verified successfully!');
     } catch (err: any) {
-      setOtpError(err.message || 'Incorrect verification code. Please request a new code.');
+      setMobileOtpError(err.message || 'Incorrect verification code. Please try again.');
     } finally {
-      setVerifyingOtp(false);
+      setVerifyingMobileOtp(false);
     }
   };
 
-  const handlePhoneChange = (val: string) => {
+  const handleEmailChange = (val: string) => {
+    updateField('email', val);
+    if (isEmailVerified || emailOtpSent) {
+      setIsEmailVerified(false);
+      setEmailOtpSent(false);
+      setEmailOtpCode('');
+      setEmailOtpError('');
+      setEmailOtpSuccess('');
+    }
+  };
+
+  const handleMobileChange = (val: string) => {
     updateField('phone', val);
-    if (isOtpVerified || otpSent) {
-      setIsOtpVerified(false);
-      setOtpSent(false);
-      setOtpCode('');
-      setOtpError('');
-      setOtpSuccess('');
+    if (isMobileVerified || mobileOtpSent) {
+      setIsMobileVerified(false);
+      setMobileOtpSent(false);
+      setMobileOtpCode('');
+      setMobileOtpError('');
+      setMobileOtpSuccess('');
     }
   };
 
@@ -309,9 +390,12 @@ export default function RegisterPage() {
       if (!form.orgName.trim()) { setError('Organization / Campus Name is required'); return; }
       if (!form.city.trim() || !form.state.trim()) { setError('City and State are required fields'); return; }
     } else if (step === 4) {
-      if (!form.email.trim() || !form.phone.trim()) { setError('Official Email and Phone number are required'); return; }
+      if (!form.email.trim()) { setError('Official Email address is required'); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setError('Please enter a valid email address'); return; }
-      if (!isOtpVerified) { setError('Phone number must be verified via OTP code before proceeding.'); return; }
+      if (!isEmailVerified && !form.requestManualApproval) {
+        setError('Email must be verified via OTP before proceeding, or select Request Founder Manual Approval.');
+        return;
+      }
     } else if (step === 7) {
       if (!form.adminName.trim()) { setError('Administrator full name is required'); return; }
       
@@ -371,6 +455,7 @@ export default function RegisterPage() {
         country: form.country,
         adminGender: form.adminGender,
         adminRole: form.adminRole,
+        requestManualApproval: form.requestManualApproval,
       });
 
       // Clear local storage draft upon success
@@ -733,77 +818,136 @@ export default function RegisterPage() {
 
             {/* STEP 4: CONTACT INFO */}
             {step === 4 && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Official Email *</label>
-                  <input
-                    type="email" required
-                    placeholder="e.g. administrator@campus.com"
-                    value={form.email}
-                    onChange={e => updateField('email', e.target.value)}
-                    className="w-full rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition"
-                  />
-                  <p className="text-[10px] text-gray-400 font-semibold">The workspace approval keys and instructions will be sent here.</p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Official Phone / Mobile *</label>
+              <div className="space-y-6 animate-fade-in">
+                {/* EMAIL VERIFICATION CARD */}
+                <div className="p-5 rounded-3xl border border-gray-100 bg-white shadow-sm space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Official Email *</label>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${isEmailVerified ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                      {isEmailVerified ? '✓ Verified' : '✗ Not Verified'}
+                    </span>
+                  </div>
                   <div className="flex gap-2">
                     <input
-                      type="text" required
-                      placeholder="e.g. +919876543210"
-                      value={form.phone}
-                      onChange={e => handlePhoneChange(e.target.value)}
-                      disabled={isOtpVerified}
+                      type="email" required
+                      placeholder="e.g. administrator@campus.com"
+                      value={form.email}
+                      onChange={e => handleEmailChange(e.target.value)}
+                      disabled={isEmailVerified}
                       className="flex-1 rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
                     />
-                    {!isOtpVerified && (
+                    {!isEmailVerified && (
                       <button
                         type="button"
-                        onClick={handleSendOtp}
-                        disabled={sendingOtp || !form.phone.trim()}
+                        onClick={handleSendEmailOtp}
+                        disabled={sendingEmailOtp || !form.email.trim() || emailCooldown > 0}
                         className="px-4 py-2.5 rounded-2xl bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-200 text-white disabled:text-gray-400 font-bold text-[10px] uppercase tracking-wider transition cursor-pointer"
                       >
-                        {sendingOtp ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}
+                        {sendingEmailOtp ? 'Sending...' : emailCooldown > 0 ? `Resend in ${emailCooldown}s` : emailOtpSent ? 'Resend OTP' : 'Send OTP'}
                       </button>
                     )}
                   </div>
-                  {isOtpVerified && (
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 mt-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Mobile number verified successfully.
+                  {emailOtpSent && !isEmailVerified && (
+                    <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-3 animate-fade-in">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-500">Enter 6-Digit Email OTP</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="e.g. 123456"
+                          value={emailOtpCode}
+                          onChange={e => setEmailOtpCode(e.target.value.replace(/\D/g, ''))}
+                          className="flex-1 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-center outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleVerifyEmailOtp}
+                          disabled={verifyingEmailOtp || emailOtpCode.length !== 6}
+                          className="px-5 py-2.5 rounded-xl bg-indigo-650 hover:bg-indigo-750 text-white font-bold text-[10px] uppercase tracking-wider transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {verifyingEmailOtp ? 'Verifying...' : 'Verify OTP'}
+                        </button>
+                      </div>
                     </div>
                   )}
+                  {emailOtpError && <p className="text-[10px] font-bold text-rose-600 animate-fade-in">{emailOtpError}</p>}
+                  {emailOtpSuccess && !emailOtpError && <p className="text-[10px] font-bold text-indigo-600 animate-fade-in">{emailOtpSuccess}</p>}
                 </div>
 
-                {otpSent && !isOtpVerified && (
-                  <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-3 animate-fade-in">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-500">Enter 6-Digit OTP Code</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        maxLength={6}
-                        placeholder="e.g. 123456"
-                        value={otpCode}
-                        onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                        className="flex-1 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-center outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 transition"
-                      />
+                {/* PHONE VERIFICATION CARD */}
+                <div className="p-5 rounded-3xl border border-gray-100 bg-white shadow-sm space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-450">Official Phone / Mobile (Optional)</label>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${isMobileVerified ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                      {isMobileVerified ? '✓ Verified' : '✗ Optional'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. +919876543210"
+                      value={form.phone}
+                      onChange={e => handleMobileChange(e.target.value)}
+                      disabled={isMobileVerified}
+                      className="flex-1 rounded-2xl border border-gray-150 bg-gray-50/20 px-4 py-3.5 text-xs text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                    {!isMobileVerified && (
                       <button
                         type="button"
-                        onClick={handleVerifyOtp}
-                        disabled={verifyingOtp || otpCode.length !== 6}
-                        className="px-5 py-2.5 rounded-xl bg-indigo-650 hover:bg-indigo-750 text-white font-bold text-[10px] uppercase tracking-wider transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={handleSendMobileOtp}
+                        disabled={sendingMobileOtp || !form.phone.trim() || mobileCooldown > 0}
+                        className="px-4 py-2.5 rounded-2xl bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-200 text-white disabled:text-gray-400 font-bold text-[10px] uppercase tracking-wider transition cursor-pointer"
                       >
-                        {verifyingOtp ? 'Verifying...' : 'Verify OTP'}
+                        {sendingMobileOtp ? 'Sending...' : mobileCooldown > 0 ? `Resend in ${mobileCooldown}s` : mobileOtpSent ? 'Resend OTP' : 'Send OTP'}
                       </button>
+                    )}
+                  </div>
+                  {mobileOtpSent && !isMobileVerified && (
+                    <div className="p-4 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-3 animate-fade-in">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-indigo-500">Enter 6-Digit Mobile OTP</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="e.g. 123456"
+                          value={mobileOtpCode}
+                          onChange={e => setMobileOtpCode(e.target.value.replace(/\D/g, ''))}
+                          className="flex-1 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-mono font-bold tracking-widest text-center outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/10 transition"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleVerifyMobileOtp}
+                          disabled={verifyingMobileOtp || mobileOtpCode.length !== 6}
+                          className="px-5 py-2.5 rounded-xl bg-indigo-650 hover:bg-indigo-750 text-white font-bold text-[10px] uppercase tracking-wider transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {verifyingMobileOtp ? 'Verifying...' : 'Verify OTP'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {mobileOtpError && <p className="text-[10px] font-bold text-rose-600 animate-fade-in">{mobileOtpError}</p>}
+                  {mobileOtpSuccess && !mobileOtpError && <p className="text-[10px] font-bold text-indigo-600 animate-fade-in">{mobileOtpSuccess}</p>}
+                </div>
+
+                {/* MANUAL APPROVAL OPTION CHECKBOX */}
+                {!isEmailVerified && (
+                  <div className="p-4 rounded-2xl border border-amber-100 bg-amber-50/20 flex gap-3 items-start animate-fade-in">
+                    <input
+                      type="checkbox"
+                      id="requestManualApproval"
+                      checked={form.requestManualApproval || false}
+                      onChange={e => updateField('requestManualApproval', e.target.checked)}
+                      className="mt-0.5 rounded border-gray-300 text-indigo-650 focus:ring-indigo-500 cursor-pointer h-4 w-4"
+                    />
+                    <div className="space-y-1">
+                      <label htmlFor="requestManualApproval" className="block text-xs font-bold text-gray-800 cursor-pointer select-none">
+                        Request Founder Manual Approval Override
+                      </label>
+                      <p className="text-[10px] text-gray-450 leading-relaxed font-semibold">
+                        Select this if you cannot receive the verification OTP or do not have access to an official mail domain. Your registration will be held for manual review.
+                      </p>
                     </div>
                   </div>
-                )}
-
-                {otpError && (
-                  <p className="text-[10px] font-bold text-rose-600 animate-fade-in">{otpError}</p>
-                )}
-                {otpSuccess && !otpError && (
-                  <p className="text-[10px] font-bold text-indigo-600 animate-fade-in">{otpSuccess}</p>
                 )}
               </div>
             )}

@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, IsOptional, IsInt, IsArray } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsOptional, IsInt, IsArray, IsBoolean } from 'class-validator';
 
 export class CreateRegistrationDto {
   @IsString()
@@ -86,5 +86,9 @@ export class CreateRegistrationDto {
   @IsString()
   @IsOptional()
   adminRole?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  requestManualApproval?: boolean;
 }
 

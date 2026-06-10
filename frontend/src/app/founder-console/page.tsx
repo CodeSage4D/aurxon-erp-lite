@@ -458,7 +458,7 @@ export default function ProductOperationsPage() {
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-8 space-y-6">
         
         {/* Header */}
-        <header className="flex justify-between items-center border-b border-slate-950 pb-5">
+        <header className="relative z-40 flex justify-between items-center border-b border-slate-950 pb-5">
           <div>
             <span className="text-[9px] font-black uppercase text-indigo-400 tracking-wider">AURXON Product Control Plane</span>
             <h1 className="text-xl font-black text-white uppercase tracking-tight">Platform Operations & Demo Center</h1>

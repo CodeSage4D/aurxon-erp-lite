@@ -17,7 +17,8 @@ import {
   getPlanDefinitionsApi, getRbacMatrixApi, bulkUpdatePermissionsApi,
   getActivationKeysApi, revokeActivationKeyApi, suspendActivationKeyApi, renewActivationKeyApi, regenerateActivationKeyApi,
   getRenewalRequestsApi, approveRenewalRequestApi, founderDirectRenewalApi,
-  technicalReviewRegistrationApi, provisionWorkspaceApi
+  technicalReviewRegistrationApi, provisionWorkspaceApi,
+  verifyRegistrationManualApi, resendVerificationOtpApi
 } from '@/lib/api';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -297,6 +298,32 @@ export default function FounderDashboardPage() {
     }
   };
 
+  const handleVerifyManual = async (id: string) => {
+    setSubmitting(true);
+    try {
+      await verifyRegistrationManualApi(id);
+      triggerToast('Registration email & mobile manually verified successfully!');
+      loadDashboardData();
+    } catch (err: any) {
+      triggerToast(err.message || 'Manual verification override failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendVerification = async (id: string) => {
+    setSubmitting(true);
+    try {
+      await resendVerificationOtpApi(id);
+      triggerToast('Verification OTP requests resent successfully.');
+      loadDashboardData();
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to resend verification OTPs.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ─── Key Actions Helpers ───────────────────────────────────────────────────
 
   const copyToClipboard = (text: string) => {
@@ -537,7 +564,7 @@ export default function FounderDashboardPage() {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
         
         {/* Top OS Status Bar */}
-        <header className="flex items-center justify-between border-b border-border px-8 py-4 bg-card/40 backdrop-blur-md">
+        <header className="relative z-40 flex items-center justify-between border-b border-border px-8 py-4 bg-card/40 backdrop-blur-md">
           <div className="flex items-center gap-6">
             <div>
               <h1 className="text-sm font-black text-foreground uppercase tracking-tight flex items-center gap-1.5">
@@ -942,7 +969,15 @@ export default function FounderDashboardPage() {
                                 <div>
                                   <span className="text-[9px] font-black uppercase bg-primary/10 px-2 py-0.5 rounded text-primary">{reg.orgType} Size: {reg.orgSize}</span>
                                   <h4 className="text-sm font-black text-foreground uppercase tracking-tight mt-1">{reg.orgName}</h4>
-                                  <p className="text-[10px] text-zinc-550 font-mono mt-0.5">Reference: {reg.referenceNumber} • Email: {reg.email}</p>
+                                  <p className="text-[10px] text-zinc-550 font-mono mt-0.5">Reference: {reg.referenceNumber} • Email: {reg.email} • Mobile: {reg.phone || 'None'}</p>
+                                  <div className="flex gap-2.5 mt-1.5 flex-wrap">
+                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${reg.emailVerified ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                      Email: {reg.emailVerified ? '✓ Verified' : '✗ Not Verified'}
+                                    </span>
+                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${reg.phoneVerified ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                                      Mobile: {reg.phoneVerified ? '✓ Verified' : '✗ Not Verified'}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="text-right">
                                   <span className="text-xs font-black text-foreground">{progressVal}% Progress</span>
@@ -974,12 +1009,26 @@ export default function FounderDashboardPage() {
                               {/* ACTIVE STEP ACTIONS */}
                               <div className="flex gap-2 items-center justify-end flex-wrap">
                                 {reg.status === 'PENDING_REVIEW' && (
-                                  <div className="flex gap-2">
+                                  <div className="flex gap-2 flex-wrap">
+                                    {(!reg.emailVerified || !reg.phoneVerified) && (
+                                      <button 
+                                        onClick={() => handleVerifyManual(reg.id)}
+                                        className="px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-[10px] font-bold uppercase rounded-xl border border-emerald-500/20 text-emerald-500 transition"
+                                      >
+                                        Verify Manually
+                                      </button>
+                                    )}
+                                    <button 
+                                      onClick={() => handleResendVerification(reg.id)}
+                                      className="px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-[10px] font-bold uppercase rounded-xl border border-indigo-500/20 text-indigo-400 transition"
+                                    >
+                                      Resend Verification
+                                    </button>
                                     <button 
                                       onClick={() => setSelectedRegForDocs(reg.id)}
                                       className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-[10px] font-bold uppercase rounded-xl border border-border text-foreground transition"
                                     >
-                                      Request Documents
+                                      Request Docs
                                     </button>
                                     <button 
                                       onClick={() => handleRejectRegistration(reg.id)}
