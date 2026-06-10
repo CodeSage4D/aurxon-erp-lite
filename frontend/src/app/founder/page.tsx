@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Building2, KeyRound, ShieldCheck, Activity, Bell, Search, Database, 
   Save, Settings, User, CreditCard, ChevronRight, Menu, LogOut, CheckCircle, 
   XCircle, Play, ShieldAlert, Sparkles, RefreshCw, Layers, ArrowUpRight,
   UserCheck, HelpCircle, HardDrive, Terminal, Clock, Shield, Award, FolderOpen, 
-  AlertTriangle, Copy, Mail, Download, Check, Info
+  AlertTriangle, Copy, Mail, Download, Check, Info, X, TrendingUp, Users,
+  Zap, Globe, BarChart3, Lock, Eye, EyeOff, ChevronDown, Filter
 } from 'lucide-react';
 import { 
   getRegistrationsApi, reviewRegistrationApi, 
@@ -32,7 +33,7 @@ import {
 
 export default function FounderDashboardPage() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, setTheme } = useTheme();
   const { 
     notifications, unreadCount, criticalCount, approvalsCount, supportCount, 
     markAllRead, clearNotifications, markAsRead, fetchNotifications 
@@ -41,14 +42,14 @@ export default function FounderDashboardPage() {
   
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  
-  // Greeting state
   const [greeting, setGreeting] = useState('Good Morning, Karan');
+  const notifRef = useRef<HTMLDivElement>(null);
 
   // Loading states
   const [loading, setLoading] = useState(true);
   const [tabLoading, setTabLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
   
   // Datasets
   const [registrations, setRegistrations] = useState<any[]>([]);
@@ -63,7 +64,7 @@ export default function FounderDashboardPage() {
   const [activationKeys, setActivationKeys] = useState<any[]>([]);
   const [renewalRequests, setRenewalRequests] = useState<any[]>([]);
 
-  // Stepper UI simulations & inputs
+  // Stepper UI
   const [requestDocsNotes, setRequestDocsNotes] = useState('');
   const [selectedRegForDocs, setSelectedRegForDocs] = useState<string | null>(null);
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState<Record<string, string>>({});
@@ -81,24 +82,37 @@ export default function FounderDashboardPage() {
   const [selectedMatrixRoleId, setSelectedMatrixRoleId] = useState('');
   const [matrixEdits, setMatrixEdits] = useState<Record<string, boolean>>({});
 
-  // Global Command Palette search
+  // Global Command Palette
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandSearchQuery, setCommandSearchQuery] = useState('');
   const [backendSearchResults, setBackendSearchResults] = useState<any[]>([]);
   const [searchingBackend, setSearchingBackend] = useState(false);
 
-  // Notification center popup state
+  // Notification center
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifSearch, setNotifSearch] = useState('');
   const [notifCategoryFilter, setNotifCategoryFilter] = useState<string>('ALL');
 
   // Toast
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ msg: string; type?: 'success' | 'error' | 'info' } | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 4000);
+  const triggerToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
   };
+
+  // Close notification popup on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotificationOpen(false);
+      }
+    };
+    if (notificationOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notificationOpen]);
 
   useEffect(() => {
     setMounted(true);
@@ -110,7 +124,7 @@ export default function FounderDashboardPage() {
 
     const cached = localStorage.getItem('aurxon_user');
     if (!cached) {
-      router.push('/');
+      router.push('/founder/login');
       return;
     }
     const user = JSON.parse(cached);
@@ -122,7 +136,6 @@ export default function FounderDashboardPage() {
     setGreeting(`${greet}, Karan`);
     loadDashboardData();
 
-    // Listen for keys: CTRL+K for Command Palette, ESC to close dropdowns
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
@@ -139,9 +152,24 @@ export default function FounderDashboardPage() {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setDataError(null);
     try {
-      const [regs, currMetrics, histMetrics, stor, threats, backups, bills, plns, rbac, actKeys, renewals] = await Promise.all([
-        getRegistrationsApi().catch(() => []),
+      // Load registrations with its own error handling so it never blocks others
+      const regsPromise = getRegistrationsApi().catch((err: any) => {
+        console.error('Failed to load registrations:', err);
+        if (err.message === 'Unauthorized') {
+          triggerToast('Session expired. Please log in again.', 'error');
+          logout();
+          router.push('/founder/login');
+        }
+        return [];
+      });
+
+      const [
+        regs,
+        currMetrics, histMetrics, stor, threats, backups, bills, plns, rbac, actKeys, renewals
+      ] = await Promise.all([
+        regsPromise,
         getFounderMetricsCurrentApi().catch(() => ({ dbSizeGb: 0.045, avgResponseMs: 45 })),
         getFounderMetricsHistoryApi(12).catch(() => []),
         getFounderStorageStatsApi().catch(() => []),
@@ -154,7 +182,7 @@ export default function FounderDashboardPage() {
         getRenewalRequestsApi().catch(() => []),
       ]);
 
-      setRegistrations(regs);
+      setRegistrations(Array.isArray(regs) ? regs : []);
       setMetricsCurrent(currMetrics);
       setMetricsHistory(histMetrics);
       setStorageStats(stor);
@@ -171,7 +199,8 @@ export default function FounderDashboardPage() {
         initializeMatrixEdits(rbac, rbac.roles[0].id);
       }
     } catch (err: any) {
-      console.warn('Founder dashboard data offline: Using local mock/cached telemetry.');
+      console.error('Founder dashboard critical error:', err);
+      setDataError('Unable to connect to backend. Check server status.');
     } finally {
       setLoading(false);
     }
@@ -190,9 +219,7 @@ export default function FounderDashboardPage() {
 
   const handleMatrixRoleChange = (roleId: string) => {
     setSelectedMatrixRoleId(roleId);
-    if (rbacMatrix) {
-      initializeMatrixEdits(rbacMatrix, roleId);
-    }
+    if (rbacMatrix) initializeMatrixEdits(rbacMatrix, roleId);
   };
 
   const handleMatrixToggle = (resource: string, action: string, checked: boolean) => {
@@ -208,20 +235,18 @@ export default function FounderDashboardPage() {
         const [resource, action] = key.split(':');
         return { resource, action, isAllowed };
       });
-
       await bulkUpdatePermissionsApi(selectedMatrixRoleId, assignments);
       triggerToast('Permissions matrix updated successfully.');
-      
       const rbac = await getRbacMatrixApi();
       setRbacMatrix(rbac);
     } catch (err: any) {
-      triggerToast(err.message || 'Failed to update matrix');
+      triggerToast(err.message || 'Failed to update matrix', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Interactive Stepper Handlers ──────────────────────────────────────────
+  // ─── Registration Handlers ──────────────────────────────────────────────────
 
   const handleApproveRegistration = async (id: string) => {
     setSubmitting(true);
@@ -231,7 +256,7 @@ export default function FounderDashboardPage() {
       loadDashboardData();
       fetchNotifications();
     } catch (err: any) {
-      triggerToast(err.message || 'Approval failed');
+      triggerToast(err.message || 'Approval failed', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -245,7 +270,7 @@ export default function FounderDashboardPage() {
       loadDashboardData();
       fetchNotifications();
     } catch (err: any) {
-      triggerToast(err.message || 'Rejection failed');
+      triggerToast(err.message || 'Rejection failed', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -253,18 +278,18 @@ export default function FounderDashboardPage() {
 
   const handleRequestDocuments = async (id: string) => {
     if (!requestDocsNotes.trim()) {
-      triggerToast('Please write the request details.');
+      triggerToast('Please write the request details.', 'info');
       return;
     }
     setSubmitting(true);
     try {
       await reviewRegistrationApi(id, 'CHANGES_REQUESTED', requestDocsNotes);
-      triggerToast('Documents request email logged.');
+      triggerToast('Documents request logged.');
       setSelectedRegForDocs(null);
       setRequestDocsNotes('');
       loadDashboardData();
     } catch (err: any) {
-      triggerToast(err.message || 'Failed to request documents');
+      triggerToast(err.message || 'Failed to request documents', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -278,7 +303,7 @@ export default function FounderDashboardPage() {
       loadDashboardData();
       fetchNotifications();
     } catch (err: any) {
-      triggerToast(err.message || 'Verification failed');
+      triggerToast(err.message || 'Verification failed', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -288,11 +313,11 @@ export default function FounderDashboardPage() {
     setSubmitting(true);
     try {
       const result = await provisionWorkspaceApi(id, paymentStatus);
-      triggerToast(`Workspace database provisioned! Licence: ${result.licenseKey}`);
+      triggerToast(`Workspace provisioned! Licence: ${result.licenseKey}`);
       loadDashboardData();
       fetchNotifications();
     } catch (err: any) {
-      triggerToast(err.message || 'Provisioning failed');
+      triggerToast(err.message || 'Provisioning failed', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -302,10 +327,10 @@ export default function FounderDashboardPage() {
     setSubmitting(true);
     try {
       await verifyRegistrationManualApi(id);
-      triggerToast('Registration email & mobile manually verified successfully!');
+      triggerToast('Manually verified successfully!');
       loadDashboardData();
     } catch (err: any) {
-      triggerToast(err.message || 'Manual verification override failed.');
+      triggerToast(err.message || 'Manual verification failed.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -315,24 +340,20 @@ export default function FounderDashboardPage() {
     setSubmitting(true);
     try {
       await resendVerificationOtpApi(id);
-      triggerToast('Verification OTP requests resent successfully.');
+      triggerToast('Verification OTP resent successfully.');
       loadDashboardData();
     } catch (err: any) {
-      triggerToast(err.message || 'Failed to resend verification OTPs.');
+      triggerToast(err.message || 'Failed to resend OTPs.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Key Actions Helpers ───────────────────────────────────────────────────
+  // ─── Utility Helpers ───────────────────────────────────────────────────────
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    triggerToast('Copied to clipboard!');
-  };
-
-  const mockEmailTrigger = (orgName: string, key: string) => {
-    triggerToast(`Email dispatched containing Licence Key package to ${orgName} Admin.`);
+    triggerToast('Copied to clipboard!', 'info');
   };
 
   const downloadKeyFile = (orgName: string, key: string) => {
@@ -343,10 +364,8 @@ export default function FounderDashboardPage() {
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    triggerToast('Downloading license credentials...');
+    triggerToast('Downloading license file...', 'info');
   };
-
-  // ─── Support Actions ───────────────────────────────────────────────────────
 
   const handleResolveThreat = async (id: string) => {
     try {
@@ -355,7 +374,7 @@ export default function FounderDashboardPage() {
       const threats = await getSecurityThreatsApi();
       setThreatLogs(threats);
     } catch (err: any) {
-      triggerToast(err.message || 'Resolution failed');
+      triggerToast(err.message || 'Resolution failed', 'error');
     }
   };
 
@@ -368,48 +387,37 @@ export default function FounderDashboardPage() {
         setBackupRecords(backups);
       }, 2100);
     } catch (err: any) {
-      triggerToast(err.message || 'Failed to trigger backup');
+      triggerToast(err.message || 'Failed to trigger backup', 'error');
     }
   };
 
   const handleLaunchImpersonation = async () => {
-    if (!selectedImpersonateOrg) {
-      triggerToast('Please select a target organization');
-      return;
-    }
-    if (!impersonateReason || impersonateReason.trim().length < 5) {
-      triggerToast('Impersonating reason is too short');
-      return;
-    }
-
+    if (!selectedImpersonateOrg) { triggerToast('Please select target org', 'info'); return; }
+    if (!impersonateReason || impersonateReason.trim().length < 5) { triggerToast('Reason is too short', 'info'); return; }
     setSubmitting(true);
     try {
       const originalToken = localStorage.getItem('aurxon_token');
       const result = await impersonateOrganizationApi(selectedImpersonateOrg, impersonateReason, impersonateTicket);
-      
-      if (originalToken) {
-        localStorage.setItem('aurxon_founder_token', originalToken);
-      }
+      if (originalToken) localStorage.setItem('aurxon_founder_token', originalToken);
       localStorage.setItem('aurxon_token', result.token);
       localStorage.setItem('aurxon_impersonating', 'true');
-      
-      triggerToast(`Launching impersonation session for ${result.orgName}...`);
+      triggerToast(`Launching impersonation for ${result.orgName}...`);
       window.open('/dashboard', '_blank');
     } catch (err: any) {
-      triggerToast(err.message || 'Impersonation failed');
+      triggerToast(err.message || 'Impersonation failed', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Search Queries ────────────────────────────────────────────────────────
+  // ─── Search ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (commandSearchQuery.trim().length < 2) {
       setBackendSearchResults([]);
       return;
     }
-    const delayDebounceFn = setTimeout(async () => {
+    const delay = setTimeout(async () => {
       setSearchingBackend(true);
       try {
         const results = await founderGlobalSearchApi(commandSearchQuery);
@@ -420,117 +428,115 @@ export default function FounderDashboardPage() {
         setSearchingBackend(false);
       }
     }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
+    return () => clearTimeout(delay);
   }, [commandSearchQuery]);
 
   const handleTabChange = (tab: string) => {
     setTabLoading(true);
     setActiveTab(tab);
-    setTimeout(() => setTabLoading(false), 250);
+    setTimeout(() => setTabLoading(false), 200);
   };
 
-  const getBreadcrumbs = () => {
-    const items = ['Founder'];
-    if (activeTab === 'overview') items.push('Overview');
-    else if (activeTab === 'organizations') items.push('Digital Twins');
-    else if (activeTab === 'approvals') items.push('Pending Approvals');
-    else if (activeTab === 'subscriptions') items.push('Subscriptions');
-    else if (activeTab === 'leads') items.push('Leads & Signups');
-    else if (activeTab === 'support') items.push('Diagnostics Tunnel');
-    else if (activeTab === 'analytics') items.push('Billing Analytics');
-    else if (activeTab === 'monitoring') items.push('System Monitoring');
-    else if (activeTab === 'audit') items.push('Security Audit');
-    else if (activeTab === 'team') items.push('Founder Team');
-    else if (activeTab === 'deployments') items.push('Deployments');
-    else if (activeTab === 'settings') items.push('Console Settings');
-
-    return (
-      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-zinc-500 tracking-wider mb-2">
-        {items.map((item, index) => (
-          <React.Fragment key={index}>
-            {index > 0 && <span className="text-zinc-650">/</span>}
-            <span className={index === items.length - 1 ? 'text-primary' : ''}>{item}</span>
-          </React.Fragment>
-        ))}
-      </div>
-    );
-  };
+  // ─── Computed Stats ────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#070b13] text-white">
+      <div className="min-h-screen flex items-center justify-center bg-[#070b13]">
         <div className="text-center space-y-4">
-          <RefreshCw className="h-8 w-8 text-sky-500 animate-spin mx-auto" />
-          <p className="text-xs font-bold text-zinc-450 uppercase tracking-widest">Booting Operating Control Plane...</p>
+          <div className="relative mx-auto w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+            <div className="absolute inset-0 rounded-full border-t-2 border-primary animate-spin" />
+            <div className="absolute inset-2 rounded-full bg-primary/10 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-primary" />
+            </div>
+          </div>
+          <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Loading AURXON OS...</p>
         </div>
       </div>
     );
   }
 
-  const planPieData = [
-    { name: 'Trial Subscriptions', value: billingStats?.trialSubscriptions || 0, color: '#64748b' },
-    { name: 'Active Subscriptions', value: billingStats?.activeSubscriptions || 0, color: '#0284c7' },
-  ];
-
   const pendingApprovalsCount = registrations.filter(r => r.status === 'PENDING_REVIEW').length;
   const pendingRenewalsCount = renewalRequests.filter(r => r.status === 'PENDING').length;
   const criticalThreatsCount = threatLogs.filter(t => !t.resolved && t.severity === 'CRITICAL').length;
+  const planPieData = [
+    { name: 'Trial', value: billingStats?.trialSubscriptions || 0, color: '#64748b' },
+    { name: 'Active', value: billingStats?.activeSubscriptions || 0, color: '#2563EB' },
+  ];
+
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: Activity },
+    { id: 'approvals', label: 'Approvals', count: pendingApprovalsCount, icon: UserCheck, urgent: pendingApprovalsCount > 0 },
+    { id: 'organizations', label: 'Digital Twins', count: billingStats?.activeSubscriptions, icon: Building2 },
+    { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
+    { id: 'leads', label: 'Leads', icon: HelpCircle },
+    { id: 'support', label: 'Support', count: pendingRenewalsCount, icon: Play },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'monitoring', label: 'Monitoring', count: criticalThreatsCount, icon: ShieldAlert, urgent: criticalThreatsCount > 0 },
+    { id: 'audit', label: 'Audit Logs', icon: Terminal },
+    { id: 'team', label: 'Founder Team', icon: Users },
+    { id: 'deployments', label: 'Deployments', icon: Clock },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground font-sans relative overflow-hidden select-none">
-      {/* Dynamic Background Gradients */}
-      <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[140px] pointer-events-none" />
+    <div className="min-h-screen flex bg-background text-foreground font-sans relative overflow-hidden">
+      {/* Background atmosphere */}
+      <div className="fixed top-0 right-1/4 w-[700px] h-[700px] bg-primary/10 rounded-full blur-[160px] pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-1/4 w-[500px] h-[500px] bg-indigo-500/8 rounded-full blur-[140px] pointer-events-none z-0" />
 
-      {/* OS Toast Box */}
+      {/* ── Toast ── */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-xs font-bold text-primary-text shadow-xl border border-primary/20 uppercase tracking-wide">
-          <Sparkles className="h-4 w-4 text-sky-200 animate-pulse" />
-          <span>{toast}</span>
+        <div
+          className={`fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-2.5 rounded-2xl px-5 py-3 text-xs font-bold shadow-2xl border transition-all animate-fade-in
+            ${toast.type === 'error' ? 'bg-red-600 text-white border-red-500/40' :
+              toast.type === 'info' ? 'bg-zinc-900 text-zinc-100 border-zinc-700' :
+              'bg-primary text-white border-primary/30'}`}
+        >
+          {toast.type === 'error' ? <XCircle className="h-3.5 w-3.5 shrink-0" /> :
+           toast.type === 'info' ? <Info className="h-3.5 w-3.5 shrink-0" /> :
+           <CheckCircle className="h-3.5 w-3.5 shrink-0" />}
+          <span>{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="ml-2 opacity-70 hover:opacity-100"><X className="h-3 w-3" /></button>
         </div>
       )}
 
-      {/* Left Navigation Panel (Daily Tasks First) */}
-      <aside className="w-64 border-r border-border bg-sidebar/95 backdrop-blur-xl shrink-0 flex flex-col justify-between p-5 relative z-10">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2.5 px-1">
-            <div className="h-8 w-8 bg-gradient-to-tr from-primary to-indigo-650 rounded-lg flex items-center justify-center font-black text-white text-md">
+      {/* ════ LEFT SIDEBAR ════ */}
+      <aside className="w-60 border-r border-border bg-sidebar/95 backdrop-blur-xl shrink-0 flex flex-col justify-between relative z-10">
+        {/* Logo */}
+        <div className="p-5 space-y-6">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 bg-gradient-to-tr from-primary to-indigo-500 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-lg shadow-primary/30">
               A
             </div>
-            <span className="text-xs font-black tracking-widest uppercase text-card-text">AURXON OS</span>
+            <div>
+              <span className="text-[11px] font-black tracking-widest uppercase text-foreground block leading-none">AURXON OS</span>
+              <span className="text-[8px] text-zinc-500 font-semibold">Founder Control</span>
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider px-2 block mb-2">Command Console</span>
-            {[
-              { id: 'overview', label: 'Overview', icon: Activity },
-              { id: 'organizations', label: 'Digital Twins', count: billingStats?.activeSubscriptions, icon: Building2 },
-              { id: 'approvals', label: 'Approvals', count: pendingApprovalsCount, icon: UserCheck },
-              { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
-              { id: 'leads', label: 'Leads', icon: HelpCircle },
-              { id: 'support', label: 'Support', count: pendingRenewalsCount, icon: Play },
-              { id: 'analytics', label: 'Analytics', icon: Layers },
-              { id: 'monitoring', label: 'Monitoring', count: criticalThreatsCount, icon: ShieldAlert },
-              { id: 'audit', label: 'Audit Logs', icon: Terminal },
-              { id: 'team', label: 'Founder Team', icon: User },
-              { id: 'deployments', label: 'Deployments', icon: Clock },
-              { id: 'settings', label: 'Settings', icon: Settings },
-            ].map(item => {
+          {/* Nav */}
+          <div className="space-y-0.5">
+            <span className="text-[8px] font-black uppercase text-zinc-500 tracking-widest px-2 block mb-2">Command Console</span>
+            {navItems.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition ${isActive ? 'bg-primary text-primary-text shadow-lg' : 'hover:bg-secondary/60 text-zinc-400'}`}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-[11px] font-bold rounded-xl transition-all group
+                    ${isActive 
+                      ? 'bg-primary text-white shadow-md shadow-primary/25' 
+                      : 'text-zinc-400 hover:bg-secondary/60 hover:text-foreground'}`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4" />
+                    <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-white' : item.urgent ? 'text-red-400' : 'text-zinc-500 group-hover:text-primary'}`} />
                     <span>{item.label}</span>
                   </div>
                   {!!item.count && (
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-black ${isActive ? 'bg-black/20 text-white' : 'bg-secondary text-zinc-550'}`}>
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black min-w-[18px] text-center
+                      ${isActive ? 'bg-white/20 text-white' : item.urgent ? 'bg-red-500/15 text-red-400' : 'bg-secondary text-zinc-500'}`}>
                       {item.count}
                     </span>
                   )}
@@ -540,117 +546,163 @@ export default function FounderDashboardPage() {
           </div>
         </div>
 
-        <div className="pt-5 border-t border-border space-y-3">
+        {/* User Profile */}
+        <div className="p-5 border-t border-border space-y-3">
           <div className="flex items-center gap-2.5 px-1.5">
-            <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-zinc-300">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-primary/20 to-indigo-500/20 border border-primary/20 flex items-center justify-center text-xs font-black text-primary">
               K
             </div>
-            <div>
-              <p className="text-xs font-bold text-card-text">Karan Admin</p>
-              <p className="text-[9px] text-zinc-500 font-mono">Platform Founder</p>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black text-foreground truncate">Karan</p>
+              <p className="text-[8px] text-zinc-500 font-mono">SUPER_ADMIN</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-xl transition"
+            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-bold text-red-400 hover:bg-red-500/10 rounded-xl transition"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
             <span>Sign Out</span>
           </button>
         </div>
       </aside>
 
-      {/* Main OS Command Board */}
+      {/* ════ MAIN AREA ════ */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
-        
-        {/* Top OS Status Bar */}
-        <header className="relative z-40 flex items-center justify-between border-b border-border px-8 py-4 bg-card/40 backdrop-blur-md">
-          <div className="flex items-center gap-6">
+
+        {/* ── Top Header Bar ── */}
+        <header className="flex items-center justify-between border-b border-border px-6 py-3.5 bg-card/30 backdrop-blur-md relative z-30">
+          <div className="flex items-center gap-5">
             <div>
-              <h1 className="text-sm font-black text-foreground uppercase tracking-tight flex items-center gap-1.5">
+              <h1 className="text-sm font-black text-foreground tracking-tight flex items-center gap-1.5">
                 {greeting}
-                <Sparkles className="h-4.5 w-4.5 text-primary animate-pulse" />
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
               </h1>
-              <p className="text-[10px] text-zinc-500 font-semibold mt-0.5">
-                AURXON SaaS Control Center • Dynamic Cockpit
+              <p className="text-[9px] text-zinc-500 font-semibold mt-0.5">
+                AURXON SaaS Control Center • Dynamic Cockpit v3.0
               </p>
             </div>
 
-            <div className="hidden md:flex items-center gap-2.5 rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-extrabold text-emerald-600 border border-emerald-500/25">
+            <div className="hidden md:flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-[9px] font-extrabold text-emerald-500 border border-emerald-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Platform Healthy (SLA 99.9%)</span>
+              Platform SLA 99.9%
             </div>
+
+            {dataError && (
+              <div className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-[9px] font-bold text-red-400 border border-red-500/20">
+                <AlertTriangle className="h-3 w-3" />
+                {dataError}
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Global Search shortcut button */}
-            <button 
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <button
               onClick={() => setCommandPaletteOpen(true)}
-              className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 bg-secondary hover:bg-secondary/80 rounded-xl text-xs font-bold text-zinc-400 border border-border transition"
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-secondary/80 rounded-xl text-[11px] font-bold text-zinc-400 border border-border transition"
             >
               <Search className="h-3.5 w-3.5" />
-              <span>Search Platform...</span>
-              <span className="rounded bg-background px-1.5 py-0.5 text-[9px] font-mono border border-border">Ctrl+K</span>
+              <span>Search...</span>
+              <span className="rounded bg-background px-1.5 py-0.5 text-[8px] font-mono border border-border">Ctrl+K</span>
             </button>
 
-            {/* Theme Toggle */}
-            <button 
+            {/* Theme */}
+            <button
               onClick={toggleTheme}
               className="p-2 rounded-xl bg-secondary hover:bg-secondary/80 text-zinc-400 border border-border transition"
-              title="Toggle theme mode"
+              title="Toggle theme"
             >
-              <Activity className="h-4 w-4 text-primary animate-pulse" />
+              <Activity className="h-3.5 w-3.5 text-primary animate-pulse" />
             </button>
 
-            {/* Notification drop center */}
-            <div className="relative">
-              <button 
-                onClick={() => setNotificationOpen(!notificationOpen)}
-                className="relative p-2 rounded-xl bg-secondary hover:bg-secondary/80 text-zinc-400 border border-border transition"
+            {/* Refresh */}
+            <button
+              onClick={loadDashboardData}
+              className="p-2 rounded-xl bg-secondary hover:bg-secondary/80 text-zinc-400 border border-border transition"
+              title="Refresh data"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+
+            {/* ── Notification Bell (fixed position panel) ── */}
+            <div ref={notifRef} className="relative">
+              <button
+                onClick={() => setNotificationOpen(prev => !prev)}
+                className={`relative p-2 rounded-xl border transition ${
+                  notificationOpen
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-secondary hover:bg-secondary/80 text-zinc-400 border-border'
+                }`}
               >
-                <Bell className="h-4 w-4" />
+                <Bell className="h-3.5 w-3.5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-[8px] font-black text-white rounded-full flex items-center justify-center animate-bounce">
-                    {unreadCount}
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-[8px] font-black text-white rounded-full flex items-center justify-center animate-bounce z-10">
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
 
-              {/* Priority Badges Header Section */}
+              {/* Notification Dropdown — fixed positioned to avoid stacking context issues */}
               {notificationOpen && (
-                <div className="absolute right-0 top-11 w-96 bg-card border border-border rounded-2xl shadow-2xl p-4 z-50 space-y-3 z-notification">
-                  <div className="flex items-center justify-between border-b border-border pb-2">
+                <div
+                  className="fixed right-6 top-[60px] w-96 bg-card border border-border rounded-2xl shadow-2xl z-[9999]"
+                  style={{ boxShadow: '0 20px 60px -10px rgba(0,0,0,0.5)' }}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <div>
-                      <span className="text-[10px] font-black uppercase text-foreground">Notification Drawer</span>
-                      <div className="flex gap-2 mt-1">
-                        {criticalCount > 0 && <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-1 rounded text-[7px] font-mono uppercase tracking-tight">Critical ({criticalCount})</span>}
-                        {approvalsCount > 0 && <span className="bg-blue-500/10 text-blue-500 border border-blue-500/20 px-1 rounded text-[7px] font-mono uppercase tracking-tight">Approvals ({approvalsCount})</span>}
-                        {supportCount > 0 && <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1 rounded text-[7px] font-mono uppercase tracking-tight">Support ({supportCount})</span>}
+                      <span className="text-[11px] font-black uppercase text-foreground">Notifications</span>
+                      <div className="flex gap-1.5 mt-1 flex-wrap">
+                        {criticalCount > 0 && (
+                          <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded text-[7px] font-mono uppercase">
+                            Critical ({criticalCount})
+                          </span>
+                        )}
+                        {approvalsCount > 0 && (
+                          <span className="bg-blue-500/10 text-blue-500 border border-blue-500/20 px-1.5 py-0.5 rounded text-[7px] font-mono uppercase">
+                            Approvals ({approvalsCount})
+                          </span>
+                        )}
+                        {supportCount > 0 && (
+                          <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded text-[7px] font-mono uppercase">
+                            Support ({supportCount})
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => { markAllRead(); triggerToast('All notifications marked as read.'); }}
-                      className="text-[9px] font-extrabold text-primary hover:underline"
-                    >
-                      Mark all read
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { markAllRead(); triggerToast('All marked as read.', 'info'); }}
+                        className="text-[9px] font-extrabold text-primary hover:underline"
+                      >
+                        Mark all read
+                      </button>
+                      <button
+                        onClick={() => setNotificationOpen(false)}
+                        className="p-1 rounded-lg hover:bg-secondary text-zinc-400"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Search and Category Filters Inside Panel */}
-                  <div className="space-y-2">
-                    <input 
-                      type="text" 
-                      placeholder="Filter alerts..." 
-                      className="w-full text-[11px] rounded-lg border border-border bg-input/40 px-2 py-1 outline-none text-foreground"
+                  {/* Filters */}
+                  <div className="px-4 py-2 border-b border-border space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Filter notifications..."
+                      className="w-full text-[11px] rounded-lg border border-border bg-input/40 px-2.5 py-1.5 outline-none text-foreground"
                       value={notifSearch}
                       onChange={e => setNotifSearch(e.target.value)}
                     />
                     <div className="flex flex-wrap gap-1">
-                      {['ALL', 'REGISTRATION', 'APPROVAL', 'LICENSE', 'SECURITY', 'SUPPORT', 'DEPLOYMENT', 'SYSTEM'].map(cat => (
+                      {['ALL', 'REGISTRATION', 'APPROVAL', 'LICENSE', 'SECURITY', 'SUPPORT', 'SYSTEM'].map(cat => (
                         <button
                           key={cat}
                           onClick={() => setNotifCategoryFilter(cat)}
-                          className={`px-1.5 py-0.5 rounded text-[8px] font-mono uppercase border border-border tracking-tighter ${notifCategoryFilter === cat ? 'bg-primary text-primary-text' : 'bg-secondary text-zinc-500'}`}
+                          className={`px-1.5 py-0.5 rounded text-[7px] font-mono uppercase border tracking-tighter transition
+                            ${notifCategoryFilter === cat ? 'bg-primary text-white border-primary' : 'bg-secondary text-zinc-500 border-border'}`}
                         >
                           {cat}
                         </button>
@@ -658,30 +710,37 @@ export default function FounderDashboardPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                  {/* Notification List */}
+                  <div className="space-y-2 max-h-72 overflow-y-auto p-3">
                     {notifications
                       .filter(n => {
-                        const matchQuery = n.title.toLowerCase().includes(notifSearch.toLowerCase()) || n.content.toLowerCase().includes(notifSearch.toLowerCase());
+                        const q = notifSearch.toLowerCase();
+                        const matchQuery = n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q);
                         const matchCat = notifCategoryFilter === 'ALL' || n.category === notifCategoryFilter;
                         return matchQuery && matchCat;
                       })
                       .map(n => (
-                        <div key={n.id} className={`p-2.5 rounded-xl border border-border bg-secondary/20 text-xs space-y-1 relative group transition ${!n.isRead ? 'border-primary/20 bg-primary/5' : ''}`}>
+                        <div
+                          key={n.id}
+                          className={`p-3 rounded-xl border text-xs space-y-1 transition
+                            ${!n.isRead
+                              ? 'bg-primary/5 border-primary/20'
+                              : 'bg-secondary/20 border-border'}`}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
-                              <span className={`h-1.5 w-1.5 rounded-full ${!n.isRead ? 'bg-primary animate-pulse' : 'bg-zinc-650'}`} />
-                              <span className="font-extrabold text-foreground uppercase tracking-tight text-[11px]">{n.title}</span>
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${!n.isRead ? 'bg-primary animate-pulse' : 'bg-zinc-600'}`} />
+                              <span className="font-extrabold text-foreground text-[10px] uppercase tracking-tight">{n.title}</span>
                             </div>
-                            <span className="text-[7px] text-zinc-500 font-mono">{new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <span className="text-[7px] text-zinc-500 font-mono shrink-0">
+                              {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                           </div>
-                          <p className="text-[10px] text-zinc-500 leading-normal">{n.content}</p>
-                          <div className="flex items-center justify-between pt-1 border-t border-border/10">
-                            <span className="text-[8px] font-mono text-zinc-500 tracking-tighter uppercase px-1 rounded bg-secondary/80">{n.category}</span>
+                          <p className="text-[10px] text-zinc-500 leading-relaxed">{n.content}</p>
+                          <div className="flex items-center justify-between pt-0.5">
+                            <span className="text-[7px] font-mono text-zinc-500 uppercase px-1.5 py-0.5 rounded bg-secondary">{n.category}</span>
                             {!n.isRead && (
-                              <button 
-                                onClick={() => markAsRead(n.id)}
-                                className="text-[8px] text-primary font-black uppercase hover:underline"
-                              >
+                              <button onClick={() => markAsRead(n.id)} className="text-[8px] text-primary font-black hover:underline">
                                 Mark read
                               </button>
                             )}
@@ -689,7 +748,13 @@ export default function FounderDashboardPage() {
                         </div>
                       ))}
                     {notifications.length === 0 && (
-                      <p className="text-xs text-zinc-500 italic text-center py-4">No notifications registered.</p>
+                      <p className="text-[11px] text-zinc-500 italic text-center py-6">No notifications yet.</p>
+                    )}
+                    {notifications.length > 0 && notifications.filter(n => {
+                      const q = notifSearch.toLowerCase();
+                      return (n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q)) && (notifCategoryFilter === 'ALL' || n.category === notifCategoryFilter);
+                    }).length === 0 && (
+                      <p className="text-[11px] text-zinc-500 italic text-center py-4">No matching notifications.</p>
                     )}
                   </div>
                 </div>
@@ -698,440 +763,373 @@ export default function FounderDashboardPage() {
           </div>
         </header>
 
-        {/* Central OS Desk Area */}
+        {/* ── Content Area ── */}
         <div className="flex-1 flex overflow-hidden">
           
-          {/* Active content grid (Left side) */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-6">
-            {getBreadcrumbs()}
+          {/* Main content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-1.5 text-[8px] font-black uppercase text-zinc-500 tracking-widest">
+              <span>Founder</span>
+              <span className="text-zinc-600">/</span>
+              <span className="text-primary">{navItems.find(n => n.id === activeTab)?.label || 'Overview'}</span>
+            </div>
 
             {tabLoading ? (
               <div className="space-y-4 animate-pulse">
-                <div className="h-8 bg-secondary rounded-xl w-1/4" />
-                <div className="h-40 bg-secondary rounded-3xl w-full" />
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="h-24 bg-secondary rounded-2xl" />
-                  <div className="h-24 bg-secondary rounded-2xl" />
+                <div className="h-6 bg-secondary rounded-xl w-1/4" />
+                <div className="h-36 bg-secondary rounded-3xl w-full" />
+                <div className="grid grid-cols-3 gap-4">
+                  {[0,1,2].map(i => <div key={i} className="h-24 bg-secondary rounded-2xl" />)}
                 </div>
               </div>
             ) : (
               <>
                 {/* ════ OVERVIEW TAB ════ */}
                 {activeTab === 'overview' && (
-                  <div className="space-y-6 animate-fade-in">
-                    {/* Welcome banner center OS */}
-                    <div className="glass rounded-3xl p-6 border border-border relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="space-y-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">SaaS Command Center</span>
-                        <h2 className="text-xl font-black text-foreground uppercase tracking-tight">{greeting}</h2>
-                        <p className="text-xs text-zinc-550 leading-relaxed max-w-lg font-semibold">
-                          Your tenant platform has <span className="text-primary font-bold">{pendingApprovalsCount} pending registrations</span> to authorize, and <span className="text-primary font-bold">{pendingRenewalsCount} renewal requests</span> outstanding.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button 
-                          onClick={() => handleTabChange('approvals')}
-                          className="px-4 py-2.5 rounded-xl bg-primary text-primary-text text-xs font-black uppercase tracking-wider hover-lift transition"
-                        >
-                          Review Approvals ({pendingApprovalsCount})
-                        </button>
+                  <div className="space-y-6">
+                    {/* Hero Banner */}
+                    <div className="glass rounded-3xl p-6 border border-border relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                        <div className="space-y-2">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+                            <Sparkles className="h-3 w-3" /> SaaS Command Center
+                          </span>
+                          <h2 className="text-xl font-black text-foreground tracking-tight">{greeting}</h2>
+                          <p className="text-xs text-zinc-500 leading-relaxed max-w-lg">
+                            You have{' '}
+                            <span className={`font-bold ${pendingApprovalsCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                              {pendingApprovalsCount} pending registrations
+                            </span>{' '}
+                            to authorize and{' '}
+                            <span className={`font-bold ${pendingRenewalsCount > 0 ? 'text-blue-500' : 'text-emerald-500'}`}>
+                              {pendingRenewalsCount} renewal requests
+                            </span>{' '}
+                            outstanding.
+                          </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          {pendingApprovalsCount > 0 && (
+                            <button
+                              onClick={() => handleTabChange('approvals')}
+                              className="px-4 py-2.5 rounded-xl bg-primary text-white text-[11px] font-black uppercase tracking-wider shadow-md shadow-primary/25 hover:bg-hover transition flex items-center gap-1.5"
+                            >
+                              <UserCheck className="h-3.5 w-3.5" />
+                              Review Approvals ({pendingApprovalsCount})
+                            </button>
+                          )}
+                          <button
+                            onClick={loadDashboardData}
+                            className="px-3 py-2.5 rounded-xl bg-secondary text-foreground text-[11px] font-bold border border-border hover:bg-secondary/80 transition"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Platform Lifecycle Quick Counters */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {/* Status Counters */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                       {[
-                        { label: 'Pending Review', count: registrations.filter(r => r.status === 'PENDING_REVIEW').length, color: 'text-amber-500 bg-amber-500/5' },
-                        { label: 'Provisioning', count: registrations.filter(r => r.status === 'PROVISIONING').length, color: 'text-blue-500 bg-blue-500/5 animate-pulse' },
-                        { label: 'Failed Deploy', count: registrations.filter(r => r.status === 'PROVISIONING_FAILED').length, color: 'text-red-500 bg-red-500/5' },
-                        { label: 'Activated', count: registrations.filter(r => r.status === 'LIVE' || r.status === 'ACTIVATED').length, color: 'text-emerald-500 bg-emerald-500/5' },
-                        { label: 'Trial Mode', count: registrations.filter(r => r.status === 'PROVISIONED' && r.activationKey && r.activationKey.id.includes('TRIAL')).length, color: 'text-zinc-400 bg-zinc-500/5' },
-                        { label: 'Paid / Enterprise', count: registrations.filter(r => r.status === 'PROVISIONED' && r.activationKey && r.activationKey.id.includes('PROD')).length, color: 'text-indigo-400 bg-indigo-500/5' }
+                        { label: 'Pending Review', count: registrations.filter(r => r.status === 'PENDING_REVIEW').length, color: 'text-amber-500', bg: 'bg-amber-500/8 border-amber-500/20' },
+                        { label: 'Provisioning', count: registrations.filter(r => r.status === 'PROVISIONING').length, color: 'text-blue-500', bg: 'bg-blue-500/8 border-blue-500/20' },
+                        { label: 'Failed Deploy', count: registrations.filter(r => r.status === 'PROVISIONING_FAILED').length, color: 'text-red-500', bg: 'bg-red-500/8 border-red-500/20' },
+                        { label: 'Activated', count: registrations.filter(r => r.status === 'LIVE' || r.status === 'ACTIVATED').length, color: 'text-emerald-500', bg: 'bg-emerald-500/8 border-emerald-500/20' },
+                        { label: 'Trial Mode', count: registrations.filter(r => r.status === 'PROVISIONED').length, color: 'text-zinc-400', bg: 'bg-zinc-500/5 border-zinc-500/20' },
+                        { label: 'Total Regs', count: registrations.length, color: 'text-primary', bg: 'bg-primary/8 border-primary/20' },
                       ].map((c, idx) => (
-                        <div key={idx} className={`glass rounded-2xl p-4 border border-border shadow-sm flex flex-col items-center justify-center text-center ${c.color}`}>
-                          <span className="text-[20px] font-black">{c.count}</span>
-                          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500 mt-1">{c.label}</span>
+                        <div key={idx} className={`rounded-2xl p-4 border flex flex-col items-center justify-center text-center gap-1 ${c.bg}`}>
+                          <span className={`text-2xl font-black ${c.color}`}>{c.count}</span>
+                          <span className="text-[7px] font-black uppercase tracking-wider text-zinc-500">{c.label}</span>
                         </div>
                       ))}
                     </div>
 
-                    {/* Operational KPI Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       {[
-                        { label: 'Active Subscriptions', val: billingStats?.activeSubscriptions || 0, desc: 'Live SaaS Desks' },
-                        { label: 'Monthly Revenue (MRR)', val: `₹${Number(billingStats?.mrr || 0).toLocaleString('en-IN')}`, desc: 'Collections current month' },
-                        { label: 'Database Capacity', val: `${Number(metricsCurrent?.dbSizeGb || 0.05).toFixed(3)} GB`, desc: 'Active Neon PG capacity' },
-                        { label: 'Average Response Time', val: `${metricsCurrent?.avgResponseMs || 45} ms`, desc: 'P95 latency performance' }
-                      ].map((kpi, idx) => (
-                        <div key={idx} className="glass rounded-2xl p-5 border border-border shadow-md space-y-3">
-                          <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">{kpi.label}</span>
-                          <div className="text-xl font-black text-foreground">{kpi.val}</div>
-                          <p className="text-[10px] text-zinc-450 font-semibold">{kpi.desc}</p>
-                        </div>
-                      ))}
+                        { label: 'Active Subscriptions', val: billingStats?.activeSubscriptions || 0, desc: 'Live SaaS Desks', icon: Users, color: 'text-blue-500 bg-blue-500/10' },
+                        { label: 'Monthly Revenue', val: `₹${Number(billingStats?.mrr || 0).toLocaleString('en-IN')}`, desc: 'MRR This Month', icon: TrendingUp, color: 'text-emerald-500 bg-emerald-500/10' },
+                        { label: 'DB Capacity', val: `${Number(metricsCurrent?.dbSizeGb || 0.05).toFixed(3)} GB`, desc: 'Neon PG Cluster', icon: Database, color: 'text-indigo-400 bg-indigo-500/10' },
+                        { label: 'Avg Response', val: `${metricsCurrent?.avgResponseMs || 45} ms`, desc: 'P95 Latency', icon: Zap, color: 'text-amber-500 bg-amber-500/10' },
+                      ].map((kpi, idx) => {
+                        const Icon = kpi.icon;
+                        return (
+                          <div key={idx} className="glass rounded-2xl p-5 border border-border shadow-sm hover-lift">
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">{kpi.label}</span>
+                              <div className={`p-2 rounded-xl ${kpi.color}`}>
+                                <Icon className="h-3.5 w-3.5" />
+                              </div>
+                            </div>
+                            <div className="text-xl font-black text-foreground">{kpi.val}</div>
+                            <p className="text-[9px] text-zinc-500 mt-1">{kpi.desc}</p>
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    {/* Chart load metrics */}
-                    {mounted && (
-                      <div className="glass rounded-3xl p-5 border border-border shadow-md space-y-4">
-                        <h3 className="text-xs font-black uppercase tracking-wider text-foreground">Requests Load & Latency Trends</h3>
+                    {/* Chart */}
+                    {mounted && metricsHistory.length > 0 && (
+                      <div className="glass rounded-3xl p-5 border border-border shadow-sm">
+                        <h3 className="text-[10px] font-black uppercase tracking-wider text-foreground mb-4">Request Load & Latency Trends</h3>
                         <ResponsiveContainer width="100%" height={200}>
                           <AreaChart data={metricsHistory}>
                             <defs>
-                              <linearGradient id="colorLatency" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#818cf8" stopOpacity={0.2}/>
-                                <stop offset="95%" stopColor="#818cf8" stopOpacity={0}/>
+                              <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#263247" />
-                            <XAxis dataKey="capturedAt" tick={{ fill: '#64748b', fontSize: 9 }} tickFormatter={time => new Date(time).toLocaleTimeString()} />
-                            <YAxis tick={{ fill: '#64748b', fontSize: 9 }} />
-                            <Tooltip contentStyle={{ backgroundColor: '#121b2d', borderColor: '#263247', color: '#ffffff', fontSize: 10 }} />
-                            <Area type="monotone" dataKey="requestsPerMin" stroke="#818cf8" fillOpacity={1} fill="url(#colorLatency)" name="Requests/min" />
-                            <Line type="monotone" dataKey="avgResponseMs" stroke="#38bdf8" name="Latency (ms)" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                            <XAxis dataKey="capturedAt" tick={{ fill: '#64748b', fontSize: 8 }} tickFormatter={t => new Date(t).toLocaleTimeString()} />
+                            <YAxis tick={{ fill: '#64748b', fontSize: 8 }} />
+                            <Tooltip contentStyle={{ backgroundColor: '#121b2d', borderColor: '#263247', color: '#fff', fontSize: 10, borderRadius: 8 }} />
+                            <Area type="monotone" dataKey="requestsPerMin" stroke="#2563EB" fillOpacity={1} fill="url(#colorLoad)" name="Req/min" />
+                            <Line type="monotone" dataKey="avgResponseMs" stroke="#f59e0b" name="Latency (ms)" dot={false} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
                     )}
-
                   </div>
                 )}
 
-                {/* ════ ORGANIZATIONS TAB (SCHOOL DIGITAL TWIN CARDS) ════ */}
-                {activeTab === 'organizations' && (
-                  <div className="space-y-6 animate-fade-in">
-                    <div className="glass rounded-3xl p-6 border border-border space-y-4 shadow-sm">
-                      <div>
-                        <h3 className="text-sm font-black uppercase tracking-wider text-foreground">School Digital Twins</h3>
-                        <p className="text-[10px] text-zinc-550 font-semibold mt-0.5">Real-time status tracking, configurations, database metrics, and health scores.</p>
-                      </div>
-
-                      {billingStats?.recentOrganizations?.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-border rounded-3xl bg-secondary/15 text-center">
-                          <FolderOpen className="h-8 w-8 text-zinc-400 mb-3" />
-                          <h4 className="text-sm font-black text-foreground">No Digital Twins Active</h4>
-                          <p className="text-xs text-zinc-550 mt-1">Register and provision a school to launch a twin tracker.</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {billingStats?.recentOrganizations?.map((org: any) => {
-                            // Find active registration if matched
-                            const reg = registrations.find(r => r.institutionId === org.id);
-                            
-                            // Mock scoring metrics or pull from structures
-                            const licenseDays = 365;
-                            const activeUsers = reg?.expectedUsers || 120;
-                            const activeStorage = '4GB';
-                            const healthScore = org.healthScore || 98;
-
-                            return (
-                              <div key={org.id} className="glass rounded-3xl p-6 border border-border shadow-lg relative overflow-hidden flex flex-col justify-between hover-lift">
-                                <div className="space-y-4">
-                                  {/* Twin Header */}
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <h4 className="text-sm font-black text-foreground uppercase tracking-tight">{org.name}</h4>
-                                      <p className="text-[9px] text-zinc-500 font-mono mt-0.5">{org.id.slice(0, 8)}.aurxon.com</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase border border-emerald-500/20">
-                                        {org.status}
-                                      </span>
-                                      <span className="text-[9px] font-black uppercase bg-primary/10 px-2 py-0.5 rounded text-primary">
-                                        {healthScore}% Health
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* KPI Metrics */}
-                                  <div className="grid grid-cols-3 gap-3 border-y border-border/40 py-3 text-center">
-                                    <div>
-                                      <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Active Users</span>
-                                      <p className="text-xs font-black text-foreground mt-0.5">{activeUsers} Users</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Neon Storage</span>
-                                      <p className="text-xs font-black text-foreground mt-0.5">{activeStorage} / 10GB</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">License validity</span>
-                                      <p className="text-xs font-black text-foreground mt-0.5">{licenseDays} Days</p>
-                                    </div>
-                                  </div>
-
-                                  {/* Dynamic Timelines & Checklist */}
-                                  <div className="space-y-2">
-                                    <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider block">Autoconfig Database Timelines</span>
-                                    <div className="space-y-1.5 text-[9px] font-semibold text-zinc-400">
-                                      <div className="flex items-center gap-1.5 text-emerald-500">
-                                        <Check className="h-3 w-3" />
-                                        <span>Registered & Approved (Auth Checkmarks)</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 text-emerald-500">
-                                        <Check className="h-3 w-3" />
-                                        <span>Workspace Provisioned (Licence LIC-TRIALGenerated)</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 text-emerald-500">
-                                        <Check className="h-3 w-3" />
-                                        <span>Setup Autoconfigured (Grading CBSEAffiliation)</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 text-emerald-500">
-                                        <Check className="h-3 w-3" />
-                                        <span>Principal Admin activated successfully</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Twin Actions */}
-                                <div className="mt-4 pt-3 border-t border-border flex justify-between items-center gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="h-3.5 w-3.5 rounded" style={{ backgroundColor: org.primaryColor }} />
-                                    <span className="text-[10px] font-mono text-zinc-500">{org.primaryColor}</span>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <button 
-                                      onClick={() => { setSelectedImpersonateOrg(org.id); handleTabChange('support'); }}
-                                      className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-[10px] font-black text-primary border border-border"
-                                    >
-                                      Diagnose
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ════ APPROVALS TAB (INTERACTIVE STEPPER PIPELINE) ════ */}
+                {/* ════ APPROVALS TAB ════ */}
                 {activeTab === 'approvals' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-6 shadow-lg animate-fade-in relative">
-                    <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Interactive Stepper Pipeline</h3>
-                      <p className="text-xs text-zinc-550 font-semibold mt-0.5">Control onboarding workflows, evaluate setup checks, and trigger workspace provision deployments.</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Interactive Stepper Pipeline</h3>
+                        <p className="text-[10px] text-zinc-500 mt-0.5">Evaluate, approve, and provision organization workspaces.</p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-[9px] font-black uppercase border border-primary/20">
+                        {registrations.length} Registrations
+                      </span>
                     </div>
 
                     {registrations.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-border rounded-3xl bg-secondary/15 text-center">
-                        <CheckCircle className="h-8 w-8 text-emerald-500 mb-3 animate-pulse" />
+                      <div className="glass rounded-3xl p-12 border border-dashed border-border text-center">
+                        <CheckCircle className="h-10 w-10 text-emerald-500 mb-3 mx-auto animate-pulse" />
                         <h4 className="text-sm font-black text-foreground">No Registrations in Pipeline</h4>
-                        <p className="text-xs text-zinc-550 mt-1">Submit registration signup requests to track setup progress.</p>
+                        <p className="text-xs text-zinc-500 mt-1">Submit signup requests to track setup progress.</p>
+                        <button
+                          onClick={loadDashboardData}
+                          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" /> Refresh Data
+                        </button>
                       </div>
                     ) : (
-                      <div className="space-y-8 divide-y divide-border/40">
+                      <div className="space-y-4">
                         {registrations.map(reg => {
-                          // Compute steps status
                           const isRejected = reg.status === 'REJECTED';
-                          const isApproved = reg.status === 'APPROVED' || reg.status === 'APPROVED_WITH_CONDITIONS' || reg.status === 'READY_FOR_PROVISIONING' || reg.status === 'PROVISIONED' || reg.status === 'ACTIVATED' || reg.status === 'LIVE';
-                          const isTechnicalChecked = reg.status === 'READY_FOR_PROVISIONING' || reg.status === 'PROVISIONED' || reg.status === 'ACTIVATED' || reg.status === 'LIVE';
-                          const isProvisioned = reg.status === 'PROVISIONED' || reg.status === 'ACTIVATED' || reg.status === 'LIVE';
+                          const isApproved = ['APPROVED', 'APPROVED_WITH_CONDITIONS', 'READY_FOR_PROVISIONING', 'PROVISIONED', 'ACTIVATED', 'LIVE'].includes(reg.status);
+                          const isTechnicalChecked = ['READY_FOR_PROVISIONING', 'PROVISIONED', 'ACTIVATED', 'LIVE'].includes(reg.status);
+                          const isProvisioned = ['PROVISIONED', 'ACTIVATED', 'LIVE'].includes(reg.status);
                           const isKeyGenerated = !!reg.activationKey || isProvisioned;
-                          const isLicenceGenerated = reg.institution?.license || isProvisioned;
-                          const isActivated = reg.institution?.status === 'ACTIVE' || reg.status === 'ACTIVATED' || reg.status === 'LIVE';
+                          const isActivated = reg.institution?.status === 'ACTIVE' || ['ACTIVATED', 'LIVE'].includes(reg.status);
                           const isLive = reg.status === 'LIVE';
 
-                          // Progress percentage math
                           let progressVal = 12.5;
-                          let estTime = 'Awaiting review';
+                          if (isRejected) progressVal = 0;
+                          else if (isLive) progressVal = 100;
+                          else if (isActivated) progressVal = 87.5;
+                          else if (isProvisioned) progressVal = 75;
+                          else if (isTechnicalChecked) progressVal = 50;
+                          else if (isApproved) progressVal = 37.5;
+                          else if (reg.status === 'PENDING_REVIEW') progressVal = 25;
 
-                          if (isRejected) {
-                            progressVal = 0;
-                            estTime = 'Rejected';
-                          } else if (isLive) {
-                            progressVal = 100;
-                            estTime = 'System is Live & Healthy!';
-                          } else if (isActivated) {
-                            progressVal = 87.5;
-                            estTime = 'Activating default branch assets (approx. 1 min)';
-                          } else if (isProvisioned) {
-                            progressVal = 75;
-                            estTime = 'Admin onboarding activation pending';
-                          } else if (isTechnicalChecked) {
-                            progressVal = 50;
-                            estTime = 'Deploying databases & setting parameters (approx. 2 mins)';
-                          } else if (isApproved) {
-                            progressVal = 37.5;
-                            estTime = 'Performing technical integrity diagnostics (approx. 5 mins)';
-                          } else if (reg.status === 'PENDING_REVIEW') {
-                            progressVal = 25;
-                            estTime = 'Awaiting Founder approval checks';
-                          }
+                          const statusColor = isRejected ? 'border-red-500/30 bg-red-500/3' :
+                            isLive ? 'border-emerald-500/30 bg-emerald-500/3' :
+                            reg.status === 'PENDING_REVIEW' ? 'border-amber-500/30 bg-amber-500/3' :
+                            'border-border bg-card/30';
 
-                          // Action items based on current active step
                           return (
-                            <div key={reg.id} className="pt-6 first:pt-0 space-y-4">
-                              <div className="flex justify-between items-start flex-wrap gap-2">
-                                <div>
-                                  <span className="text-[9px] font-black uppercase bg-primary/10 px-2 py-0.5 rounded text-primary">{reg.orgType} Size: {reg.orgSize}</span>
-                                  <h4 className="text-sm font-black text-foreground uppercase tracking-tight mt-1">{reg.orgName}</h4>
-                                  <p className="text-[10px] text-zinc-550 font-mono mt-0.5">Reference: {reg.referenceNumber} • Email: {reg.email} • Mobile: {reg.phone || 'None'}</p>
-                                  <div className="flex gap-2.5 mt-1.5 flex-wrap">
-                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${reg.emailVerified ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
-                                      Email: {reg.emailVerified ? '✓ Verified' : '✗ Not Verified'}
+                            <div key={reg.id} className={`glass rounded-2xl p-5 border shadow-sm space-y-4 ${statusColor}`}>
+                              {/* Header Row */}
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[8px] font-black uppercase bg-primary/10 px-2 py-0.5 rounded text-primary">
+                                      {reg.orgType} • {reg.orgSize}
                                     </span>
-                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border flex items-center gap-1 ${reg.phoneVerified ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                      Mobile: {reg.phoneVerified ? '✓ Verified' : '✗ Not Verified'}
+                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border
+                                      ${isRejected ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                        isLive ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                        reg.status === 'PENDING_REVIEW' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                        'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                                      {reg.status.replace(/_/g, ' ')}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-sm font-black text-foreground">{reg.orgName}</h4>
+                                  <p className="text-[9px] text-zinc-500 font-mono">
+                                    {reg.referenceNumber} • {reg.email}
+                                    {reg.phone && ` • ${reg.phone}`}
+                                  </p>
+                                  <div className="flex gap-2 flex-wrap mt-1">
+                                    <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded border
+                                      ${reg.emailVerified ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                      Email: {reg.emailVerified ? '✓ Verified' : '✗ Unverified'}
+                                    </span>
+                                    <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded border
+                                      ${reg.phoneVerified ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                                      Phone: {reg.phoneVerified ? '✓ Verified' : '◌ Optional'}
                                     </span>
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <span className="text-xs font-black text-foreground">{progressVal}% Progress</span>
-                                  <p className="text-[9px] text-zinc-500 font-semibold mt-0.5 flex items-center justify-end gap-1"><Clock className="h-3 w-3" /> {estTime}</p>
+                                <div className="text-right shrink-0">
+                                  <div className="text-base font-black text-foreground">{progressVal}%</div>
+                                  <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden mt-1">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-700 ${isRejected ? 'bg-red-500' : 'bg-primary'}`}
+                                      style={{ width: `${progressVal}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
 
-                              {/* VISUAL STEPPER TRACKER */}
-                              <div className="grid grid-cols-8 gap-2 relative border border-border/20 bg-secondary/10 p-3 rounded-2xl">
+                              {/* Visual Stepper */}
+                              <div className="flex gap-2 items-center bg-secondary/20 border border-border/30 rounded-xl p-3 overflow-x-auto">
                                 {[
                                   { label: 'Registered', done: true },
                                   { label: 'Approved', done: isApproved, active: reg.status === 'PENDING_REVIEW' },
-                                  { label: 'Technical Checked', done: isTechnicalChecked, active: reg.status === 'APPROVED' },
+                                  { label: 'Tech Check', done: isTechnicalChecked, active: reg.status === 'APPROVED' },
                                   { label: 'Provisioned', done: isProvisioned, active: reg.status === 'READY_FOR_PROVISIONING' },
-                                  { label: 'Key Issued', done: isKeyGenerated, active: reg.status === 'PROVISIONED' && !isKeyGenerated },
-                                  { label: 'Licence Linked', done: isLicenceGenerated },
+                                  { label: 'Key Issued', done: isKeyGenerated },
                                   { label: 'Activated', done: isActivated },
-                                  { label: 'Live', done: isLive }
-                                ].map((step, idx) => (
-                                  <div key={idx} className="text-center flex flex-col items-center gap-1.5 relative z-10">
-                                    <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition ${step.done ? 'bg-primary border-primary text-primary-text' : step.active ? 'border-primary text-primary animate-pulse shadow-md bg-primary/10' : 'border-border text-zinc-650'}`}>
-                                      {step.done ? '✓' : idx + 1}
+                                  { label: 'Live', done: isLive },
+                                ].map((step, idx, arr) => (
+                                  <React.Fragment key={idx}>
+                                    <div className="flex flex-col items-center gap-1 shrink-0 min-w-[52px]">
+                                      <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-black border transition
+                                        ${step.done ? 'bg-primary border-primary text-white' :
+                                          step.active ? 'border-primary text-primary bg-primary/10 animate-pulse' :
+                                          'border-border text-zinc-600 bg-secondary/30'}`}>
+                                        {step.done ? '✓' : idx + 1}
+                                      </div>
+                                      <span className="text-[7px] font-black uppercase tracking-tight text-zinc-500 text-center leading-tight">
+                                        {step.label}
+                                      </span>
                                     </div>
-                                    <span className="text-[8px] font-black uppercase tracking-tight block truncate w-full text-zinc-500">{step.label}</span>
-                                  </div>
+                                    {idx < arr.length - 1 && (
+                                      <div className={`flex-1 h-px min-w-[12px] ${step.done ? 'bg-primary/50' : 'bg-border'}`} />
+                                    )}
+                                  </React.Fragment>
                                 ))}
                               </div>
 
-                              {/* ACTIVE STEP ACTIONS */}
-                              <div className="flex gap-2 items-center justify-end flex-wrap">
+                              {/* Action Buttons */}
+                              <div className="flex flex-wrap gap-2 items-center justify-end">
                                 {reg.status === 'PENDING_REVIEW' && (
-                                  <div className="flex gap-2 flex-wrap">
+                                  <>
                                     {(!reg.emailVerified || !reg.phoneVerified) && (
-                                      <button 
+                                      <button
                                         onClick={() => handleVerifyManual(reg.id)}
                                         className="px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-[10px] font-bold uppercase rounded-xl border border-emerald-500/20 text-emerald-500 transition"
                                       >
                                         Verify Manually
                                       </button>
                                     )}
-                                    <button 
+                                    <button
                                       onClick={() => handleResendVerification(reg.id)}
                                       className="px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-[10px] font-bold uppercase rounded-xl border border-indigo-500/20 text-indigo-400 transition"
                                     >
-                                      Resend Verification
+                                      Resend OTP
                                     </button>
-                                    <button 
+                                    <button
                                       onClick={() => setSelectedRegForDocs(reg.id)}
                                       className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-[10px] font-bold uppercase rounded-xl border border-border text-foreground transition"
                                     >
                                       Request Docs
                                     </button>
-                                    <button 
+                                    <button
                                       onClick={() => handleRejectRegistration(reg.id)}
-                                      className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-[10px] font-bold uppercase rounded-xl border border-border text-red-500 transition"
+                                      className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-bold uppercase rounded-xl border border-red-500/20 text-red-500 transition"
                                     >
                                       Reject
                                     </button>
-                                    <button 
+                                    <button
                                       onClick={() => handleApproveRegistration(reg.id)}
-                                      className="px-4 py-1.5 bg-primary text-primary-text text-[10px] font-black uppercase rounded-xl shadow hover-lift transition"
+                                      disabled={submitting}
+                                      className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-md shadow-primary/25 hover:bg-hover transition disabled:opacity-50"
                                     >
                                       Approve
                                     </button>
-                                  </div>
+                                  </>
                                 )}
 
                                 {reg.status === 'APPROVED' && (
                                   <button
                                     onClick={() => handleTechnicalReview(reg.id)}
-                                    className="px-4 py-1.5 bg-primary text-primary-text text-[10px] font-black uppercase rounded-xl shadow hover-lift transition flex items-center gap-1"
+                                    disabled={submitting}
+                                    className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-md shadow-primary/25 hover:bg-hover transition flex items-center gap-1.5 disabled:opacity-50"
                                   >
-                                    <ShieldCheck className="h-3.5 w-3.5" /> Approve Technical Check
+                                    <ShieldCheck className="h-3.5 w-3.5" /> Run Technical Check
                                   </button>
                                 )}
 
                                 {(reg.status === 'READY_FOR_PROVISIONING' || reg.status === 'PROVISIONING_FAILED') && (
-                                  <div className="flex flex-col gap-2 p-3 bg-secondary/20 border border-border rounded-2xl w-full">
-                                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Payment Status Selection</span>
-                                    <div className="flex items-center gap-3">
-                                      <select
-                                        value={selectedPaymentStatus[reg.id] || 'TRIAL'}
-                                        onChange={(e) => setSelectedPaymentStatus(prev => ({ ...prev, [reg.id]: e.target.value }))}
-                                        className="text-xs bg-input border border-border text-foreground px-3 py-1.5 rounded-xl outline-none"
-                                      >
-                                        <option value="TRIAL">Trial (30 Days)</option>
-                                        <option value="PAID">Paid / Professional (1 Year)</option>
-                                        <option value="PARTIAL">Partial Payment (1 Year)</option>
-                                        <option value="PENDING">Pending Payment (Trial)</option>
-                                        <option value="ENTERPRISE">Enterprise Contract (1 Year)</option>
-                                      </select>
-                                      <button
-                                        onClick={() => handleProvisionWorkspace(reg.id, selectedPaymentStatus[reg.id] || 'TRIAL')}
-                                        className="px-4 py-1.5 bg-primary text-primary-text text-[10px] font-black uppercase rounded-xl shadow hover-lift transition flex items-center gap-1.5"
-                                      >
-                                        <Database className="h-3.5 w-3.5" /> 
-                                        {reg.status === 'PROVISIONING_FAILED' ? 'Retry Provision Workspace' : 'Build Workspace Deployments'}
-                                      </button>
-                                    </div>
-                                    {reg.status === 'PROVISIONING_FAILED' && (
-                                      <div className="text-[10px] text-destructive font-semibold">
-                                        Last Provision Attempt Failed. You can select status and retry.
-                                      </div>
-                                    )}
+                                  <div className="flex items-center gap-2 flex-wrap p-3 rounded-xl border border-border bg-secondary/20 w-full">
+                                    <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider w-full">Select Payment Tier</span>
+                                    <select
+                                      value={selectedPaymentStatus[reg.id] || 'TRIAL'}
+                                      onChange={e => setSelectedPaymentStatus(prev => ({ ...prev, [reg.id]: e.target.value }))}
+                                      className="text-xs bg-input border border-border text-foreground px-3 py-1.5 rounded-xl outline-none"
+                                    >
+                                      <option value="TRIAL">Trial (30 Days)</option>
+                                      <option value="PAID">Paid (1 Year)</option>
+                                      <option value="PARTIAL">Partial Payment</option>
+                                      <option value="PENDING">Pending Payment</option>
+                                      <option value="ENTERPRISE">Enterprise</option>
+                                    </select>
+                                    <button
+                                      onClick={() => handleProvisionWorkspace(reg.id, selectedPaymentStatus[reg.id] || 'TRIAL')}
+                                      disabled={submitting}
+                                      className="px-4 py-1.5 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-md shadow-primary/25 hover:bg-hover transition flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                      <Database className="h-3.5 w-3.5" />
+                                      {reg.status === 'PROVISIONING_FAILED' ? 'Retry Provision' : 'Build Workspace'}
+                                    </button>
                                   </div>
                                 )}
 
                                 {isProvisioned && reg.activationKey && (
-                                  <div className="p-3 bg-secondary/35 border border-border rounded-2xl w-full flex items-center justify-between flex-wrap gap-3">
+                                  <div className="p-3 rounded-xl border border-border bg-secondary/20 w-full flex items-center justify-between flex-wrap gap-3">
                                     <div>
-                                      <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Generated Activation Key package:</span>
-                                      <p className="text-xs font-mono font-black text-foreground select-all mt-0.5">{reg.activationKey.id}</p>
+                                      <span className="text-[7px] font-black uppercase text-zinc-500 tracking-wider">Activation Key</span>
+                                      <p className="text-xs font-mono font-black text-foreground select-all">{reg.activationKey.id}</p>
                                     </div>
                                     <div className="flex gap-1.5">
-                                      <button 
-                                        onClick={() => copyToClipboard(reg.activationKey.id)}
-                                        className="p-2 bg-card border border-border rounded-xl text-zinc-400 hover:text-foreground hover:bg-secondary/40 transition"
-                                        title="Copy key"
-                                      >
-                                        <Copy className="h-3.5 w-3.5" />
-                                      </button>
-                                      <button 
-                                        onClick={() => mockEmailTrigger(reg.orgName, reg.activationKey.id)}
-                                        className="p-2 bg-card border border-border rounded-xl text-zinc-400 hover:text-foreground hover:bg-secondary/40 transition"
-                                        title="Email key package"
-                                      >
-                                        <Mail className="h-3.5 w-3.5" />
-                                      </button>
-                                      <button 
-                                        onClick={() => downloadKeyFile(reg.orgName, reg.activationKey.id)}
-                                        className="p-2 bg-card border border-border rounded-xl text-zinc-400 hover:text-foreground hover:bg-secondary/40 transition"
-                                        title="Download license text file"
-                                      >
-                                        <Download className="h-3.5 w-3.5" />
-                                      </button>
+                                      {[
+                                        { icon: Copy, fn: () => copyToClipboard(reg.activationKey.id), tip: 'Copy' },
+                                        { icon: Mail, fn: () => triggerToast(`Key emailed to ${reg.orgName}.`), tip: 'Email' },
+                                        { icon: Download, fn: () => downloadKeyFile(reg.orgName, reg.activationKey.id), tip: 'Download' },
+                                      ].map(({ icon: Icon, fn, tip }) => (
+                                        <button key={tip} onClick={fn} title={tip} className="p-2 bg-card border border-border rounded-xl text-zinc-400 hover:text-foreground hover:bg-secondary/60 transition">
+                                          <Icon className="h-3.5 w-3.5" />
+                                        </button>
+                                      ))}
                                     </div>
                                   </div>
                                 )}
                               </div>
 
-                              {/* MODAL / INPUT PANEL FOR CHANGES_REQUESTED */}
+                              {/* Request Docs Panel */}
                               {selectedRegForDocs === reg.id && (
-                                <div className="p-4 rounded-2xl border border-border bg-secondary/25 space-y-3">
-                                  <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider block">Write documents request requirements</span>
-                                  <textarea 
-                                    placeholder="e.g. Please upload CBSE affiliation certification and Principal verification cards."
+                                <div className="p-4 rounded-xl border border-border bg-secondary/20 space-y-3">
+                                  <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider block">Document Request Details</span>
+                                  <textarea
+                                    placeholder="e.g. Please upload CBSE affiliation certification..."
                                     rows={2}
                                     className="w-full text-xs rounded-xl border border-border bg-input px-3.5 py-2 outline-none text-foreground"
                                     value={requestDocsNotes}
                                     onChange={e => setRequestDocsNotes(e.target.value)}
                                   />
                                   <div className="flex justify-end gap-2">
-                                    <button onClick={() => setSelectedRegForDocs(null)} className="px-3 py-1 bg-secondary rounded-xl text-[10px] font-bold">Cancel</button>
-                                    <button onClick={() => handleRequestDocuments(reg.id)} className="px-4 py-1 bg-primary text-primary-text rounded-xl text-[10px] font-black uppercase">Send Request</button>
+                                    <button onClick={() => setSelectedRegForDocs(null)} className="px-3 py-1.5 bg-secondary rounded-xl text-[10px] font-bold text-foreground">Cancel</button>
+                                    <button onClick={() => handleRequestDocuments(reg.id)} className="px-4 py-1.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase">Send Request</button>
                                   </div>
                                 </div>
                               )}
@@ -1143,35 +1141,104 @@ export default function FounderDashboardPage() {
                   </div>
                 )}
 
-                {/* ════ SUBSCRIPTIONS TAB ════ */}
-                {activeTab === 'subscriptions' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-5 shadow-lg animate-fade-in">
+                {/* ════ ORGANIZATIONS TAB ════ */}
+                {activeTab === 'organizations' && (
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Licensing Plans & Rates</h3>
-                      <p className="text-xs text-zinc-550 font-semibold">Core billing profiles configurations. Checked by controllers at execution time.</p>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">School Digital Twins</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Real-time status tracking, health scores and configurations.</p>
                     </div>
 
+                    {!billingStats?.recentOrganizations?.length ? (
+                      <div className="glass rounded-3xl p-12 border border-dashed border-border text-center">
+                        <FolderOpen className="h-10 w-10 text-zinc-400 mb-3 mx-auto" />
+                        <h4 className="text-sm font-black text-foreground">No Digital Twins Active</h4>
+                        <p className="text-xs text-zinc-500 mt-1">Register and provision a school to launch twin tracking.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {billingStats?.recentOrganizations?.map((org: any) => {
+                          const reg = registrations.find(r => r.institutionId === org.id);
+                          return (
+                            <div key={org.id} className="glass rounded-2xl p-5 border border-border shadow-sm hover-lift space-y-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h4 className="text-sm font-black text-foreground">{org.name}</h4>
+                                  <p className="text-[9px] text-zinc-500 font-mono mt-0.5">{org.id.slice(0, 8)}.aurxon.com</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase border border-emerald-500/20">
+                                    {org.status}
+                                  </span>
+                                  <span className="text-[9px] font-black uppercase bg-primary/10 px-2 py-0.5 rounded text-primary">
+                                    {org.healthScore || 98}% Health
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-3 border-y border-border/40 py-3 text-center">
+                                <div>
+                                  <span className="text-[7px] font-black uppercase text-zinc-500">Users</span>
+                                  <p className="text-xs font-black text-foreground mt-0.5">{reg?.expectedUsers || 120}</p>
+                                </div>
+                                <div>
+                                  <span className="text-[7px] font-black uppercase text-zinc-500">Storage</span>
+                                  <p className="text-xs font-black text-foreground mt-0.5">4GB / 10GB</p>
+                                </div>
+                                <div>
+                                  <span className="text-[7px] font-black uppercase text-zinc-500">License</span>
+                                  <p className="text-xs font-black text-foreground mt-0.5">365 Days</p>
+                                </div>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <span className="h-3 w-3 rounded" style={{ backgroundColor: org.primaryColor }} />
+                                  <span className="text-[9px] font-mono text-zinc-500">{org.primaryColor}</span>
+                                </div>
+                                <button
+                                  onClick={() => { setSelectedImpersonateOrg(org.id); handleTabChange('support'); }}
+                                  className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-[10px] font-black text-primary border border-border"
+                                >
+                                  Diagnose
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ════ SUBSCRIPTIONS TAB ════ */}
+                {activeTab === 'subscriptions' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Licensing Plans & Rates</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Core billing profiles checked by controllers at execution time.</p>
+                    </div>
                     {plans.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-border rounded-3xl bg-secondary/15 text-center">
-                        <FolderOpen className="h-8 w-8 text-zinc-400 mb-3" />
+                      <div className="glass rounded-3xl p-12 border border-dashed border-border text-center">
+                        <FolderOpen className="h-10 w-10 text-zinc-400 mb-3 mx-auto" />
                         <h4 className="text-sm font-black text-foreground">No Plans Configured</h4>
-                        <p className="text-xs text-zinc-550 mt-1">No SaaS plan definitions are currently available in the database.</p>
+                        <p className="text-xs text-zinc-500 mt-1">No plan definitions in the database.</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {plans.map(plan => (
-                          <div key={plan.id} className="rounded-2xl border border-border bg-card p-5 space-y-4 hover-lift">
+                          <div key={plan.id} className="glass rounded-2xl border border-border p-5 space-y-4 hover-lift">
                             <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-primary">{plan.code}</span>
-                              <span className="text-xs font-black text-foreground">₹{plan.monthlyPrice} / mo</span>
+                              <span className="text-[9px] font-black uppercase tracking-widest text-primary">{plan.code}</span>
+                              <span className="text-sm font-black text-foreground">₹{plan.monthlyPrice}/mo</span>
                             </div>
                             <h4 className="text-base font-black text-foreground">{plan.name}</h4>
-                            <div className="text-xs space-y-1.5 text-zinc-400 border-t border-border pt-3 font-semibold">
-                              <p>👥 Limit: {plan.studentLimit} Students</p>
-                              <p>💾 Storage: {plan.storageLimitGb} GB</p>
+                            <div className="text-xs space-y-1.5 text-zinc-500 border-t border-border pt-3">
+                              <p>👥 {plan.studentLimit} Students</p>
+                              <p>💾 {plan.storageLimitGb} GB Storage</p>
                               <div className="pt-1.5 flex flex-wrap gap-1">
                                 {plan.moduleAccess?.map((m: string) => (
-                                  <span key={m} className="px-2 py-0.5 bg-secondary rounded text-[8px] font-mono text-zinc-550 uppercase">{m.split('_')[0]}</span>
+                                  <span key={m} className="px-2 py-0.5 bg-secondary rounded text-[7px] font-mono text-zinc-500 uppercase">
+                                    {m.split('_')[0]}
+                                  </span>
                                 ))}
                               </div>
                             </div>
@@ -1184,91 +1251,108 @@ export default function FounderDashboardPage() {
 
                 {/* ════ LEADS TAB ════ */}
                 {activeTab === 'leads' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-4 shadow-lg animate-fade-in">
+                  <div className="space-y-4">
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Leads & Workspace Queries</h3>
-                      <p className="text-xs text-zinc-500 font-semibold">Overview of signup leads, inquiries, and custom package requests.</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Signup leads, inquiries, and custom package requests.</p>
                     </div>
-
-                    <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-border rounded-3xl bg-secondary/15 text-center">
-                      <Layers className="h-8 w-8 text-zinc-400 mb-3 animate-pulse" />
+                    <div className="glass rounded-3xl p-12 border border-dashed border-border text-center">
+                      <Layers className="h-10 w-10 text-zinc-400 mb-3 mx-auto animate-pulse" />
                       <h4 className="text-sm font-black text-foreground">CRM Integration Pending</h4>
-                      <p className="text-xs text-zinc-550 mt-1 max-w-xs leading-relaxed">Leads & inquiries CRM module will load here (Coming Soon in V1.1).</p>
+                      <p className="text-xs text-zinc-500 mt-1">Leads & inquiries CRM module coming in V1.1.</p>
                     </div>
                   </div>
                 )}
 
-                {/* ════ SUPPORT TAB (IMPERSONATE) ════ */}
+                {/* ════ SUPPORT TAB ════ */}
                 {activeTab === 'support' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-5 shadow-lg animate-fade-in">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Founder Diagnostics Impersonation</h3>
-                      <p className="text-xs text-zinc-550 font-semibold mt-0.5">Start secure diagnostic tunnels to troubleshoot tenant accounts. All actions audit logged.</p>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Founder Diagnostics</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Secure diagnostic tunnels to troubleshoot tenant accounts. All actions audit logged.</p>
                     </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <label className="block text-[9px] font-black uppercase tracking-wider text-zinc-550">Target Tenant UUID *</label>
-                          <input
-                            type="text"
-                            placeholder="Enter Institution / School ID"
-                            value={selectedImpersonateOrg}
-                            onChange={e => setSelectedImpersonateOrg(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-input px-3.5 py-2.5 text-xs text-input-text placeholder-placeholder font-mono outline-none"
-                          />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Impersonation */}
+                      <div className="glass rounded-2xl p-5 border border-border space-y-4">
+                        <h4 className="text-xs font-black uppercase text-foreground">Impersonation Tunnel</h4>
+                        <div className="space-y-3">
+                          <div className="space-y-1.5">
+                            <label className="block text-[8px] font-black uppercase tracking-wider text-zinc-500">Target Tenant UUID *</label>
+                            <input
+                              type="text"
+                              placeholder="Enter Institution ID"
+                              value={selectedImpersonateOrg}
+                              onChange={e => setSelectedImpersonateOrg(e.target.value)}
+                              className="w-full rounded-xl border border-border bg-input px-3.5 py-2.5 text-xs font-mono outline-none text-foreground"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="block text-[8px] font-black uppercase tracking-wider text-zinc-500">Diagnostic Reason *</label>
+                            <textarea
+                              placeholder="Explain the troubleshooting requirement..."
+                              value={impersonateReason}
+                              onChange={e => setImpersonateReason(e.target.value)}
+                              rows={3}
+                              className="w-full rounded-xl border border-border bg-input px-3.5 py-2.5 text-xs outline-none text-foreground"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="block text-[8px] font-black uppercase tracking-wider text-zinc-500">Ticket Reference</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. TKT-182"
+                              value={impersonateTicket}
+                              onChange={e => setImpersonateTicket(e.target.value)}
+                              className="w-full rounded-xl border border-border bg-input px-3.5 py-2.5 text-xs font-mono outline-none text-foreground"
+                            />
+                          </div>
+                          <button
+                            onClick={handleLaunchImpersonation}
+                            disabled={submitting || !selectedImpersonateOrg || impersonateReason.trim().length < 5}
+                            className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white text-xs font-black uppercase rounded-xl shadow-md shadow-primary/25 disabled:opacity-50 transition"
+                          >
+                            <Play className="h-4 w-4" /> Start Diagnostic Tunnel
+                          </button>
                         </div>
-
-                        <div className="space-y-1.5">
-                          <label className="block text-[9px] font-black uppercase tracking-wider text-zinc-550">Diagnostic Reason *</label>
-                          <textarea
-                            placeholder="Explain the troubleshooting requirement..."
-                            value={impersonateReason}
-                            onChange={e => setImpersonateReason(e.target.value)}
-                            rows={3}
-                            className="w-full rounded-xl border border-border bg-input px-3.5 py-2.5 text-xs text-input-text placeholder-placeholder outline-none"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="block text-[9px] font-black uppercase tracking-wider text-zinc-550">Ticket Reference ID</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. TKT-182"
-                            value={impersonateTicket}
-                            onChange={e => setImpersonateTicket(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-input px-3.5 py-2.5 text-xs text-input-text placeholder-placeholder font-mono outline-none"
-                          />
-                        </div>
-
-                        <button
-                          onClick={handleLaunchImpersonation}
-                          disabled={submitting || !selectedImpersonateOrg || impersonateReason.trim().length < 5}
-                          className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-primary-text hover:bg-hover text-xs font-black uppercase tracking-wider rounded-xl shadow-lg disabled:opacity-50 transition cursor-pointer"
-                        >
-                          <Play className="h-4 w-4" /> Start Diagnosis Tunnel
-                        </button>
                       </div>
 
-                      {/* Renewal generator direct */}
+                      {/* Direct Renewal */}
                       <div className="glass rounded-2xl p-5 border border-border space-y-4">
                         <h4 className="text-xs font-black uppercase text-foreground">Direct License Renewal Override</h4>
                         <div className="space-y-3">
                           <div className="space-y-1.5">
-                            <label className="text-[9px] font-black uppercase text-zinc-550">Institution UUID</label>
-                            <input type="text" placeholder="UUID" value={directRenewalOrgId} onChange={e => setDirectRenewalOrgId(e.target.value)} className="w-full rounded-xl border border-border bg-input px-3 py-2 text-xs font-mono outline-none" />
+                            <label className="text-[8px] font-black uppercase text-zinc-500">Institution UUID</label>
+                            <input type="text" placeholder="UUID" value={directRenewalOrgId} onChange={e => setDirectRenewalOrgId(e.target.value)} className="w-full rounded-xl border border-border bg-input px-3 py-2.5 text-xs font-mono outline-none text-foreground" />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[9px] font-black uppercase text-zinc-550">Months extension</label>
-                            <input type="number" min={1} value={directRenewalMonths} onChange={e => setDirectRenewalMonths(parseInt(e.target.value)||12)} className="w-full rounded-xl border border-border bg-input px-3 py-2 text-xs font-mono outline-none" />
+                            <label className="text-[8px] font-black uppercase text-zinc-500">Extension (Months)</label>
+                            <input type="number" min={1} value={directRenewalMonths} onChange={e => setDirectRenewalMonths(parseInt(e.target.value) || 12)} className="w-full rounded-xl border border-border bg-input px-3 py-2.5 text-xs font-mono outline-none text-foreground" />
                           </div>
                           {directRenewalResult && (
-                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-[10px] font-mono text-emerald-600 dark:text-emerald-400 space-y-1">
-                              <p className="font-bold">Key Generated:</p>
+                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-[10px] font-mono text-emerald-600 space-y-1">
+                              <p className="font-bold text-[9px] uppercase">Generated Key:</p>
                               <p className="font-black text-xs text-foreground select-all">{directRenewalResult.renewalKey}</p>
                             </div>
                           )}
-                          <button onClick={async () => { if (!directRenewalOrgId) { triggerToast('Enter UUID'); return; } setSubmitting(true); try { const r = await founderDirectRenewalApi(directRenewalOrgId, directRenewalMonths, directRenewalNotes); setDirectRenewalResult(r); triggerToast('Key generated.'); } catch(e:any){triggerToast(e.message);} finally{setSubmitting(false);} }} className="w-full py-2.5 rounded-xl bg-primary text-primary-text text-xs font-bold uppercase transition">Generate Key</button>
+                          <button
+                            onClick={async () => {
+                              if (!directRenewalOrgId) { triggerToast('Enter UUID', 'info'); return; }
+                              setSubmitting(true);
+                              try {
+                                const r = await founderDirectRenewalApi(directRenewalOrgId, directRenewalMonths, directRenewalNotes);
+                                setDirectRenewalResult(r);
+                                triggerToast('Renewal key generated.');
+                              } catch(e: any) {
+                                triggerToast(e.message, 'error');
+                              } finally {
+                                setSubmitting(false);
+                              }
+                            }}
+                            disabled={submitting}
+                            className="w-full py-2.5 rounded-xl bg-primary text-white text-xs font-bold uppercase transition disabled:opacity-50"
+                          >
+                            Generate Renewal Key
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1277,35 +1361,27 @@ export default function FounderDashboardPage() {
 
                 {/* ════ ANALYTICS TAB ════ */}
                 {activeTab === 'analytics' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-6 shadow-lg animate-fade-in">
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">MRR & Usage Charts</h3>
-                      <p className="text-xs text-zinc-550">Overview of billing plans growth and subscription tiers breakdown.</p>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">MRR & Usage Analytics</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Billing plans growth and subscription tier breakdown.</p>
                     </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Plan Adoption Split */}
-                      <div className="glass rounded-2xl p-5 border border-border flex flex-col justify-between">
-                        <h4 className="text-[10px] font-black uppercase text-zinc-550 mb-4">Adoption Tiers Split</h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="glass rounded-2xl p-5 border border-border">
+                        <h4 className="text-[9px] font-black uppercase text-zinc-500 mb-4">Adoption Tier Split</h4>
                         <div className="h-48">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie
-                                data={planPieData}
-                                innerRadius={45}
-                                outerRadius={65}
-                                paddingAngle={5}
-                                dataKey="value"
-                              >
+                              <Pie data={planPieData} innerRadius={45} outerRadius={65} paddingAngle={5} dataKey="value">
                                 {planPieData.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={entry.color} />
                                 ))}
                               </Pie>
-                              <Tooltip contentStyle={{ backgroundColor: '#121b2d', borderColor: '#263247', color: '#ffffff', fontSize: 10 }} />
+                              <Tooltip contentStyle={{ backgroundColor: '#121b2d', borderColor: '#263247', color: '#fff', fontSize: 10, borderRadius: 8 }} />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
-                        <div className="flex justify-center gap-4 text-[10px] font-bold text-zinc-500 border-t border-border pt-3">
+                        <div className="flex justify-center gap-4 text-[9px] font-bold text-zinc-500 border-t border-border pt-3">
                           {planPieData.map((d, i) => (
                             <div key={i} className="flex items-center gap-1.5">
                               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
@@ -1314,14 +1390,14 @@ export default function FounderDashboardPage() {
                           ))}
                         </div>
                       </div>
-
-                      {/* Storage Allocation */}
                       <div className="glass rounded-2xl p-5 border border-border space-y-3">
-                        <h4 className="text-[10px] font-black uppercase text-zinc-550">Active Storage Quota Allocation</h4>
-                        <div className="space-y-3 max-h-48 overflow-y-auto">
-                          {storageStats.map((item, idx) => (
+                        <h4 className="text-[9px] font-black uppercase text-zinc-500">Storage Quota Allocation</h4>
+                        <div className="space-y-3 max-h-52 overflow-y-auto">
+                          {storageStats.length === 0 ? (
+                            <p className="text-[10px] text-zinc-500 italic text-center py-8">No storage data available.</p>
+                          ) : storageStats.map((item, idx) => (
                             <div key={idx} className="space-y-1.5 p-3 rounded-xl border border-border bg-secondary/20">
-                              <div className="flex justify-between text-[11px] font-bold text-foreground">
+                              <div className="flex justify-between text-[10px] font-bold text-foreground">
                                 <span>{item.name}</span>
                                 <span className="text-zinc-500">{Number(item.usedGb).toFixed(4)} GB / {item.quotaGb} GB</span>
                               </div>
@@ -1338,31 +1414,32 @@ export default function FounderDashboardPage() {
 
                 {/* ════ MONITORING TAB ════ */}
                 {activeTab === 'monitoring' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-4 shadow-lg animate-fade-in">
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Active Threats & Alert Logs</h3>
-                      <p className="text-xs text-zinc-550">Log of failed password attempts, lockouts and IP security flags.</p>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Security & Threat Monitoring</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Failed login attempts, lockouts and IP security flags.</p>
                     </div>
-
                     {threatLogs.filter(t => !t.resolved).length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-border rounded-3xl bg-secondary/15 text-center">
-                        <ShieldCheck className="h-8 w-8 text-emerald-500 mb-3 animate-pulse" />
+                      <div className="glass rounded-3xl p-12 border border-dashed border-border text-center">
+                        <ShieldCheck className="h-10 w-10 text-emerald-500 mb-3 mx-auto animate-pulse" />
                         <h4 className="text-sm font-black text-foreground">Platform Secure</h4>
-                        <p className="text-xs text-zinc-550">No security warnings or login lockout flags active.</p>
+                        <p className="text-xs text-zinc-500 mt-1">No active security warnings or lockout flags.</p>
                       </div>
                     ) : (
-                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                      <div className="space-y-3">
                         {threatLogs.filter(t => !t.resolved).map(threat => (
                           <div key={threat.id} className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 flex justify-between items-start gap-4">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-red-500/20 text-red-650">{threat.severity}</span>
+                                <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded bg-red-500/20 text-red-500">{threat.severity}</span>
                                 <span className="text-xs font-black text-foreground">{threat.threatType}</span>
                               </div>
-                              <p className="text-[11px] text-zinc-550 leading-relaxed">{threat.details}</p>
-                              <p className="text-[9px] text-zinc-500 font-mono">IP address: {threat.ipAddress || 'Not logged'}</p>
+                              <p className="text-[10px] text-zinc-500">{threat.details}</p>
+                              <p className="text-[8px] text-zinc-500 font-mono">IP: {threat.ipAddress || 'Not logged'}</p>
                             </div>
-                            <button onClick={() => handleResolveThreat(threat.id)} className="px-3 py-1 rounded-lg bg-card text-foreground hover:bg-secondary border border-border text-[10px] font-bold">Resolve</button>
+                            <button onClick={() => handleResolveThreat(threat.id)} className="px-3 py-1.5 rounded-lg bg-card text-foreground hover:bg-secondary border border-border text-[10px] font-bold shrink-0">
+                              Resolve
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -1372,16 +1449,15 @@ export default function FounderDashboardPage() {
 
                 {/* ════ AUDIT TAB ════ */}
                 {activeTab === 'audit' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-4 shadow-lg animate-fade-in">
+                  <div className="space-y-4">
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Global Audit Trails</h3>
-                      <p className="text-xs text-zinc-550">Review platform action entries, diagnostic tunnels and backup triggers.</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Platform action entries, diagnostic tunnels, and backup triggers.</p>
                     </div>
-
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-xs text-left border-collapse">
+                    <div className="glass rounded-2xl border border-border overflow-hidden">
+                      <table className="w-full text-xs text-left">
                         <thead>
-                          <tr className="bg-secondary text-[9px] font-black uppercase text-zinc-500 border-b border-border">
+                          <tr className="bg-secondary text-[8px] font-black uppercase text-zinc-500 border-b border-border">
                             <th className="p-3">Log Type</th>
                             <th className="p-3">Action Details</th>
                             <th className="p-3">Logged At</th>
@@ -1390,13 +1466,13 @@ export default function FounderDashboardPage() {
                         <tbody className="divide-y divide-border">
                           <tr className="hover:bg-secondary/25 transition">
                             <td className="p-3 font-bold text-foreground">DB_MIGRATION</td>
-                            <td className="p-3 text-zinc-550">Applied migration: add_notification_category successfully to Neon master cluster.</td>
-                            <td className="p-3 text-zinc-500">{new Date().toLocaleString()}</td>
+                            <td className="p-3 text-zinc-500">Applied migration: add_notification_category successfully to Neon master.</td>
+                            <td className="p-3 text-zinc-500 font-mono text-[9px]">{new Date().toLocaleString()}</td>
                           </tr>
                           <tr className="hover:bg-secondary/25 transition">
                             <td className="p-3 font-bold text-foreground">WORKSPACE_ACTIVATION</td>
-                            <td className="p-3 text-zinc-550">Default settings initialized and roles matrix generated for standard school ERP.</td>
-                            <td className="p-3 text-zinc-500">{new Date(Date.now() - 3600000).toLocaleString()}</td>
+                            <td className="p-3 text-zinc-500">Default settings initialized and roles matrix generated for school ERP.</td>
+                            <td className="p-3 text-zinc-500 font-mono text-[9px]">{new Date(Date.now() - 3600000).toLocaleString()}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -1406,16 +1482,20 @@ export default function FounderDashboardPage() {
 
                 {/* ════ TEAM TAB ════ */}
                 {activeTab === 'team' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-4 shadow-lg animate-fade-in">
+                  <div className="space-y-4">
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Founder Team</h3>
-                      <p className="text-xs text-zinc-555">Administrators authorized to access the super-admin OS cockpit.</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Administrators authorized for the AURXON OS cockpit.</p>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="rounded-xl border border-border bg-card p-4 hover-lift">
-                        <p className="text-xs font-black text-foreground">Karan Founder</p>
-                        <p className="text-[10px] text-zinc-500 mt-1 font-semibold">Role: PLATFORM_OWNER • email: founder@aurxon.com</p>
+                      <div className="glass rounded-2xl border border-border p-4 hover-lift">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-primary/20 to-indigo-500/20 border border-primary/20 flex items-center justify-center font-black text-primary">K</div>
+                          <div>
+                            <p className="text-xs font-black text-foreground">Karan Founder</p>
+                            <p className="text-[9px] text-zinc-500">PLATFORM_OWNER • founder@aurxon.com</p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1423,81 +1503,87 @@ export default function FounderDashboardPage() {
 
                 {/* ════ DEPLOYMENTS TAB ════ */}
                 {activeTab === 'deployments' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-4 shadow-lg animate-fade-in">
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Platform Deployments Scheduler</h3>
-                      <p className="text-xs text-zinc-550 font-semibold">Schedule code updates and backup routines.</p>
+                      <h3 className="text-sm font-black uppercase tracking-wider text-foreground">Platform Deployments</h3>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">Code update schedules and backup routines.</p>
                     </div>
-
-                    <div className="space-y-3">
-                      <div className="p-4 rounded-xl border border-border bg-secondary/25 space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-foreground">Version: 3.0 (Stable release)</span>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase">Active</span>
-                        </div>
-                        <p className="text-[10px] text-zinc-555 leading-relaxed font-semibold">Multi-tenant routing engines, priority-badge notifications, and interactive provisioning loaders verified.</p>
+                    <div className="glass rounded-2xl border border-border p-4 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-foreground">Version: 3.0 (Stable)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase">Active</span>
                       </div>
+                      <p className="text-[10px] text-zinc-500">Multi-tenant routing, priority-badge notifications, and interactive provisioning verified.</p>
                     </div>
                   </div>
                 )}
 
                 {/* ════ SETTINGS TAB ════ */}
                 {activeTab === 'settings' && (
-                  <div className="glass rounded-3xl p-6 border border-border space-y-5 shadow-lg animate-fade-in">
+                  <div className="space-y-6">
                     <div>
                       <h3 className="text-sm font-black uppercase tracking-wider text-foreground">OS Settings</h3>
-                      <p className="text-xs text-zinc-550">Toggle system branding configs and preview light/dark modes.</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">System branding configs and theme modes.</p>
                     </div>
 
-                    <div className="space-y-4">
-                      {/* Quick Theme Preview */}
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-black uppercase text-foreground">Quick Theme Preview</h4>
-                        <div className="flex gap-2">
-                          {['light', 'dark', 'system'].map((t: any) => (
-                            <button
-                              key={t}
-                              onClick={() => { const { setTheme } = useTheme(); setTheme(t); }}
-                              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase border border-border transition ${theme === t ? 'bg-primary text-primary-text' : 'bg-secondary text-zinc-550 hover:bg-secondary/80'}`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
+                    {/* Theme */}
+                    <div className="glass rounded-2xl border border-border p-5 space-y-3">
+                      <h4 className="text-xs font-black uppercase text-foreground">Quick Theme</h4>
+                      <div className="flex gap-2">
+                        {(['light', 'dark', 'system'] as const).map(t => (
+                          <button
+                            key={t}
+                            onClick={() => setTheme(t)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase border transition
+                              ${theme === t ? 'bg-primary text-white border-primary' : 'bg-secondary text-zinc-500 border-border hover:bg-secondary/80'}`}
+                          >
+                            {t}
+                          </button>
+                        ))}
                       </div>
+                    </div>
 
-                      {/* RBAC editor definitions */}
-                      <div className="pt-4 border-t border-border space-y-3">
-                        <div className="flex justify-between items-center flex-wrap gap-2">
-                          <h4 className="text-xs font-black uppercase text-foreground">RBAC Policy Editor Override</h4>
-                          {rbacMatrix && (
-                            <button onClick={saveMatrixChanges} className="px-3.5 py-1.5 bg-primary text-primary-text rounded-lg text-[10px] font-black uppercase shadow-sm">Save Policies</button>
-                          )}
-                        </div>
-
+                    {/* RBAC Editor */}
+                    <div className="glass rounded-2xl border border-border p-5 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-black uppercase text-foreground">RBAC Policy Editor</h4>
                         {rbacMatrix && (
-                          <div className="space-y-3">
-                            <select value={selectedMatrixRoleId} onChange={e => handleMatrixRoleChange(e.target.value)} className="rounded-xl border border-border bg-input px-3 py-2 text-xs font-bold outline-none text-foreground">
-                              {rbacMatrix.roles?.map((r: any) => (
-                                  <option key={r.id} value={r.id}>{r.name} ({r.code})</option>
-                              ))}
-                            </select>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-1">
-                              {rbacMatrix.groups?.[0]?.permissions?.map((perm: any) => {
-                                const key = `${perm.resource}:${perm.action}`;
-                                const isChecked = !!matrixEdits[key];
-                                return (
-                                  <div key={key} className="flex justify-between items-center p-2 border border-border bg-secondary/15 rounded-lg text-[11px]">
-                                    <span className="font-bold text-foreground">{perm.label || perm.resource}</span>
-                                    <input type="checkbox" checked={isChecked} onChange={e => handleMatrixToggle(perm.resource, perm.action, e.target.checked)} className="h-4 w-4 accent-primary" />
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
+                          <button onClick={saveMatrixChanges} disabled={submitting} className="px-3.5 py-1.5 bg-primary text-white rounded-lg text-[10px] font-black uppercase shadow-sm disabled:opacity-50">
+                            Save Policies
+                          </button>
                         )}
                       </div>
+                      {rbacMatrix ? (
+                        <div className="space-y-3">
+                          <select
+                            value={selectedMatrixRoleId}
+                            onChange={e => handleMatrixRoleChange(e.target.value)}
+                            className="rounded-xl border border-border bg-input px-3 py-2 text-xs font-bold outline-none text-foreground"
+                          >
+                            {rbacMatrix.roles?.map((r: any) => (
+                              <option key={r.id} value={r.id}>{r.name} ({r.code})</option>
+                            ))}
+                          </select>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                            {rbacMatrix.groups?.[0]?.permissions?.map((perm: any) => {
+                              const key = `${perm.resource}:${perm.action}`;
+                              return (
+                                <div key={key} className="flex justify-between items-center p-2 border border-border bg-secondary/15 rounded-lg text-[11px]">
+                                  <span className="font-bold text-foreground">{perm.label || perm.resource}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!matrixEdits[key]}
+                                    onChange={e => handleMatrixToggle(perm.resource, perm.action, e.target.checked)}
+                                    className="h-4 w-4 accent-primary"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-zinc-500 italic">No RBAC data available.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1505,153 +1591,148 @@ export default function FounderDashboardPage() {
             )}
           </div>
 
-          {/* Right Panel widgets (35% width) */}
-          <aside className="w-80 border-l border-border bg-card/15 backdrop-blur-md p-6 space-y-6 overflow-y-auto shrink-0 hidden xl:block">
-            {/* Real-time Telemetry logs widget (OS Control panel style) */}
-            <div className="glass rounded-2xl p-5 border border-border space-y-4">
+          {/* Right Panel */}
+          <aside className="w-72 border-l border-border bg-card/10 backdrop-blur-md p-5 space-y-5 overflow-y-auto shrink-0 hidden xl:block">
+            {/* Hardware Telemetry */}
+            <div className="glass rounded-2xl p-4 border border-border space-y-3">
               <div className="flex justify-between items-center border-b border-border pb-2">
-                <span className="text-[10px] font-black uppercase text-foreground">Hardware Telemetry</span>
-                <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[8px] font-black uppercase tracking-wider">V1.1 Pending</span>
+                <span className="text-[9px] font-black uppercase text-foreground">Hardware Telemetry</span>
+                <span className="px-2 py-0.5 rounded bg-secondary text-zinc-500 text-[7px] font-black uppercase">V1.1</span>
               </div>
-              
-              <div className="relative p-2 rounded-xl bg-secondary/35 text-center select-none border border-dashed border-border py-8">
-                <HardDrive className="h-6 w-6 text-zinc-400 mx-auto mb-2" />
-                <h4 className="text-[11px] font-black text-foreground">Hardware Agent Integration</h4>
-                <p className="text-[9px] text-zinc-500 mt-1 max-w-xs leading-relaxed font-semibold">Real-time CPU & RAM gauges are coming soon in V1.1 agent release.</p>
+              <div className="py-6 text-center border border-dashed border-border rounded-xl bg-secondary/15">
+                <HardDrive className="h-5 w-5 text-zinc-400 mx-auto mb-2" />
+                <p className="text-[9px] font-black text-foreground">Agent Pending</p>
+                <p className="text-[8px] text-zinc-500 mt-0.5">CPU & RAM gauges in V1.1</p>
               </div>
             </div>
 
-            {/* Platform events logs feed */}
-            <div className="glass rounded-2xl p-5 border border-border space-y-4">
+            {/* Backups */}
+            <div className="glass rounded-2xl p-4 border border-border space-y-3">
               <div className="flex justify-between items-center border-b border-border pb-2">
-                <span className="text-[10px] font-black uppercase text-foreground">Backup & DR Snapshots</span>
+                <span className="text-[9px] font-black uppercase text-foreground">Backup & DR</span>
               </div>
-              <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                {backupRecords.slice(0, 3).map(rec => (
-                  <div key={rec.id} className="p-2.5 rounded-xl border border-border bg-secondary/15 text-[10px] font-mono space-y-1">
-                    <div className="flex justify-between text-zinc-450 font-bold">
-                      <span className="truncate">{rec.backupType} snapshot</span>
-                      <span className="text-emerald-500">{rec.status}</span>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {backupRecords.slice(0, 4).map(rec => (
+                  <div key={rec.id} className="p-2.5 rounded-xl border border-border bg-secondary/15 text-[9px] font-mono space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400 truncate">{rec.backupType} snapshot</span>
+                      <span className="text-emerald-500 shrink-0">{rec.status}</span>
                     </div>
-                    <p className="text-[9px] text-zinc-550 truncate">{rec.storedAt}</p>
+                    <p className="text-zinc-600 truncate">{rec.storedAt}</p>
                   </div>
                 ))}
                 {backupRecords.length === 0 && (
-                  <p className="text-[10px] text-zinc-550 italic text-center py-4">No backup logs registered yet.</p>
+                  <p className="text-[9px] text-zinc-500 italic text-center py-4">No backups logged.</p>
                 )}
               </div>
-              <button 
+              <button
                 onClick={handleTriggerBackup}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-secondary hover:bg-secondary/80 border border-border text-[10px] font-black uppercase rounded-xl transition"
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-secondary hover:bg-secondary/80 border border-border text-[9px] font-black uppercase rounded-xl transition"
               >
                 <Database className="h-3.5 w-3.5 text-primary" />
-                <span>Snap Database</span>
+                Snap Database
               </button>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="glass rounded-2xl p-4 border border-border space-y-3">
+              <span className="text-[9px] font-black uppercase text-foreground border-b border-border pb-2 block">Quick Stats</span>
+              <div className="space-y-2.5">
+                {[
+                  { label: 'Total Registrations', val: registrations.length },
+                  { label: 'Renewal Pending', val: pendingRenewalsCount },
+                  { label: 'Active Keys', val: activationKeys.filter((k: any) => k.status === 'ACTIVE').length },
+                  { label: 'Security Threats', val: threatLogs.filter(t => !t.resolved).length },
+                ].map((s, i) => (
+                  <div key={i} className="flex justify-between items-center text-[10px]">
+                    <span className="text-zinc-500 font-semibold">{s.label}</span>
+                    <span className="font-black text-foreground">{s.val}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </aside>
         </div>
 
-        {/* Bottom OS Audit log Feed */}
-        <footer className="h-10 border-t border-border bg-secondary/85 flex items-center px-6 text-[9px] font-mono text-zinc-550 justify-between select-none relative z-10">
+        {/* Footer Status Bar */}
+        <footer className="h-9 border-t border-border bg-secondary/80 flex items-center px-6 text-[8px] font-mono text-zinc-500 justify-between shrink-0">
           <div className="flex items-center gap-2.5 truncate">
-            <span className="px-1.5 py-0.5 rounded bg-black/20 text-emerald-500 font-bold uppercase tracking-wider animate-pulse">Live logs</span>
-            <span className="truncate">FOUNDER ADMIN ACCESS [KARAN]: Session diagnostically authenticated via secure control JWT.</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-bold uppercase animate-pulse">Live</span>
+            <span className="truncate">FOUNDER: Session authenticated via secure JWT control plane.</span>
           </div>
-          <div className="shrink-0 pl-4 text-zinc-500 font-bold">
-            SLA: 99.99% • Neon Cluster DB Connected
-          </div>
+          <div className="shrink-0 pl-4 text-zinc-600 font-bold">SLA: 99.99% • Neon DB ✓</div>
         </footer>
       </main>
 
-      {/* Global Command Palette search Modal (CTRL+K) */}
+      {/* ════ COMMAND PALETTE ════ */}
       {commandPaletteOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-fade-in z-dialog"
+        <div
+          className="fixed inset-0 z-[9998] flex items-start justify-center pt-24 px-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setCommandPaletteOpen(false)}
         >
-          <div 
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+          <div
+            className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center border-b border-border px-4 py-3">
+            <div className="flex items-center border-b border-border px-4 py-3 gap-3">
               <Search className="h-4 w-4 text-zinc-400 shrink-0" />
               <input
                 type="text"
                 autoFocus
-                placeholder="Search schools, user logins, licenses, approvals..."
-                className="w-full border-none bg-transparent px-3 text-xs text-foreground placeholder-placeholder outline-none"
+                placeholder="Search schools, licenses, approvals..."
+                className="w-full bg-transparent text-xs text-foreground placeholder-placeholder outline-none"
                 value={commandSearchQuery}
                 onChange={e => setCommandSearchQuery(e.target.value)}
               />
-              <button 
-                onClick={() => setCommandPaletteOpen(false)}
-                className="rounded bg-secondary px-2 py-0.5 text-[9px] font-bold text-zinc-450 border border-border"
-              >
-                ESC
-              </button>
+              <button onClick={() => setCommandPaletteOpen(false)} className="rounded bg-secondary px-2 py-0.5 text-[8px] font-bold text-zinc-500 border border-border">ESC</button>
             </div>
 
             <div className="p-3 max-h-80 overflow-y-auto space-y-3">
-              {/* Dynamic Backend Search Results */}
               {commandSearchQuery.trim().length >= 2 && (
                 <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase text-zinc-500 tracking-wider px-2 block mb-1">Database Search Results</p>
-                  
-                  {searchingBackend && (
-                    <p className="text-zinc-550 text-[10px] italic px-2 animate-pulse">Querying database indexes...</p>
-                  )}
-
-                  {!searchingBackend && backendSearchResults.length === 0 && (
-                    <p className="text-zinc-555 text-[10px] italic px-2">No matching database records found.</p>
-                  )}
-
+                  <p className="text-[8px] font-black uppercase text-zinc-500 tracking-wider px-2">Database Results</p>
+                  {searchingBackend && <p className="text-[10px] text-zinc-500 italic px-2 animate-pulse">Querying indexes...</p>}
+                  {!searchingBackend && backendSearchResults.length === 0 && <p className="text-[10px] text-zinc-500 italic px-2">No records found.</p>}
                   {!searchingBackend && backendSearchResults.map((item, idx) => (
                     <button
                       key={idx}
-                      onClick={() => {
-                        handleTabChange(item.href);
-                        setCommandPaletteOpen(false);
-                      }}
+                      onClick={() => { handleTabChange(item.href); setCommandPaletteOpen(false); }}
                       className="w-full flex items-center justify-between p-2 rounded-xl text-left hover:bg-secondary/40 transition border border-transparent hover:border-border"
                     >
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">{item.type}</span>
-                          <p className="text-xs font-bold text-foreground leading-snug">{item.label}</p>
+                          <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">{item.type}</span>
+                          <p className="text-xs font-bold text-foreground">{item.label}</p>
                         </div>
-                        <p className="text-[10px] text-zinc-550 mt-1 font-mono">{item.sublabel}</p>
+                        <p className="text-[9px] text-zinc-500 mt-0.5 font-mono">{item.sublabel}</p>
                       </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-zinc-450" />
+                      <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Actions & Quick Access */}
               <div className="space-y-1 border-t border-border/20 pt-3">
-                <p className="text-[9px] font-black uppercase text-zinc-500 tracking-wider px-2 block mb-1">Quick Console Shortcuts</p>
+                <p className="text-[8px] font-black uppercase text-zinc-500 tracking-wider px-2">Quick Shortcuts</p>
                 {[
-                  { title: 'Approve School Signup', desc: 'Authorize and bootstrap new school workspace', action: () => { handleTabChange('approvals'); setCommandPaletteOpen(false); } },
-                  { title: 'Suspend School Tenant', desc: 'Temporarily lock organization account', action: () => { handleTabChange('organizations'); setCommandPaletteOpen(false); } },
-                  { title: 'Direct Renewal Extension', desc: 'Add months quota override directly', action: () => { handleTabChange('support'); setCommandPaletteOpen(false); } },
-                  { title: 'Open Diagnostics Tunnel', desc: 'Secure 15-minute diagnostic impersonation link', action: () => { handleTabChange('support'); setCommandPaletteOpen(false); } },
-                  { title: 'View Audit logs', desc: 'Review global event log trails', action: () => { handleTabChange('audit'); setCommandPaletteOpen(false); } },
-                  { title: 'Generate Demo School', desc: 'Bootstrap mock educational institution environment', action: () => { setCommandPaletteOpen(false); triggerToast('Demo school generated.'); } },
-                ]
-                  .filter(c => c.title.toLowerCase().includes(commandSearchQuery.toLowerCase()))
-                  .map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={item.action}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-left hover:bg-secondary/40 transition"
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-foreground leading-snug">{item.title}</p>
-                        <p className="text-[10px] text-zinc-555 mt-0.5">{item.desc}</p>
-                      </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-zinc-450" />
-                    </button>
-                  ))}
+                  { title: 'Approve School Signup', desc: 'Authorize and bootstrap school workspace', href: 'approvals' },
+                  { title: 'View Digital Twins', desc: 'Monitor active school organizations', href: 'organizations' },
+                  { title: 'Direct Renewal Extension', desc: 'Add months override directly', href: 'support' },
+                  { title: 'Open Diagnostics Tunnel', desc: 'Secure impersonation session', href: 'support' },
+                  { title: 'View Audit Logs', desc: 'Review global event trail', href: 'audit' },
+                ].filter(c => c.title.toLowerCase().includes(commandSearchQuery.toLowerCase())).map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => { handleTabChange(item.href); setCommandPaletteOpen(false); }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl text-left hover:bg-secondary/40 transition"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-foreground">{item.title}</p>
+                      <p className="text-[9px] text-zinc-500 mt-0.5">{item.desc}</p>
+                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
+                  </button>
+                ))}
               </div>
             </div>
           </div>

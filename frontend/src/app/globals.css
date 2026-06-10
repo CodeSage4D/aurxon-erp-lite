@@ -318,3 +318,23 @@ button.bg-primary, button.bg-indigo-600, button.bg-indigo-650, button.bg-emerald
 .z-critical {
   z-index: 80 !important;
 }
+
+/* Fade-in animation for panels and tabs */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease forwards;
+}
+
+/* Slide-down for dropdowns */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease forwards;
+}

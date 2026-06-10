@@ -4370,6 +4370,9 @@ export async function getRegistrationsApi(status?: string) {
     ? `${API_URL}/registrations?status=${encodeURIComponent(status)}`
     : `${API_URL}/registrations`;
   const res = await fetch(url, { headers: getHeaders() });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) throw new Error('Failed to fetch registrations');
   return await res.json();
 }
