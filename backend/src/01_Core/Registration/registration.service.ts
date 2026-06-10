@@ -4,12 +4,15 @@ import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { ProvisioningService } from '../Provisioning/provisioning.service';
 import * as crypto from 'crypto';
 import * as argon2 from 'argon2';
+import { NotificationService } from '../../08_Communication/InAppAlerts/notification.service';
+import { NotificationCategory } from '@prisma/client';
 
 @Injectable()
 export class RegistrationService {
   constructor(
     private prisma: PrismaService,
     private provisioningService: ProvisioningService,
+    private notifService: NotificationService,
   ) {}
 
   /**
@@ -64,7 +67,7 @@ export class RegistrationService {
       adminPasswordHash = await argon2.hash(dto.adminPassword);
     }
 
-    return await this.prisma.organizationRegistration.create({
+    const registration = await this.prisma.organizationRegistration.create({
       data: {
         referenceNumber,
         orgName: dto.orgName.trim(),
@@ -86,6 +89,19 @@ export class RegistrationService {
         status: 'PENDING_REVIEW',
       },
     });
+
+    try {
+      await this.notifService.createSystemNotif(
+        'SUPER_ADMIN',
+        'New School Registered',
+        `${dto.orgName} has submitted registration request ${referenceNumber}.`,
+        NotificationCategory.REGISTRATION,
+      );
+    } catch (err) {
+      console.error('Failed to trigger registration notification:', err);
+    }
+
+    return registration;
   }
 
   /**
@@ -101,7 +117,21 @@ export class RegistrationService {
       orderBy: { createdAt: 'desc' },
       include: {
         reviewedBy: { select: { email: true } },
-        institution: { select: { id: true, name: true } },
+        institution: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            license: true,
+          },
+        },
+        activationKey: {
+          select: {
+            id: true,
+            status: true,
+            expiresAt: true,
+          },
+        },
       },
     });
   }
@@ -123,7 +153,7 @@ export class RegistrationService {
     }
 
     if (status === 'REJECTED') {
-      return this.prisma.organizationRegistration.update({
+      const updated = await this.prisma.organizationRegistration.update({
         where: { id },
         data: {
           status: 'REJECTED',
@@ -132,6 +162,17 @@ export class RegistrationService {
           rejectedAt: new Date(),
         },
       });
+      try {
+        await this.notifService.createSystemNotif(
+          'SUPER_ADMIN',
+          'Registration Rejected',
+          `Registration for ${registration.orgName} has been rejected.`,
+          NotificationCategory.APPROVAL,
+        );
+      } catch (err) {
+        console.error(err);
+      }
+      return updated;
     }
 
     // Update status to APPROVED or APPROVED_WITH_CONDITIONS
@@ -144,6 +185,17 @@ export class RegistrationService {
         approvedAt: new Date(),
       },
     });
+
+    try {
+      await this.notifService.createSystemNotif(
+        'SUPER_ADMIN',
+        `Registration ${status}`,
+        `Registration for ${registration.orgName} has been ${status.toLowerCase()}.`,
+        NotificationCategory.APPROVAL,
+      );
+    } catch (err) {
+      console.error(err);
+    }
 
     // BACKWARD COMPATIBILITY GATEWAY:
     // If registration has NO adminPasswordHash (meaning it's legacy/validation-runner signup),
@@ -216,6 +268,17 @@ Slug: ${provisionResult.slug}
       },
     });
 
+    try {
+      await this.notifService.createSystemNotif(
+        'SUPER_ADMIN',
+        'Technical Review Passed',
+        `Registration for ${reg.orgName} passed technical review. Ready for provisioning.`,
+        NotificationCategory.DEPLOYMENT,
+      );
+    } catch (err) {
+      console.error(err);
+    }
+
     // Log to AuditLog
     await this.prisma.auditLog.create({
       data: {
@@ -246,6 +309,17 @@ Slug: ${provisionResult.slug}
     }
 
     const provisionResult = await this.provisioningService.provisionTenant(id);
+
+    try {
+      await this.notifService.createSystemNotif(
+        'SUPER_ADMIN',
+        'Workspace Provisioned',
+        `Workspace for ${reg.orgName} has been provisioned. Slug: ${provisionResult.slug}`,
+        NotificationCategory.DEPLOYMENT,
+      );
+    } catch (err) {
+      console.error(err);
+    }
 
     // Create Audit Log
     await this.prisma.auditLog.create({

@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { SetupModule } from '../Setup/setup.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { JwtStrategy } from './jwt.strategy';
       secret: process.env.JWT_SECRET || 'super-secret-aurxon-jwt-key-2026-lite-erp',
       signOptions: { expiresIn: '7d' },
     }),
+    SetupModule,
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],

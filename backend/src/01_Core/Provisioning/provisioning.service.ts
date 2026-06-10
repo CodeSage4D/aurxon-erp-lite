@@ -102,10 +102,39 @@ export class ProvisioningService {
       });
 
       // 4. Create default Roles
-      const defaultRoles = (pack.defaultRoles as any[]) || [
+      let defaultRoles = (pack.defaultRoles as any[]) || [
         { roleCode: 'SUPER_ADMIN', roleName: 'Super Admin' },
         { roleCode: 'INSTITUTE_ADMIN', roleName: 'Institute Admin' }
       ];
+
+      // Merge and auto-create all roles as per Production Implementation Plan V2.1
+      if (packCode === 'SCHOOL_ERP') {
+        const schoolRoles = [
+          { roleCode: 'CHAIRMAN', roleName: 'Chairman' },
+          { roleCode: 'PRINCIPAL', roleName: 'Principal' },
+          { roleCode: 'VICE_PRINCIPAL', roleName: 'Vice Principal' },
+          { roleCode: 'ACADEMIC_COORDINATOR', roleName: 'Academic Coordinator' },
+          { roleCode: 'TEACHER', roleName: 'Teacher' },
+          { roleCode: 'CLASS_TEACHER', roleName: 'Class Teacher' },
+          { roleCode: 'ACCOUNTANT', roleName: 'Accountant' },
+          { roleCode: 'HR', roleName: 'HR' },
+          { roleCode: 'RECEPTIONIST', roleName: 'Receptionist' },
+          { roleCode: 'ADMISSION_OFFICER', roleName: 'Admission Officer' },
+          { roleCode: 'TRANSPORT_MANAGER', roleName: 'Transport Manager' },
+          { roleCode: 'LIBRARY_MANAGER', roleName: 'Library Manager' },
+          { roleCode: 'STUDENT', roleName: 'Student' },
+          { roleCode: 'PARENT', roleName: 'Parent' },
+          { roleCode: 'DRIVER', roleName: 'Driver' },
+          { roleCode: 'SECURITY', roleName: 'Security' },
+          { roleCode: 'IT_ADMIN', roleName: 'IT Admin' },
+        ];
+        const existingCodes = new Set(defaultRoles.map(r => r.roleCode));
+        for (const req of schoolRoles) {
+          if (!existingCodes.has(req.roleCode)) {
+            defaultRoles.push(req);
+          }
+        }
+      }
 
       const roles: Record<string, string> = {};
       for (const roleDef of defaultRoles) {
@@ -122,6 +151,79 @@ export class ProvisioningService {
 
       // 5. Seed default permissions for roles
       const permissionsTemplate = (pack.defaultPermissions as Record<string, any[]>) || {};
+      
+      // Auto-assign default permission packs for V2.1
+      if (packCode === 'SCHOOL_ERP') {
+        const schoolPermissions: Record<string, any[]> = {
+          INSTITUTE_ADMIN: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'organization:settings', action: 'CRUD' },
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          CHAIRMAN: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'organization:settings', action: 'CRUD' },
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          PRINCIPAL: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'organization:settings', action: 'CRUD' },
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          VICE_PRINCIPAL: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'READ' }
+          ],
+          ACADEMIC_COORDINATOR: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'READ' }
+          ],
+          TEACHER: [
+            { resource: 'student:profile', action: 'READ' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' }
+          ],
+          CLASS_TEACHER: [
+            { resource: 'student:profile', action: 'READ' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' }
+          ],
+          ACCOUNTANT: [
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          HR: [
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          PARENT: [
+            { resource: 'student:profile', action: 'READ' }
+          ],
+          STUDENT: [
+            { resource: 'student:profile', action: 'READ' }
+          ]
+        };
+        for (const [rCode, perms] of Object.entries(schoolPermissions)) {
+          permissionsTemplate[rCode] = perms;
+        }
+      }
+
       const permissionDataList: any[] = [];
       for (const [roleCode, perms] of Object.entries(permissionsTemplate)) {
         const roleId = roles[roleCode];
@@ -286,6 +388,55 @@ export class ProvisioningService {
           { settingId: setting.id, key: 'scholar_number_prefix', value: 'SCH' },
           { settingId: setting.id, key: 'scholar_number_digits', value: '4' },
         ],
+      });
+
+      // 9.5 Create Default Settings table entry (Silent Auto Configuration)
+      await tx.settings.create({
+        data: {
+          institutionId: institution.id,
+          academicYear: '2026-2027',
+          gradingSystem: packCode === 'SCHOOL_ERP' ? 'CBSE' : 'STANDARD',
+          timezone: 'Asia/Kolkata',
+          currency: 'INR',
+        },
+      });
+
+      // 9.6 Create Default Branch (Main branch)
+      await tx.branch.create({
+        data: {
+          institutionId: institution.id,
+          name: registration.orgName + ' HQ Branch',
+          code: 'HQ',
+          phone: registration.phone || '+91-1234567890',
+          address: registration.address || 'Main Campus Street',
+          city: registration.city || 'Kolkata',
+          state: registration.state || 'West Bengal',
+          pinCode: '700001',
+        },
+      });
+
+      // 9.7 Create Default Academic Session (AcademicYear table)
+      await tx.academicYear.create({
+        data: {
+          institutionId: institution.id,
+          name: '2026-2027',
+          startDate: new Date('2026-04-01'),
+          endDate: new Date('2027-03-31'),
+          isActive: true,
+          status: 'ACTIVE',
+        },
+      });
+
+      // 9.8 Create Organization Setup Status (marked setupCompleted = true, version 2.0 to bypass wizard)
+      await tx.organizationSetupStatus.create({
+        data: {
+          institutionId: institution.id,
+          setupStarted: true,
+          setupCompleted: true,
+          setupCompletedAt: new Date(),
+          currentStep: 3,
+          wizardVersion: '2.0',
+        },
       });
 
       return {

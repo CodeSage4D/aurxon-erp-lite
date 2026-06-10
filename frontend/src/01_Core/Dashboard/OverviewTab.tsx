@@ -64,6 +64,21 @@ export default function OverviewTab({
   user
 }: OverviewTabProps) {
   
+  // Greeting by time of day
+  const hour = new Date().getHours();
+  let timeOfDay = 'Good morning';
+  if (hour >= 12 && hour < 17) timeOfDay = 'Good afternoon';
+  else if (hour >= 17) timeOfDay = 'Good evening';
+
+  const firstName = (user?.profileName || '').split(' ')[0] || 'User';
+  const roleLabel = currentRole === 'SUPER_ADMIN' ? 'Founder' : 
+                    currentRole === 'INSTITUTE_ADMIN' ? 'School Admin' : 
+                    currentRole === 'PRINCIPAL' ? 'Principal' : 
+                    currentRole === 'VICE_PRINCIPAL' ? 'Vice Principal' : 
+                    currentRole === 'TEACHER' ? 'Teacher' : 
+                    currentRole === 'PARENT' ? 'Parent' : 
+                    currentRole === 'STUDENT' ? 'Student' : currentRole;
+
   // Theme state check for charts styling
   const [isDarkMode, setIsDarkMode] = useState(true);
   useEffect(() => {
@@ -445,10 +460,10 @@ export default function OverviewTab({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-3xl border border-primary/20">
             <div>
               <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
-                <span>Good morning, {user?.profileName || 'Principal'}</span>
+                <span>{timeOfDay}, {firstName}</span>
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
               </h2>
-              <p className="text-xs text-muted-foreground font-medium mt-0.5">{user?.institutionName || 'Your Organization'} — Cockpit Dashboard</p>
+              <p className="text-xs text-muted-foreground font-medium mt-0.5">{user?.institutionName || 'Your Organization'} — Academic Year: 2026-2027 • Role: {roleLabel}</p>
             </div>
             <div className="flex items-center gap-3">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
@@ -982,10 +997,10 @@ export default function OverviewTab({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-3xl border border-primary/20">
             <div>
               <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
-                <span>Welcome back, {user?.profileName || 'Teacher'}</span>
+                <span>{timeOfDay}, {firstName}</span>
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
               </h2>
-              <p className="text-xs text-muted-foreground font-medium mt-0.5">Teacher Classroom Hub — Daily lessons & grading</p>
+              <p className="text-xs text-muted-foreground font-medium mt-0.5">Teacher Classroom Hub — Role: {roleLabel}</p>
             </div>
             <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground bg-card border border-border px-3 py-1.5 rounded-xl shadow-sm">
               Today: {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -1224,10 +1239,10 @@ export default function OverviewTab({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-3xl border border-primary/20">
             <div>
               <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
-                <span>Welcome, {user?.profileName || 'Parent'}</span>
+                <span>{timeOfDay}, {firstName}</span>
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
               </h2>
-              <p className="text-xs text-muted-foreground font-medium mt-0.5">Parent Family Portal — Track child standing</p>
+              <p className="text-xs text-muted-foreground font-medium mt-0.5">Parent Family Portal — Role: {roleLabel}</p>
             </div>
             <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
               Scholar: Rohan Sharma

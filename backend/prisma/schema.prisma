@@ -70,6 +70,7 @@ model User {
   role          String      // e.g. "SUPER_ADMIN", "INSTITUTE_ADMIN", etc.
   isActive      Boolean     @default(true)
   mustChangePassword Boolean @default(true)
+  themePreference String @default("system")
   institutionId String
   institution   Institution @relation(fields: [institutionId], references: [id])
   createdAt     DateTime    @default(now())
@@ -635,13 +636,26 @@ model Branch {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
+  id        String               @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   content   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  category  NotificationCategory @default(SYSTEM)
+  isRead    Boolean              @default(false)
+  createdAt DateTime             @default(now())
+}
+
+enum NotificationCategory {
+  REGISTRATION
+  APPROVAL
+  LICENSE
+  SECURITY
+  SUPPORT
+  DEPLOYMENT
+  BILLING
+  SYSTEM
+  AUDIT
 }
 
 model Settings {

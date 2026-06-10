@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, ChevronRight } from 'lucide-react';
+import { useTheme } from '@/context/ThemeContext';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function CommandPalette({
   setAiAssistantOpen
 }: CommandPaletteProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const { toggleTheme } = useTheme();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -94,7 +96,7 @@ export default function CommandPalette({
     },
     { 
       title: "Dark Theme Toggle", 
-      action: () => { document.documentElement.classList.toggle('dark'); onClose(); }, 
+      action: () => { toggleTheme(); onClose(); }, 
       desc: "Toggle color modes" 
     }
   ];

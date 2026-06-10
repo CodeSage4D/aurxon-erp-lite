@@ -95,5 +95,20 @@ export class AuthController {
     const password = body.password || body.pass || '';
     return this.authService.activateOrganization(token, password);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('theme-preference')
+  async updateThemePreference(
+    @Request() req: any,
+    @Body() body: { theme: string },
+  ) {
+    return this.authService.updateThemePreference(req.user.id, body.theme);
+  }
+
+  @Get('institution/:slug')
+  async getInstitutionBySlug(@Param('slug') slug: string) {
+    return this.authService.getInstitutionBySlug(slug);
+  }
 }
 

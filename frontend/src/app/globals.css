@@ -1,97 +1,262 @@
 @import "tailwindcss";
 
 :root {
-  /* Light Mode Design System V2 (Ramp, Stripe & Mercury Inspired) */
+  /* Light Mode Design System V3 (Ramp & Stripe High-Contrast Inspired) */
   --background: #F8FAFC;
-  --foreground: #0F172A;
+  --foreground: #000000; /* Pure Black for contrast */
   
   --card: #FFFFFF;
-  --card-foreground: #0F172A;
+  --card-text: #000000;
   
-  --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
+  --sidebar: #FFFFFF;
+  --sidebar-text: #000000;
   
-  --primary: #2563EB; /* Premium SaaS Accent */
-  --primary-foreground: #FFFFFF;
+  --table: #FFFFFF;
+  --table-text: #000000;
   
-  --secondary: #FFFFFF;
-  --secondary-foreground: #475569;
+  --border: #CBD5E1; /* High-contrast slate border */
+  --input: #FFFFFF;
+  --input-text: #000000;
+  --placeholder: #666666; /* High-contrast placeholder */
   
-  --muted: #F8FAFC;
-  --muted-foreground: #94A3B8;
+  --primary: #2563EB; /* Premium Brand Accent */
+  --primary-text: #FFFFFF;
   
-  --accent: #E2E8F0;
-  --accent-foreground: #2563EB;
+  --secondary: #F1F5F9;
+  --secondary-text: #222222;
   
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #3B82F6;
   
-  --border: #E2E8F0;
-  --input: #E2E8F0;
-  --ring: #2563EB;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --focus: #2563EB;
+  --hover: #1D4ED8;
   
   --radius: 0.75rem;
 }
 
 .dark {
-  /* Dark Mode Design System V2 (Stripe, Linear & Vercel Slate & Navy) */
+  /* Dark Mode Design System V3 (Vercel & Linear inspired Slate) */
   --background: #0B1220;
-  --foreground: #F8FAFC;
+  --foreground: #FFFFFF;
   
   --card: #121B2D;
-  --card-foreground: #F8FAFC;
+  --card-text: #FFFFFF;
   
-  --popover: #121B2D;
-  --popover-foreground: #F8FAFC;
+  --sidebar: #0B1220;
+  --sidebar-text: #FFFFFF;
   
-  --primary: #2563EB;
-  --primary-foreground: #FFFFFF;
-  
-  --secondary: #182338;
-  --secondary-foreground: #CBD5E1;
-  
-  --muted: #182338;
-  --muted-foreground: #94A3B8;
-  
-  --accent: #2563EB;
-  --accent-foreground: #FFFFFF;
-  
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
+  --table: #121B2D;
+  --table-text: #FFFFFF;
   
   --border: #263247;
   --input: #182338;
-  --ring: #2563EB;
+  --input-text: #FFFFFF;
+  --placeholder: #BBBBBB;
+  
+  --primary: #2563EB;
+  --primary-text: #FFFFFF;
+  
+  --secondary: #182338;
+  --secondary-text: #CBD5E1;
+  
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #3B82F6;
+  
+  --shadow: rgba(0, 0, 0, 0.4);
+  --focus: #3B82F6;
+  --hover: #1D4ED8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-card-text: var(--card-text);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-text: var(--sidebar-text);
+  --color-table: var(--table);
+  --color-table-text: var(--table-text);
   --color-border: var(--border);
   --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-input-text: var(--input-text);
+  --color-placeholder: var(--placeholder);
+  --color-primary: var(--primary);
+  --color-primary-text: var(--primary-text);
+  --color-secondary: var(--secondary);
+  --color-secondary-text: var(--secondary-text);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-shadow: var(--shadow);
+  --color-focus: var(--focus);
+  --color-hover: var(--hover);
 }
 
-* {
+/* Typography global styling without universal * selector */
+body, button, input, textarea, select {
+  font-family: Aptos, "Segoe UI", Inter, Arial, sans-serif;
   border-color: var(--border);
-  outline-color: var(--ring);
+  outline-color: var(--focus);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-weight: 400;
+}
+
+/* Font weight mappings */
+h1, .h1 {
+  font-weight: 700 !important;
+}
+
+h2, h3, h4, h5, h6, .h2, .h3, .subheading {
+  font-weight: 600 !important;
+}
+
+p, span, li, a, td {
+  font-weight: 400;
+}
+
+.caption {
+  font-weight: 400 !important;
+}
+
+button, .btn {
+  font-weight: 600 !important;
+}
+
+aside, .sidebar, [role="navigation"] {
+  font-weight: 500 !important;
+}
+
+table, th, td {
+  font-weight: 400 !important;
+}
+
+.badge, [class*="badge"], [class*="status"] {
+  font-weight: 600 !important;
+}
+
+/* Light mode specific accessibility overrides */
+html:not(.dark) body {
+  color: #000000 !important;
+}
+
+html:not(.dark) h1,
+html:not(.dark) h2,
+html:not(.dark) h3,
+html:not(.dark) h4,
+html:not(.dark) h5,
+html:not(.dark) h6 {
+  color: #000000 !important;
+}
+
+html:not(.dark) .text-zinc-100,
+html:not(.dark) .text-zinc-200,
+html:not(.dark) .text-zinc-300,
+html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-300,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-gray-100,
+html:not(.dark) .text-gray-250,
+html:not(.dark) .text-gray-300,
+html:not(.dark) .text-gray-400 {
+  color: #222222 !important;
+}
+
+html:not(.dark) .text-zinc-500,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-gray-500 {
+  color: #555555 !important;
+}
+
+html:not(.dark) .text-muted-foreground {
+  color: #555555 !important;
+}
+
+html:not(.dark) .text-foreground {
+  color: #000000 !important;
+}
+
+/* Ensure form controls are highly readable in light mode */
+html:not(.dark) input,
+html:not(.dark) select,
+html:not(.dark) textarea {
+  color: #000000 !important;
+  background-color: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+}
+
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #666666 !important;
+}
+
+/* Sidebar override for light mode */
+html:not(.dark) aside,
+html:not(.dark) .sidebar {
+  background-color: #FFFFFF !important;
+  border-right: 1px solid #CBD5E1 !important;
+}
+
+html:not(.dark) aside *,
+html:not(.dark) .sidebar * {
+  color: #000000 !important;
+}
+
+html:not(.dark) aside button:hover,
+html:not(.dark) .sidebar button:hover {
+  background-color: #F1F5F9 !important;
+}
+
+html:not(.dark) aside button.bg-indigo-600 *,
+html:not(.dark) aside button.bg-indigo-600 span {
+  color: #FFFFFF !important;
+}
+
+html:not(.dark) aside button.bg-indigo-600 {
+  background-color: #2563EB !important;
+}
+
+/* Tables in light mode */
+html:not(.dark) table {
+  background-color: #FFFFFF !important;
+}
+
+html:not(.dark) th {
+  color: #000000 !important;
+  background-color: #F1F5F9 !important;
+  border-bottom: 2px solid #CBD5E1 !important;
+}
+
+html:not(.dark) td {
+  color: #000000 !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+/* Cards (Glass containers) in light mode */
+html:not(.dark) .glass {
+  background: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Keep white text for primary background badges/buttons in light mode */
+.bg-primary *, .bg-indigo-650 *, .bg-emerald-600 *, .bg-red-600 *, .bg-rose-600 *,
+button.bg-primary, button.bg-indigo-600, button.bg-indigo-650, button.bg-emerald-600, button.bg-red-600, button.bg-rose-600 {
+  color: #FFFFFF !important;
 }
 
 /* Premium Scrollbars */
@@ -113,7 +278,7 @@ body {
   background: rgba(100, 116, 139, 0.4);
 }
 
-/* Custom Glassmorphism utility */
+/* Glassmorphism for dark mode */
 .glass {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(12px);
@@ -135,4 +300,21 @@ body {
 .hover-lift:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 20px -10px rgba(0, 0, 0, 0.15);
+}
+
+/* Centralized Z-Index Scale */
+.z-dropdown {
+  z-index: 40 !important;
+}
+.z-dialog {
+  z-index: 50 !important;
+}
+.z-notification {
+  z-index: 60 !important;
+}
+.z-overlay {
+  z-index: 70 !important;
+}
+.z-critical {
+  z-index: 80 !important;
 }

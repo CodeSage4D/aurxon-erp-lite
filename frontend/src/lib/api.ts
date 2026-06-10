@@ -4374,7 +4374,7 @@ export async function getRegistrationsApi(status?: string) {
   return await res.json();
 }
 
-export async function reviewRegistrationApi(id: string, status: 'APPROVED' | 'REJECTED', notes?: string) {
+export async function reviewRegistrationApi(id: string, status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'APPROVED_WITH_CONDITIONS', notes?: string) {
   const res = await fetch(`${API_URL}/registrations/${id}/review`, {
     method: 'PATCH',
     headers: getHeaders(),
@@ -4757,6 +4757,21 @@ export async function getMyRenewalRequestsApi() {
   const res = await fetch(`${API_URL}/renewals/my-requests`, { headers: getHeaders() });
   if (!res.ok) throw new Error('Failed to fetch renewal requests');
   return await res.json();
+}
+
+export async function updateThemePreferenceApi(theme: string) {
+  try {
+    const res = await fetch(`${API_URL}/auth/theme-preference`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ theme }),
+    });
+    if (!res.ok) throw new Error('Failed to update theme preference');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend theme update offline, updating local preference only...');
+    return { success: true };
+  }
 }
 
 

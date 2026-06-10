@@ -1,20 +1,25 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { decrypt } from '../../common/utils/crypto';
+import { SetupService } from '../Setup/setup.service';
 
 
 const navCache = new Map<string, { data: any; timestamp: number }>();
 const switchCache = new Map<string, { data: any; timestamp: number }>();
+const brandingCache = new Map<string, { data: any; expiresAt: number }>();
+const BRANDING_CACHE_TTL = 30 * 1000; // 30 seconds cache TTL
+
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private setupService: SetupService,
   ) {}
 
   async login(email: string, pass: string) {
@@ -232,6 +237,7 @@ export class AuthService {
         profileId: profileId || null,
         mustChangePassword: user.mustChangePassword,
         teamRole: teamMember ? teamMember.role : null,
+        themePreference: user.themePreference || 'system',
       },
       memberships: formattedMemberships,
     };
@@ -281,6 +287,9 @@ export class AuthService {
     schoolId?: string,
     campusId?: string,
   ) {
+    // Run silent self-healing validation check at context switch/login (Production Implementation Plan V2.1)
+    await this.setupService.ensureInstitutionConfig(organizationId);
+
     const cacheKey = `${userId}-${organizationId}-${schoolId || ''}-${campusId || ''}`;
     const cached = switchCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < 5000) {
@@ -356,7 +365,7 @@ export class AuthService {
 
     const userRec = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, mustChangePassword: true },
+      select: { email: true, mustChangePassword: true, themePreference: true },
     });
 
     const teamMember = await this.prisma.aurxonTeamMember.findUnique({
@@ -395,6 +404,7 @@ export class AuthService {
         enabledFeatures,
         mustChangePassword: userRec?.mustChangePassword || false,
         teamRole: teamMember ? teamMember.role : null,
+        themePreference: userRec?.themePreference || 'system',
         branding: {
           primaryColor,
           logoUrl,
@@ -722,6 +732,123 @@ export class AuthService {
         status: 'LIVE',
       };
     });
+  }
+
+  async updateThemePreference(userId: string, theme: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { themePreference: theme },
+      select: { id: true, themePreference: true },
+    });
+  }
+
+  async getInstitutionBySlug(slug: string) {
+    const sanitizedSlug = (slug || '').trim().toLowerCase();
+    if (!sanitizedSlug || !/^[a-z0-9\.\-]+$/.test(sanitizedSlug)) {
+      throw new BadRequestException('Invalid workspace slug format');
+    }
+
+    const now = Date.now();
+    const cached = brandingCache.get(sanitizedSlug);
+    if (cached && cached.expiresAt > now) {
+      return cached.data;
+    }
+
+    let inst: any = null;
+    // 1. Resolve via custom domain
+    const tenantDomain = await this.prisma.tenantDomain.findFirst({
+      where: { domain: { equals: sanitizedSlug, mode: 'insensitive' } },
+      include: { organization: true },
+    });
+
+    if (tenantDomain?.organization) {
+      inst = tenantDomain.organization;
+    } else {
+      // 2. Resolve via Tenant slug
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { slug: sanitizedSlug },
+        include: { institutions: true },
+      });
+      if (tenant && tenant.institutions && tenant.institutions.length > 0) {
+        inst = tenant.institutions[0];
+      } else {
+        // 3. Resolve via direct Institution ID
+        inst = await this.prisma.institution.findFirst({
+          where: { id: sanitizedSlug },
+        });
+      }
+    }
+
+    if (!inst) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const branding = await this.prisma.organizationBranding.findUnique({
+      where: { organizationId: inst.id },
+    });
+
+    const license = await this.prisma.license.findUnique({
+      where: { organizationId: inst.id },
+    });
+
+    const notice = await this.prisma.notice.findFirst({
+      where: {
+        institutionId: inst.id,
+        targetRoles: { contains: 'PUBLIC' },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculate dynamic health score
+    let healthScore = 100;
+    const threatsCount = await this.prisma.securityThreatLog.count({
+      where: { institutionId: inst.id, resolved: false },
+    });
+    healthScore -= threatsCount * 15;
+
+    const storage = await this.prisma.storageSnapshot.findFirst({
+      where: { institutionId: inst.id },
+      orderBy: { capturedAt: 'desc' },
+    });
+    if (storage && storage.quotaGb > 0) {
+      const usagePercent = (storage.usedGb / storage.quotaGb) * 100;
+      if (usagePercent > 90) {
+        healthScore -= 15;
+      }
+    }
+
+    let status = inst.status; // ACTIVE or SUSPENDED
+    if (license) {
+      const daysLeft = Math.ceil((new Date(license.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (daysLeft < 0) {
+        healthScore -= 30;
+        if (status !== 'SUSPENDED') {
+          status = 'EXPIRED';
+        }
+      } else if (daysLeft < 30) {
+        healthScore -= 10;
+      }
+      if (license.status === 'REVOKED') {
+        healthScore = 50;
+        status = 'EXPIRED';
+      }
+    }
+    healthScore = Math.max(50, Math.min(100, healthScore));
+
+    const result = {
+      displayName: inst.name,
+      logoUrl: branding?.logoUrl || inst.logoUrl || null,
+      brandColor: branding?.primaryColor || inst.primaryColor || '#0284c7',
+      secondaryColor: branding?.secondaryColor || '#0f172a',
+      theme: branding?.customCss || 'system',
+      portalTitle: branding?.loginBannerUrl || 'Student & Staff Portal',
+      portalMessage: notice ? `${notice.title}: ${notice.content}` : '',
+      status,
+      healthScore,
+    };
+
+    brandingCache.set(sanitizedSlug, { data: result, expiresAt: Date.now() + BRANDING_CACHE_TTL });
+    return result;
   }
 }
 

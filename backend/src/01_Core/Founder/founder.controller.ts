@@ -175,7 +175,7 @@ export class FounderController {
 
     const query = q.trim().toLowerCase();
 
-    // Search organizations
+    // 1. Search organizations
     const orgs = await this.prisma.institution.findMany({
       where: {
         name: { contains: query, mode: 'insensitive' },
@@ -183,10 +183,45 @@ export class FounderController {
       take: 5,
     });
 
-    // Search user logins
+    // 2. Search user logins
     const users = await this.prisma.user.findMany({
       where: {
         email: { contains: query, mode: 'insensitive' },
+      },
+      take: 5,
+    });
+
+    // 3. Search registrations/approvals
+    const registrations = await this.prisma.organizationRegistration.findMany({
+      where: {
+        OR: [
+          { orgName: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: 'insensitive' } },
+          { referenceNumber: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      take: 5,
+    });
+
+    // 4. Search licenses
+    const licenses = await this.prisma.license.findMany({
+      where: {
+        licenseKey: { contains: query, mode: 'insensitive' },
+      },
+      include: {
+        organization: { select: { name: true } },
+      },
+      take: 5,
+    });
+
+    // 5. Search persistent notifications
+    const notifications = await this.prisma.notification.findMany({
+      where: {
+        userId: req.user.id,
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { content: { contains: query, mode: 'insensitive' } },
+        ],
       },
       take: 5,
     });
@@ -198,8 +233,8 @@ export class FounderController {
         type: 'Organization',
         id: org.id,
         label: org.name,
-        sublabel: `Institution Code: ${org.id.slice(0, 8)}`,
-        href: `/teams/dashboard?tab=orgs&id=${org.id}`,
+        sublabel: `ID: ${org.id.slice(0, 8)} · Status: ${org.status}`,
+        href: 'organizations',
       });
     }
 
@@ -208,8 +243,38 @@ export class FounderController {
         type: 'User Login',
         id: u.id,
         label: u.email,
-        sublabel: `Role: ${u.role} · Institution ID: ${u.institutionId.slice(0, 8)}`,
-        href: `/teams/dashboard?tab=orgs&id=${u.institutionId}`,
+        sublabel: `Role: ${u.role} · Inst ID: ${u.institutionId.slice(0, 8)}`,
+        href: 'team',
+      });
+    }
+
+    for (const reg of registrations) {
+      results.push({
+        type: 'Registration',
+        id: reg.id,
+        label: reg.orgName,
+        sublabel: `Ref: ${reg.referenceNumber} · Status: ${reg.status}`,
+        href: 'approvals',
+      });
+    }
+
+    for (const lic of licenses) {
+      results.push({
+        type: 'License',
+        id: lic.id,
+        label: lic.licenseKey,
+        sublabel: `School: ${lic.organization.name} · Status: ${lic.status}`,
+        href: 'organizations',
+      });
+    }
+
+    for (const notif of notifications) {
+      results.push({
+        type: 'Notification',
+        id: notif.id,
+        label: notif.title,
+        sublabel: `Category: ${notif.category} · Content: ${notif.content.slice(0, 40)}...`,
+        href: 'overview',
       });
     }
 

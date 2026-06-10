@@ -9,6 +9,251 @@ export class SetupService {
     private auditLogService: AuditLogService,
   ) {}
 
+  async ensureInstitutionConfig(institutionId: string) {
+    if (!institutionId) return;
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Fetch the institution to identify the industry pack
+        const institution = await tx.institution.findUnique({
+          where: { id: institutionId },
+          select: { industryPackCode: true, name: true },
+        });
+        if (!institution) return;
+
+        const packCode = institution.industryPackCode || 'SCHOOL_ERP';
+
+        // 2. Ensure Settings record exists
+        let settings = await tx.settings.findUnique({
+          where: { institutionId },
+        });
+        if (!settings) {
+          settings = await tx.settings.create({
+            data: {
+              institutionId,
+              academicYear: '2026-2027',
+              gradingSystem: packCode === 'SCHOOL_ERP' ? 'CBSE' : 'STANDARD',
+              timezone: 'Asia/Kolkata',
+              currency: 'INR',
+            },
+          });
+        }
+
+        // 3. Ensure default configuration group and items for academic rules exist
+        let settingGroup = await tx.organizationSetting.findFirst({
+          where: { organizationId: institutionId, groupCode: 'ACADEMIC_RULES' },
+        });
+        if (!settingGroup) {
+          settingGroup = await tx.organizationSetting.create({
+            data: { organizationId: institutionId, groupCode: 'ACADEMIC_RULES' },
+          });
+        }
+        const configs = [
+          { key: 'board_affiliation', value: settings.gradingSystem === 'CBSE' ? 'CBSE' : 'STATE_BOARD' },
+          { key: 'grading_system', value: settings.gradingSystem },
+          { key: 'scholar_number_prefix', value: 'SCH' },
+          { key: 'scholar_number_digits', value: '4' },
+        ];
+        for (const conf of configs) {
+          const existing = await tx.configurationItem.findFirst({
+            where: { settingId: settingGroup.id, key: conf.key },
+          });
+          if (!existing) {
+            await tx.configurationItem.create({
+              data: { settingId: settingGroup.id, key: conf.key, value: conf.value },
+            });
+          }
+        }
+
+        // 4. Ensure at least one Branch exists
+        const branchCount = await tx.branch.count({
+          where: { institutionId },
+        });
+        if (branchCount === 0) {
+          await tx.branch.create({
+            data: {
+              institutionId,
+              name: 'HQ Branch',
+              code: 'HQ',
+              phone: '+91-1234567890',
+              address: 'Main Campus Street',
+              city: 'Kolkata',
+              state: 'West Bengal',
+              pinCode: '700001',
+            },
+          });
+        }
+
+        // 5. Ensure default AcademicYear exists (Prisma AcademicYear table)
+        const academicYearCount = await tx.academicYear.count({
+          where: { institutionId },
+        });
+        if (academicYearCount === 0) {
+          await tx.academicYear.create({
+            data: {
+              institutionId,
+              name: '2026-2027',
+              startDate: new Date('2026-04-01'),
+              endDate: new Date('2027-03-31'),
+              isActive: true,
+              status: 'ACTIVE',
+            },
+          });
+        }
+
+        // 6. Ensure default Roles and Permissions exist
+        const defaultRoles = [
+          { roleCode: 'SUPER_ADMIN', roleName: 'Super Admin' },
+          { roleCode: 'INSTITUTE_ADMIN', roleName: 'Institute Admin' },
+          { roleCode: 'CHAIRMAN', roleName: 'Chairman' },
+          { roleCode: 'PRINCIPAL', roleName: 'Principal' },
+          { roleCode: 'VICE_PRINCIPAL', roleName: 'Vice Principal' },
+          { roleCode: 'ACADEMIC_COORDINATOR', roleName: 'Academic Coordinator' },
+          { roleCode: 'TEACHER', roleName: 'Teacher' },
+          { roleCode: 'CLASS_TEACHER', roleName: 'Class Teacher' },
+          { roleCode: 'ACCOUNTANT', roleName: 'Accountant' },
+          { roleCode: 'HR', roleName: 'HR' },
+          { roleCode: 'RECEPTIONIST', roleName: 'Receptionist' },
+          { roleCode: 'ADMISSION_OFFICER', roleName: 'Admission Officer' },
+          { roleCode: 'TRANSPORT_MANAGER', roleName: 'Transport Manager' },
+          { roleCode: 'LIBRARY_MANAGER', roleName: 'Library Manager' },
+          { roleCode: 'STUDENT', roleName: 'Student' },
+          { roleCode: 'PARENT', roleName: 'Parent' },
+          { roleCode: 'DRIVER', roleName: 'Driver' },
+          { roleCode: 'SECURITY', roleName: 'Security' },
+          { roleCode: 'IT_ADMIN', roleName: 'IT Admin' },
+        ];
+
+        const roles: Record<string, string> = {};
+        for (const roleDef of defaultRoles) {
+          let role = await tx.role.findFirst({
+            where: { institutionId, code: roleDef.roleCode },
+          });
+          if (!role) {
+            role = await tx.role.create({
+              data: {
+                name: roleDef.roleName,
+                code: roleDef.roleCode,
+                isSystem: true,
+                institutionId,
+              },
+            });
+          }
+          roles[roleDef.roleCode] = role.id;
+        }
+
+        // Seed default permissions for roles (Production Implementation Plan V2.1)
+        const permissionsTemplate: Record<string, any[]> = {
+          INSTITUTE_ADMIN: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'organization:settings', action: 'CRUD' },
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          CHAIRMAN: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'organization:settings', action: 'CRUD' },
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          PRINCIPAL: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'organization:settings', action: 'CRUD' },
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          VICE_PRINCIPAL: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'READ' }
+          ],
+          ACADEMIC_COORDINATOR: [
+            { resource: 'student:profile', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'finance:ledger', action: 'READ' }
+          ],
+          TEACHER: [
+            { resource: 'student:profile', action: 'READ' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' }
+          ],
+          CLASS_TEACHER: [
+            { resource: 'student:profile', action: 'READ' },
+            { resource: 'attendance:records', action: 'CRUD' },
+            { resource: 'exams:setup', action: 'CRUD' }
+          ],
+          ACCOUNTANT: [
+            { resource: 'finance:ledger', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          HR: [
+            { resource: 'employee:records', action: 'CRUD' },
+            { resource: 'payroll:compensation', action: 'CRUD' }
+          ],
+          PARENT: [
+            { resource: 'student:profile', action: 'READ' }
+          ],
+          STUDENT: [
+            { resource: 'student:profile', action: 'READ' }
+          ]
+        };
+
+        for (const [roleCode, perms] of Object.entries(permissionsTemplate)) {
+          const roleId = roles[roleCode];
+          if (roleId && Array.isArray(perms)) {
+            for (const p of perms) {
+              const existingPermission = await tx.permission.findFirst({
+                where: { roleId, resource: p.resource, action: p.action },
+              });
+              if (!existingPermission) {
+                await tx.permission.create({
+                  data: {
+                    roleId,
+                    resource: p.resource,
+                    action: p.action,
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        // 7. Ensure setup completed in OrganizationSetupStatus (wizardVersion V2.0)
+        await tx.organizationSetupStatus.upsert({
+          where: { institutionId },
+          update: {
+            setupStarted: true,
+            setupCompleted: true,
+            setupCompletedAt: new Date(),
+            currentStep: 3,
+            wizardVersion: '2.0',
+          },
+          create: {
+            institutionId,
+            setupStarted: true,
+            setupCompleted: true,
+            setupCompletedAt: new Date(),
+            currentStep: 3,
+            wizardVersion: '2.0',
+          },
+        });
+      }, { timeout: 20000 });
+    } catch (err) {
+      console.error(`Silent self-healing failed for institution ${institutionId}:`, err);
+    }
+  }
+
   async getSetupStatus(institutionId: string) {
     if (!institutionId) {
       return {
@@ -32,6 +277,9 @@ export class SetupService {
       };
     }
 
+    // Run the Legacy Self Healing repair job silently
+    await this.ensureInstitutionConfig(institutionId);
+
     let status = await this.prisma.organizationSetupStatus.findUnique({
       where: { institutionId },
     });
@@ -41,8 +289,9 @@ export class SetupService {
         data: {
           institutionId,
           setupStarted: true,
-          currentStep: 1,
-          setupCompleted: false,
+          currentStep: 3,
+          setupCompleted: true,
+          wizardVersion: "2.0",
         },
       });
     }
