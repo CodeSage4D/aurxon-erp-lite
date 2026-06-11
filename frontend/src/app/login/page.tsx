@@ -78,6 +78,15 @@ export default function LoginPage() {
     try {
       const data = await loginApi(email, password);
       
+      if (data.user && (data.user.role === 'SUPER_ADMIN' || data.user.teamRole)) {
+        setError('Access Denied: Administrative and founder credentials cannot log in on the public portal. Please navigate to the secure Founder portal.');
+        localStorage.removeItem('aurxon_token');
+        localStorage.removeItem('aurxon_user');
+        localStorage.removeItem('aurxon_context');
+        localStorage.removeItem('aurxon_memberships');
+        return;
+      }
+
       if (data.user && data.user.mustChangePassword) {
         router.push('/change-password');
         return;

@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { BillingService } from '../Billing/billing.service';
 import * as crypto from 'crypto';
 import { encrypt, decrypt } from '../../common/utils/crypto';
+import * as bcrypt from 'bcryptjs';
 
 @UseGuards(JwtAuthGuard)
 @Controller('founder')
@@ -417,7 +418,7 @@ export class FounderController {
     await this.verifyTeamMember(req.user.id, [
       'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
     ]);
-    return this.prisma.activationKey.findMany({
+    const keys = await this.prisma.activationKey.findMany({
       include: {
         registration: {
           select: {
@@ -428,6 +429,20 @@ export class FounderController {
         }
       },
       orderBy: { createdAt: 'desc' },
+    });
+
+    return keys.map(key => {
+      let rawKey = null;
+      try {
+        const decrypted = JSON.parse(decrypt(key.encryptedPackage));
+        rawKey = decrypted.activationKey;
+      } catch (err) {
+        console.warn('Failed to decrypt activation key:', key.id, err.message);
+      }
+      return {
+        ...key,
+        rawKey,
+      };
     });
   }
 
@@ -576,6 +591,112 @@ export class FounderController {
       newRawKey,
       ...updated,
     };
+  }
+
+  @Post('institutions/:id/suspend')
+  async suspendInstitution(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    const inst = await this.prisma.institution.findUnique({ where: { id } });
+    if (!inst) throw new NotFoundException('Institution not found');
+
+    const updated = await this.prisma.institution.update({
+      where: { id },
+      data: { status: 'SUSPENDED' },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'INSTITUTION_SUSPENSION',
+        details: `Institution suspended: ${inst.name} (${id})`,
+      }
+    });
+
+    return updated;
+  }
+
+  @Post('institutions/:id/resume')
+  async resumeInstitution(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    const inst = await this.prisma.institution.findUnique({ where: { id } });
+    if (!inst) throw new NotFoundException('Institution not found');
+
+    const updated = await this.prisma.institution.update({
+      where: { id },
+      data: { status: 'ACTIVE' },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'INSTITUTION_RESUMPTION',
+        details: `Institution resumed: ${inst.name} (${id})`,
+      }
+    });
+
+    return updated;
+  }
+
+  @Post('users/:id/reset-password')
+  async resetUserPassword(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    // Generate temporary password
+    const securePass = 'Temp@' + crypto.randomBytes(4).toString('hex');
+    const passwordHash = await bcrypt.hash(securePass, 10);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        mustChangePassword: true,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'USER_PASSWORD_RESET',
+        details: `Password reset by founder for user: ${user.email} (${id})`,
+      }
+    });
+
+    return {
+      success: true,
+      email: user.email,
+      temporaryPassword: securePass,
+    };
+  }
+
+  @Post('impersonate/end')
+  async endImpersonation(@Request() req) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'SUPPORT_MANAGER'
+    ]);
+    const activeSession = await this.prisma.impersonationSession.findFirst({
+      where: {
+        founderId: req.user.id,
+        endedAt: null,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (activeSession) {
+      await this.prisma.impersonationSession.update({
+        where: { id: activeSession.id },
+        data: { endedAt: new Date() },
+      });
+    }
+
+    return { success: true };
   }
 }
 

@@ -16,6 +16,17 @@ export class SetupService {
     if (this.verifiedInstitutions.has(institutionId)) return;
 
     try {
+      // Fast indexed precheck to skip heavy transaction if institution config is already set up and verified
+      const setupStatus = await this.prisma.organizationSetupStatus.findUnique({
+        where: { institutionId },
+        select: { setupCompleted: true, wizardVersion: true },
+      });
+
+      if (setupStatus?.setupCompleted && setupStatus?.wizardVersion === '2.0') {
+        this.verifiedInstitutions.add(institutionId);
+        return;
+      }
+
       await this.prisma.$transaction(async (tx) => {
         // 1. Fetch the institution to identify the industry pack
         const institution = await tx.institution.findUnique({

@@ -274,11 +274,12 @@ export default function ProductOperationsPage() {
   };
 
   // Launch a direct preset persona
-  const handleLaunchPersona = async (email: string) => {
+  const handleLaunchPersona = async (email: string, customPass?: string) => {
     setLoading(true);
     setError('');
+    const actualPass = customPass || 'Password@2026';
     try {
-      const data = await loginApi(email, 'Password@2026');
+      const data = await loginApi(email, actualPass);
       triggerToast(`Authenticated as ${email}`);
       
       if (data.memberships && data.memberships.length > 1) {
@@ -294,7 +295,7 @@ export default function ProductOperationsPage() {
       // Impersonation fallback for founder@aurxon.com specifically
       if (email === 'founder@aurxon.com') {
         try {
-          const data = await loginApi(email, 'Aurxon@Founder2026');
+          const data = await loginApi(email, 'Aurxon@2026');
           triggerToast('Authenticated successfully as platform founder.');
           router.push('/dashboard');
           return;
@@ -334,8 +335,8 @@ export default function ProductOperationsPage() {
 
   const loadWorkspacePreset = (preset: string) => {
     if (preset === 'school') {
-      setOrgId('inst-gvis');
-      setOrgName('Green Valley International School');
+      setOrgId('greenvalley');
+      setOrgName('Green Valley School');
       setIndustryPack('SCHOOL_ERP');
       setPrimaryColor('#0284c7');
       setLogoUrl('https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200');
@@ -604,29 +605,29 @@ export default function ProductOperationsPage() {
               </form>
             </div>
 
-            {/* Validate User Personas */}
             <div className="glass rounded-3xl p-6 border border-slate-900 shadow-xl space-y-4">
               <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Validate User Personas (GVIS Demo)</h3>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Validate User Personas (Green Valley Demo)</h3>
                 <p className="text-[11px] text-zinc-500 mt-1 font-semibold leading-relaxed">
-                  Verify specific customer roles directly using pre-seeded Green Valley International School database. Bypasses setup wizard config to test complete journeys.
+                  Verify specific customer roles directly using pre-seeded Green Valley School database. Bypasses setup wizard config to test complete journeys.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { name: 'Founder Reviewer', email: 'founder@aurxon.com', role: 'SUPER_ADMIN', desc: 'Approve registrations, evaluate platform storage thresholds, resolve security warnings.', icon: Shield },
-                  { name: 'GVIS School Principal', email: 'principal@gvis.edu', role: 'PRINCIPAL', desc: 'Audit class timetables, review teacher schedules, track outstanding term fees.', icon: GraduationCap },
-                  { name: 'GVIS Academics Teacher', email: 'teacher@gvis.edu', role: 'TEACHER', desc: 'Verify period student attendance records and examination marks entry.', icon: UserCheck },
-                  { name: 'GVIS Student Desk', email: 'student@gvis.edu', role: 'STUDENT', desc: 'Check report cards, view assignments, check attendance rates.', icon: Users },
-                  { name: 'GVIS Parent Billing', email: 'parent@gvis.edu', role: 'PARENT', desc: 'Audit fee invoices, make payments, track children attendance.', icon: CreditCard },
-                  { name: 'GVIS School Accountant', email: 'accountant@gvis.edu', role: 'ACCOUNTANT', desc: 'Record expense logs, process fee receipts, process pay slips.', icon: CreditCard }
+                  { name: 'Founder Reviewer', email: 'founder@aurxon.com', password: 'Aurxon@2026', role: 'SUPER_ADMIN', desc: 'Approve registrations, evaluate platform storage thresholds, resolve security warnings.', icon: Shield },
+                  { name: 'Green Valley Admin', email: 'admin@gvschool.edu', password: 'Green@123', role: 'INSTITUTE_ADMIN', desc: 'Manage institution parameters, setup wizard checkpoints, academic years config.', icon: UserCheck },
+                  { name: 'Green Valley Principal', email: 'principal@gvschool.edu', password: 'Green@123', role: 'PRINCIPAL', desc: 'Audit class timetables, review teacher schedules, track outstanding term fees.', icon: GraduationCap },
+                  { name: 'Green Valley Teacher', email: 'teacher01@gvschool.edu', password: 'Green@123', role: 'TEACHER', desc: 'Verify period student attendance records and examination marks entry.', icon: UserCheck },
+                  { name: 'Green Valley Student', email: 'student1001@gvschool.edu', password: 'Green@123', role: 'STUDENT', desc: 'Check report cards, view assignments, check attendance rates.', icon: Users },
+                  { name: 'Green Valley Parent', email: 'parent1001@gvschool.edu', password: 'Green@123', role: 'PARENT', desc: 'Audit fee invoices, make payments, track children attendance.', icon: CreditCard },
+                  { name: 'Green Valley Accountant', email: 'accounts@gvschool.edu', password: 'Green@123', role: 'ACCOUNTANT', desc: 'Record expense logs, process fee receipts, process pay slips.', icon: CreditCard }
                 ].map(persona => {
                   const Icon = persona.icon;
                   return (
                     <button
                       key={persona.email}
-                      onClick={() => handleLaunchPersona(persona.email)}
+                      onClick={() => handleLaunchPersona(persona.email, persona.password)}
                       disabled={loading}
                       className="p-4 rounded-2xl border border-slate-900 bg-slate-950/30 hover:bg-slate-950/80 text-left transition flex gap-4 hover-lift"
                     >

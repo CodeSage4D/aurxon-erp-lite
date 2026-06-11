@@ -8,16 +8,16 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() body: { email: string; pass?: string; password?: string }) {
+  async login(@Body() body: { email: string; pass?: string; password?: string; tenantSlug?: string }) {
     const password = body.password || body.pass || '';
-    return this.authService.login(body.email, password);
+    return this.authService.login(body.email, password, body.tenantSlug);
   }
 
   @HttpCode(HttpStatus.OK)
   @Post('founder/login')
-  async founderLogin(@Body() body: { email: string; pass?: string; password?: string }) {
+  async founderLogin(@Body() body: { email: string; pass?: string; password?: string; tenantSlug?: string }) {
     const password = body.password || body.pass || '';
-    return this.authService.founderLogin(body.email, password);
+    return this.authService.founderLogin(body.email, password, body.tenantSlug);
   }
 
   @UseGuards(JwtAuthGuard)

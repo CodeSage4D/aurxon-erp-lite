@@ -51,6 +51,14 @@ export default function FounderLoginPage() {
     try {
       const data = await founderLoginApi(email.trim(), password);
 
+      if (data.user && data.user.role !== 'SUPER_ADMIN' && !data.user.teamRole) {
+        setError('Access denied. Only AURXON platform founders and internal team members are authorized.');
+        localStorage.removeItem('aurxon_token');
+        localStorage.removeItem('aurxon_user');
+        localStorage.removeItem('aurxon_memberships');
+        return;
+      }
+
       localStorage.setItem('aurxon_token', data.access_token);
       localStorage.setItem('aurxon_user', JSON.stringify(data.user));
       localStorage.setItem('aurxon_memberships', JSON.stringify(data.memberships || []));

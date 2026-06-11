@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   KeyRound, ArrowRight, CheckCircle2, AlertCircle, Shield,
-  Loader2, Copy, Check, LogIn, Building2
+  Loader2, Copy, Check, LogIn, Building2, Plus, Trash2
 } from 'lucide-react';
 import { verifyActivationKeyApi } from '@/lib/api';
 
@@ -19,6 +19,25 @@ export default function ActivatePage() {
   const [success, setSuccess] = useState(false);
   const [activationData, setActivationData] = useState<any>(null);
   const [copied, setCopied] = useState('');
+
+  const [hasMultipleBranches, setHasMultipleBranches] = useState(false);
+  const [branches, setBranches] = useState<Array<{ name: string; code: string; city: string; address: string }>>([
+    { name: '', code: '', city: '', address: '' }
+  ]);
+
+  const addBranch = () => {
+    setBranches([...branches, { name: '', code: '', city: '', address: '' }]);
+  };
+
+  const removeBranch = (index: number) => {
+    setBranches(branches.filter((_, i) => i !== index));
+  };
+
+  const updateBranch = (index: number, field: string, val: string) => {
+    const next = [...branches];
+    next[index] = { ...next[index], [field]: val };
+    setBranches(next);
+  };
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -45,10 +64,18 @@ export default function ActivatePage() {
 
     setLoading(true);
     try {
+      let payloadComments = comments.trim();
+      if (hasMultipleBranches) {
+        const validBranches = branches.filter(b => b.name.trim());
+        if (validBranches.length > 0) {
+          payloadComments = `${payloadComments}\nBRANCH_DETAILS:${JSON.stringify(validBranches)}`;
+        }
+      }
+
       const data = await verifyActivationKeyApi(
         referenceNumber.trim(),
         activationKey.trim(),
-        comments.trim() || undefined
+        payloadComments || undefined
       );
       setActivationData(data);
       setSuccess(true);
@@ -246,6 +273,119 @@ export default function ActivatePage() {
               autoComplete="off"
             />
           </div>
+
+          {/* Branch Customization UI */}
+          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-2xl">
+            <input
+              id="has-multiple-branches-checkbox"
+              type="checkbox"
+              checked={hasMultipleBranches}
+              onChange={e => setHasMultipleBranches(e.target.checked)}
+              disabled={loading}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            />
+            <label htmlFor="has-multiple-branches-checkbox" className="text-xs font-bold text-gray-700 cursor-pointer select-none">
+              Configure Multiple Branches / Campuses
+            </label>
+          </div>
+
+          {hasMultipleBranches && (
+            <div className="space-y-4 p-4 border border-indigo-100 bg-indigo-50/20 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-indigo-600">
+                  Branch/Campus Details
+                </span>
+                <button
+                  type="button"
+                  onClick={addBranch}
+                  disabled={loading}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition-all flex items-center gap-1 active:scale-95"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Branch
+                </button>
+              </div>
+
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                {branches.map((branch, index) => (
+                  <div key={index} className="p-3 bg-white border border-gray-150 rounded-xl space-y-2 relative group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-400">Branch #{index + 1}</span>
+                      {branches.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeBranch(index)}
+                          disabled={loading}
+                          className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          Branch Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={branch.name}
+                          onChange={e => updateBranch(index, 'name', e.target.value)}
+                          placeholder="e.g. Salt Lake Campus"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-800 placeholder-gray-300 focus:outline-none focus:border-indigo-400 focus:bg-white transition"
+                          disabled={loading}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          Branch Code
+                        </label>
+                        <input
+                          type="text"
+                          value={branch.code}
+                          onChange={e => updateBranch(index, 'code', e.target.value.toUpperCase())}
+                          placeholder="e.g. SLC-01"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-800 placeholder-gray-300 focus:outline-none focus:border-indigo-400 focus:bg-white transition"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          value={branch.city}
+                          onChange={e => updateBranch(index, 'city', e.target.value)}
+                          placeholder="e.g. Kolkata"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-800 placeholder-gray-300 focus:outline-none focus:border-indigo-400 focus:bg-white transition"
+                          disabled={loading}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                          Address
+                        </label>
+                        <input
+                          type="text"
+                          value={branch.address}
+                          onChange={e => updateBranch(index, 'address', e.target.value)}
+                          placeholder="e.g. Sector 5, Block EP"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-800 placeholder-gray-300 focus:outline-none focus:border-indigo-400 focus:bg-white transition"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="text-xs font-black uppercase tracking-wider text-gray-500">

@@ -19,7 +19,8 @@ import {
   getActivationKeysApi, revokeActivationKeyApi, suspendActivationKeyApi, renewActivationKeyApi, regenerateActivationKeyApi,
   getRenewalRequestsApi, approveRenewalRequestApi, founderDirectRenewalApi,
   technicalReviewRegistrationApi, provisionWorkspaceApi,
-  verifyRegistrationManualApi, resendVerificationOtpApi
+  verifyRegistrationManualApi, resendVerificationOtpApi,
+  suspendInstitutionApi, resumeInstitutionApi, resetUserPasswordApi
 } from '@/lib/api';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -78,6 +79,9 @@ export default function FounderDashboardPage() {
   const [selectedImpersonateOrg, setSelectedImpersonateOrg] = useState('');
   const [impersonateReason, setImpersonateReason] = useState('');
   const [impersonateTicket, setImpersonateTicket] = useState('');
+
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{ email: string; temporaryPassword: string } | null>(null);
 
   const [selectedMatrixRoleId, setSelectedMatrixRoleId] = useState('');
   const [matrixEdits, setMatrixEdits] = useState<Record<string, boolean>>({});
@@ -405,6 +409,48 @@ export default function FounderDashboardPage() {
       window.open('/dashboard', '_blank');
     } catch (err: any) {
       triggerToast(err.message || 'Impersonation failed', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSuspendOrg = async (id: string) => {
+    if (!confirm('Are you sure you want to suspend this organization workspace? Users will be blocked from logging in.')) return;
+    setSubmitting(true);
+    try {
+      await suspendInstitutionApi(id);
+      triggerToast('Workspace suspended successfully', 'success');
+      loadDashboardData();
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to suspend workspace', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResumeOrg = async (id: string) => {
+    setSubmitting(true);
+    try {
+      await resumeInstitutionApi(id);
+      triggerToast('Workspace resumed successfully', 'success');
+      loadDashboardData();
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to resume workspace', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetUserPassword = async (userId: string) => {
+    if (!confirm('Are you sure you want to reset this user\'s password? A temporary password will be generated.')) return;
+    setSubmitting(true);
+    try {
+      const res = await resetUserPasswordApi(userId);
+      setResetPasswordResult(res);
+      setResetPasswordModalOpen(true);
+      triggerToast('Password reset successful', 'success');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to reset password', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1096,21 +1142,85 @@ export default function FounderDashboardPage() {
                                 )}
 
                                 {isProvisioned && reg.activationKey && (
-                                  <div className="p-3 rounded-xl border border-border bg-secondary/20 w-full flex items-center justify-between flex-wrap gap-3">
-                                    <div>
-                                      <span className="text-[7px] font-black uppercase text-zinc-500 tracking-wider">Activation Key</span>
-                                      <p className="text-xs font-mono font-black text-foreground select-all">{reg.activationKey.id}</p>
+                                  <div className="p-4 rounded-2xl border border-border bg-secondary/10 w-full space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                      <div className="space-y-1">
+                                        <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Reference Number</span>
+                                        <div className="flex items-center gap-1.5 font-mono font-black text-foreground">
+                                          <span>{reg.referenceNumber}</span>
+                                          <button
+                                            onClick={() => copyToClipboard(reg.referenceNumber)}
+                                            className="p-1 rounded bg-card hover:bg-muted border border-border text-zinc-400 hover:text-foreground transition"
+                                            title="Copy Reference Number"
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-1">
+                                        <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider">Activation License Key (Secure Hash stored in DB)</span>
+                                        <div className="flex items-center gap-1.5 font-mono font-black text-primary">
+                                          <span>{reg.activationKey.rawKey || 'Secure Key'}</span>
+                                          <button
+                                            onClick={() => copyToClipboard(reg.activationKey.rawKey || '')}
+                                            className="p-1 rounded bg-card hover:bg-muted border border-border text-zinc-400 hover:text-foreground transition"
+                                            title="Copy Key"
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {reg.institution?.tenant?.slug && (
+                                        <div className="space-y-1 md:col-span-2">
+                                          <span className="text-[8px] font-black uppercase text-zinc-500 tracking-wider font-sans">Subdomain Workspace URL</span>
+                                          <div className="flex items-center gap-2 flex-wrap font-mono font-bold text-foreground">
+                                            <a
+                                              href={`http://${reg.institution.tenant.slug}.localhost:3000`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-primary hover:underline"
+                                            >
+                                              {`http://${reg.institution.tenant.slug}.localhost:3000`}
+                                            </a>
+                                            <span className="text-zinc-500">|</span>
+                                            <span className="text-zinc-400">{`${reg.institution.tenant.slug}.aurxon.com`}</span>
+                                            <button
+                                              onClick={() => copyToClipboard(`http://${reg.institution.tenant.slug}.localhost:3000`)}
+                                              className="p-1 rounded bg-card hover:bg-muted border border-border text-zinc-400 hover:text-foreground transition"
+                                              title="Copy URL"
+                                            >
+                                              <Copy className="h-3 w-3" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="flex gap-1.5">
-                                      {[
-                                        { icon: Copy, fn: () => copyToClipboard(reg.activationKey.id), tip: 'Copy' },
-                                        { icon: Mail, fn: () => triggerToast(`Key emailed to ${reg.orgName}.`), tip: 'Email' },
-                                        { icon: Download, fn: () => downloadKeyFile(reg.orgName, reg.activationKey.id), tip: 'Download' },
-                                      ].map(({ icon: Icon, fn, tip }) => (
-                                        <button key={tip} onClick={fn} title={tip} className="p-2 bg-card border border-border rounded-xl text-zinc-400 hover:text-foreground hover:bg-secondary/60 transition">
-                                          <Icon className="h-3.5 w-3.5" />
-                                        </button>
-                                      ))}
+
+                                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/40">
+                                      <div className="flex gap-1.5">
+                                        {[
+                                          { icon: Mail, fn: () => triggerToast(`Unified Activation License Key emailed to ${reg.orgName}.`), tip: 'Email Key' },
+                                          { icon: Download, fn: () => downloadKeyFile(reg.orgName, reg.activationKey.rawKey || ''), tip: 'Download License' },
+                                        ].map(({ icon: Icon, fn, tip }) => (
+                                          <button key={tip} onClick={fn} title={tip} className="p-2 bg-card border border-border rounded-xl text-zinc-400 hover:text-foreground hover:bg-secondary/60 transition flex items-center gap-1 text-[10px] font-bold">
+                                            <Icon className="h-3.5 w-3.5" />
+                                            <span>{tip}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+
+                                      {reg.institution?.tenant?.slug && (
+                                        <a
+                                          href={`http://${reg.institution.tenant.slug}.localhost:3000/activate?ref=${reg.referenceNumber}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-[10px] font-black uppercase rounded-xl shadow-md shadow-primary/20 transition flex items-center gap-1.5 animate-pulse"
+                                        >
+                                          <Shield className="h-3.5 w-3.5" /> Launch Subdomain Activation
+                                        </a>
+                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1194,12 +1304,31 @@ export default function FounderDashboardPage() {
                                   <span className="h-3 w-3 rounded" style={{ backgroundColor: org.primaryColor }} />
                                   <span className="text-[9px] font-mono text-zinc-500">{org.primaryColor}</span>
                                 </div>
-                                <button
-                                  onClick={() => { setSelectedImpersonateOrg(org.id); handleTabChange('support'); }}
-                                  className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-[10px] font-black text-primary border border-border"
-                                >
-                                  Diagnose
-                                </button>
+                                <div className="flex gap-2">
+                                  {org.status === 'SUSPENDED' ? (
+                                    <button
+                                      onClick={() => handleResumeOrg(org.id)}
+                                      disabled={submitting}
+                                      className="px-3 py-1.5 rounded-xl bg-emerald-600/10 hover:bg-emerald-600/20 text-[10px] font-black text-emerald-500 border border-emerald-500/20 disabled:opacity-50 transition"
+                                    >
+                                      Resume
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleSuspendOrg(org.id)}
+                                      disabled={submitting}
+                                      className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-500 border border-red-500/20 disabled:opacity-50 transition"
+                                    >
+                                      Suspend
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => { setSelectedImpersonateOrg(org.id); handleTabChange('support'); }}
+                                    className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-[10px] font-black text-primary border border-border"
+                                  >
+                                    Diagnose
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -1694,20 +1823,34 @@ export default function FounderDashboardPage() {
                   {searchingBackend && <p className="text-[10px] text-zinc-500 italic px-2 animate-pulse">Querying indexes...</p>}
                   {!searchingBackend && backendSearchResults.length === 0 && <p className="text-[10px] text-zinc-500 italic px-2">No records found.</p>}
                   {!searchingBackend && backendSearchResults.map((item, idx) => (
-                    <button
+                    <div
                       key={idx}
-                      onClick={() => { handleTabChange(item.href); setCommandPaletteOpen(false); }}
-                      className="w-full flex items-center justify-between p-2 rounded-xl text-left hover:bg-secondary/40 transition border border-transparent hover:border-border"
+                      className="w-full flex items-center justify-between p-2 rounded-xl border border-transparent hover:border-border hover:bg-secondary/40 transition group"
                     >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">{item.type}</span>
-                          <p className="text-xs font-bold text-foreground">{item.label}</p>
+                      <button
+                        onClick={() => { handleTabChange(item.href); setCommandPaletteOpen(false); }}
+                        className="flex-1 flex items-center justify-between text-left"
+                      >
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">{item.type}</span>
+                            <p className="text-xs font-bold text-foreground">{item.label}</p>
+                          </div>
+                          <p className="text-[9px] text-zinc-500 mt-0.5 font-mono">{item.sublabel}</p>
                         </div>
-                        <p className="text-[9px] text-zinc-500 mt-0.5 font-mono">{item.sublabel}</p>
-                      </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
-                    </button>
+                      </button>
+                      
+                      {item.type === 'User Login' && (
+                        <button
+                          onClick={() => handleResetUserPassword(item.id)}
+                          className="ml-2 px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-[9px] font-black uppercase border border-red-500/20 shrink-0 transition"
+                        >
+                          Reset Pass
+                        </button>
+                      )}
+                      
+                      <ChevronRight className="h-3.5 w-3.5 text-zinc-500 ml-2 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
                   ))}
                 </div>
               )}
@@ -1735,6 +1878,68 @@ export default function FounderDashboardPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ RESET PASSWORD MODAL ════ */}
+      {resetPasswordModalOpen && resetPasswordResult && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setResetPasswordModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <span className="text-[9px] font-black uppercase tracking-widest text-red-500">Security Override</span>
+                <h3 className="text-sm font-black text-foreground uppercase tracking-wider">Temporary Password Generated</h3>
+              </div>
+              <button
+                onClick={() => setResetPasswordModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-secondary text-zinc-400"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-xl border border-border bg-secondary/20 space-y-3">
+              <div className="text-xs">
+                <span className="text-zinc-500 font-semibold">User Email:</span>
+                <p className="font-bold text-foreground mt-0.5">{resetPasswordResult.email}</p>
+              </div>
+
+              <div className="text-xs">
+                <span className="text-zinc-500 font-semibold">Temporary Passphrase:</span>
+                <div className="flex items-center gap-2 mt-1 bg-background border border-border p-2 rounded-lg font-mono text-foreground font-black text-sm relative">
+                  <span className="flex-1 select-all">{resetPasswordResult.temporaryPassword}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(resetPasswordResult.temporaryPassword);
+                      triggerToast('Password copied to clipboard!', 'success');
+                    }}
+                    className="p-1.5 bg-secondary hover:bg-secondary/80 rounded border border-border text-zinc-400 hover:text-foreground transition"
+                    title="Copy to clipboard"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-550/20 p-3.5 rounded-xl text-[10px] text-amber-500 flex gap-2.5 font-semibold">
+              <Info className="h-4 w-4 shrink-0 mt-0.5" />
+              <p>For security, the user will be forced to change this temporary passphrase immediately upon their next successful workspace login.</p>
+            </div>
+
+            <button
+              onClick={() => setResetPasswordModalOpen(false)}
+              className="w-full py-2.5 bg-primary hover:bg-hover text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-primary/25"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}

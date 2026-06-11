@@ -34,10 +34,27 @@ export default function SetupWizardPage() {
     }
   });
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     document.documentElement.classList.add('dark');
     verifySetup();
   }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved configuration changes. Are you sure you want to exit onboarding?';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  if (!mounted) return null;
 
   const verifySetup = async () => {
     try {

@@ -7,6 +7,7 @@ import * as argon2 from 'argon2';
 import * as bcryptjs from 'bcryptjs';
 import { NotificationService } from '../../08_Communication/InAppAlerts/notification.service';
 import { NotificationCategory } from '@prisma/client';
+import { decrypt } from '../../common/utils/crypto';
 
 @Injectable()
 export class RegistrationService {
@@ -154,7 +155,7 @@ export class RegistrationService {
     if (status) {
       where.status = status;
     }
-    return this.prisma.organizationRegistration.findMany({
+    const regs = await this.prisma.organizationRegistration.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -165,6 +166,11 @@ export class RegistrationService {
             name: true,
             status: true,
             license: true,
+            tenant: {
+              select: {
+                slug: true,
+              }
+            }
           },
         },
         activationKey: {
@@ -172,9 +178,33 @@ export class RegistrationService {
             id: true,
             status: true,
             expiresAt: true,
+            encryptedPackage: true,
           },
         },
       },
+    });
+
+    return regs.map(reg => {
+      let rawKey = null;
+      if (reg.activationKey && reg.activationKey.encryptedPackage) {
+        try {
+          const decrypted = JSON.parse(decrypt(reg.activationKey.encryptedPackage));
+          rawKey = decrypted.activationKey;
+        } catch (e) {
+          console.warn('Failed to decrypt activation key for registration:', reg.id, e.message);
+        }
+      }
+      
+      const { activationKey, ...rest } = reg;
+      return {
+        ...rest,
+        activationKey: activationKey ? {
+          id: activationKey.id,
+          status: activationKey.status,
+          expiresAt: activationKey.expiresAt,
+          rawKey: rawKey,
+        } : null,
+      };
     });
   }
 

@@ -313,7 +313,7 @@ async function main() {
     }
   });
 
-  const founderHash = await bcrypt.hash('AurxonFuture$136', 10);
+  const founderHash = await bcrypt.hash('Aurxon@2026', 10);
   const founderUser = await prisma.user.create({
     data: {
       email: 'founder@aurxon.com',
@@ -332,6 +332,7 @@ async function main() {
   });
 
   const teamMembers = [
+    { email: 'admin@aurxon.com', password: 'Aurxon@2026', role: 'SUPER_ADMIN' },
     { email: 'ceo@aurxon.com', password: 'CEO@Aurxon2026', role: 'CEO' },
     { email: 'coo@aurxon.com', password: 'COO@Aurxon2026', role: 'COO' },
     { email: 'finance@aurxon.com', password: 'Finance@Aurxon2026', role: 'FINANCE_MANAGER' },
@@ -365,56 +366,79 @@ async function main() {
   // 6. Seed the 4 Demo Organizations + 2 Validation Organizations
   const demoOrgs = [
     {
-      name: 'Green Valley International School',
-      email: 'admin@gvis.edu',
-      password: 'GVIS@2026',
-      subdomain: 'greenvalley.aurxon.com',
-      ownerName: 'Rajesh Sharma',
-      principalName: 'Anita Verma',
+      name: 'Green Valley School',
+      subdomain: 'greenvalley.aurxon-erp-lite.vercel.app',
+      slug: 'greenvalley',
+      primaryColor: '#0284c7',
+      board: 'CBSE',
       phone: '+91 9876543210',
       city: 'Bhopal',
       state: 'Madhya Pradesh',
-      board: 'CBSE',
-      primaryColor: '#0284c7'
+      ownerName: 'Rajesh Sharma',
+      principalName: 'Anita Verma',
+      personas: [
+        { roleCode: 'INSTITUTE_ADMIN', name: 'Rajesh Sharma', email: 'admin@gvschool.edu', password: 'Green@123' },
+        { roleCode: 'PRINCIPAL', name: 'Anita Verma', email: 'principal@gvschool.edu', password: 'Green@123' },
+        { roleCode: 'TEACHER', name: 'Alok Sen', email: 'teacher01@gvschool.edu', password: 'Green@123' },
+        { roleCode: 'ACCOUNTANT', name: 'Vikas Kumar', email: 'accounts@gvschool.edu', password: 'Green@123' },
+        { roleCode: 'STUDENT', name: 'Rahul Sharma', email: 'student1001@gvschool.edu', password: 'Green@123' },
+        { roleCode: 'PARENT', name: 'Karan Sharma', email: 'parent1001@gvschool.edu', password: 'Green@123' },
+        { roleCode: 'STAFF', name: 'Sunita Roy', email: 'reception@gvschool.edu', password: 'Green@123', designation: 'RECEPTIONIST' },
+        { roleCode: 'STAFF', name: 'Amit Verma', email: 'hr@gvschool.edu', password: 'Green@123', designation: 'HR' },
+        { roleCode: 'STAFF', name: 'Rohit Joshi', email: 'library@gvschool.edu', password: 'Green@123', designation: 'LIBRARY' },
+        { roleCode: 'STAFF', name: 'Manoj Singh', email: 'transport@gvschool.edu', password: 'Green@123', designation: 'TRANSPORT' },
+        { roleCode: 'STAFF', name: 'Sanjay Rawat', email: 'admission@gvschool.edu', password: 'Green@123', designation: 'ADMISSION_OFFICER' }
+      ]
     },
     {
-      name: 'Bright Future Academy',
-      email: 'admin@bfa.edu',
-      password: 'BFA@2026',
-      subdomain: 'brightfuture.aurxon.com',
-      ownerName: 'Sanjay Gupta',
-      principalName: 'Priya Singh',
+      name: 'Sunrise Public School',
+      subdomain: 'sunrise.aurxon-erp-lite.vercel.app',
+      slug: 'sunrise',
+      primaryColor: '#4f46e5',
+      board: 'CBSE',
       phone: '+91 9988776655',
       city: 'Delhi',
       state: 'Delhi',
-      board: 'CBSE',
-      primaryColor: '#0284c7'
+      ownerName: 'Sanjay Gupta',
+      principalName: 'Priya Singh',
+      personas: [
+        { roleCode: 'INSTITUTE_ADMIN', name: 'Sanjay Gupta', email: 'admin@sunriseps.edu', password: 'Sunrise@123' },
+        { roleCode: 'PRINCIPAL', name: 'Priya Singh', email: 'principal@sunriseps.edu', password: 'Sunrise@123' },
+        { roleCode: 'TEACHER', name: 'Alok Sen', email: 'teacher01@sunriseps.edu', password: 'Sunrise@123' },
+        { roleCode: 'ACCOUNTANT', name: 'Vikas Kumar', email: 'finance@sunriseps.edu', password: 'Sunrise@123' },
+        { roleCode: 'STUDENT', name: 'Rahul Sharma', email: 'student1001@sunriseps.edu', password: 'Sunrise@123' },
+        { roleCode: 'PARENT', name: 'Karan Sharma', email: 'parent1001@sunriseps.edu', password: 'Sunrise@123' },
+        { roleCode: 'STAFF', name: 'Sunita Roy', email: 'reception@sunriseps.edu', password: 'Sunrise@123', designation: 'RECEPTIONIST' },
+        { roleCode: 'STAFF', name: 'Amit Verma', email: 'hr@sunriseps.edu', password: 'Sunrise@123', designation: 'HR' },
+        { roleCode: 'STAFF', name: 'Rohit Joshi', email: 'library@sunriseps.edu', password: 'Sunrise@123', designation: 'LIBRARY' },
+        { roleCode: 'STAFF', name: 'Manoj Singh', email: 'transport@sunriseps.edu', password: 'Sunrise@123', designation: 'TRANSPORT' },
+        { roleCode: 'STAFF', name: 'Sanjay Rawat', email: 'admission@sunriseps.edu', password: 'Sunrise@123', designation: 'ADMISSION_OFFICER' }
+      ]
     },
     {
-      name: 'Delhi Heights Public School',
-      email: 'admin@dhps.edu',
-      password: 'DHPS@2026',
-      subdomain: 'delhiheights.aurxon.com',
-      ownerName: 'Vivek Kapoor',
-      principalName: 'Neha Arora',
-      phone: '+91 8877665544',
-      city: 'Delhi',
-      state: 'Delhi',
+      name: 'Oxford International School',
+      subdomain: 'oxford.aurxon-erp-lite.vercel.app',
+      slug: 'oxford',
+      primaryColor: '#0d9488',
       board: 'CBSE',
-      primaryColor: '#0284c7'
-    },
-    {
-      name: 'Scholars World School',
-      email: 'admin@sws.edu',
-      password: 'SWS@2026',
-      subdomain: 'scholarsworld.aurxon.com',
-      ownerName: 'Ashok Jain',
-      principalName: 'Ritika Sharma',
       phone: '+91 7766554433',
       city: 'Jaipur',
       state: 'Rajasthan',
-      board: 'CBSE',
-      primaryColor: '#0284c7'
+      ownerName: 'Ashok Jain',
+      principalName: 'Ritika Sharma',
+      personas: [
+        { roleCode: 'INSTITUTE_ADMIN', name: 'Ashok Jain', email: 'admin@oxfordis.edu', password: 'Oxford@123' },
+        { roleCode: 'PRINCIPAL', name: 'Ritika Sharma', email: 'principal@oxfordis.edu', password: 'Oxford@123' },
+        { roleCode: 'TEACHER', name: 'Alok Sen', email: 'teacher01@oxfordis.edu', password: 'Oxford@123' },
+        { roleCode: 'ACCOUNTANT', name: 'Vikas Kumar', email: 'accounts@oxfordis.edu', password: 'Oxford@123' },
+        { roleCode: 'STUDENT', name: 'Rahul Sharma', email: 'student1001@oxfordis.edu', password: 'Oxford@123' },
+        { roleCode: 'PARENT', name: 'Karan Sharma', email: 'parent1001@oxfordis.edu', password: 'Oxford@123' },
+        { roleCode: 'STAFF', name: 'Sunita Roy', email: 'reception@oxfordis.edu', password: 'Oxford@123', designation: 'RECEPTIONIST' },
+        { roleCode: 'STAFF', name: 'Amit Verma', email: 'hr@oxfordis.edu', password: 'Oxford@123', designation: 'HR' },
+        { roleCode: 'STAFF', name: 'Rohit Joshi', email: 'library@oxfordis.edu', password: 'Oxford@123', designation: 'LIBRARY' },
+        { roleCode: 'STAFF', name: 'Manoj Singh', email: 'transport@oxfordis.edu', password: 'Oxford@123', designation: 'TRANSPORT' },
+        { roleCode: 'STAFF', name: 'Sanjay Rawat', email: 'admission@oxfordis.edu', password: 'Oxford@123', designation: 'ADMISSION_OFFICER' }
+      ]
     },
     {
       name: 'Ramakrishna Mission Vidyapith',
@@ -447,7 +471,7 @@ async function main() {
   for (const org of demoOrgs) {
     console.log(`Seeding ${org.name}...`);
     // 6a. Create Tenant
-    const baseSlug = org.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const baseSlug = org.slug || org.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const tenant = await prisma.tenant.create({
       data: {
         name: org.name,
@@ -605,19 +629,20 @@ async function main() {
     });
 
     // 6c. Generate all 10 persona users for this organization
-    const personas = [
-      { roleCode: 'INSTITUTE_ADMIN', name: org.ownerName, email: org.email, password: org.password },
-      { roleCode: 'PRINCIPAL', name: org.principalName, email: `principal@${org.email.split('@')[1]}`, password: 'Password@2026' },
-      { roleCode: 'TEACHER', name: 'Alok Sen', email: `teacher@${org.email.split('@')[1]}`, password: 'Password@2026' },
-      { roleCode: 'STUDENT', name: 'Rahul Sharma', email: `student@${org.email.split('@')[1]}`, password: 'Password@2026' },
-      { roleCode: 'PARENT', name: 'Karan Sharma', email: `parent@${org.email.split('@')[1]}`, password: 'Password@2026' },
-      { roleCode: 'ACCOUNTANT', name: 'Vikas Kumar', email: `accountant@${org.email.split('@')[1]}`, password: 'Password@2026' },
+    const orgAny = org as any;
+    const personas = orgAny.personas || [
+      { roleCode: 'INSTITUTE_ADMIN', name: orgAny.ownerName, email: orgAny.email, password: orgAny.password },
+      { roleCode: 'PRINCIPAL', name: orgAny.principalName, email: `principal@${orgAny.email.split('@')[1]}`, password: 'Password@2026' },
+      { roleCode: 'TEACHER', name: 'Alok Sen', email: `teacher@${orgAny.email.split('@')[1]}`, password: 'Password@2026' },
+      { roleCode: 'STUDENT', name: 'Rahul Sharma', email: `student@${orgAny.email.split('@')[1]}`, password: 'Password@2026' },
+      { roleCode: 'PARENT', name: 'Karan Sharma', email: `parent@${orgAny.email.split('@')[1]}`, password: 'Password@2026' },
+      { roleCode: 'ACCOUNTANT', name: 'Vikas Kumar', email: `accountant@${orgAny.email.split('@')[1]}`, password: 'Password@2026' },
       // The remaining 5 personas (mapped to STAFF role in membership but tracking different designations in profiles)
-      { roleCode: 'STAFF', name: 'Sunita Roy', email: `reception@${org.email.split('@')[1]}`, password: 'Password@2026', designation: 'RECEPTIONIST' },
-      { roleCode: 'STAFF', name: 'Amit Verma', email: `hr@${org.email.split('@')[1]}`, password: 'Password@2026', designation: 'HR' },
-      { roleCode: 'STAFF', name: 'Rohit Joshi', email: `library@${org.email.split('@')[1]}`, password: 'Password@2026', designation: 'LIBRARY' },
-      { roleCode: 'STAFF', name: 'Manoj Singh', email: `transport@${org.email.split('@')[1]}`, password: 'Password@2026', designation: 'TRANSPORT' },
-      { roleCode: 'STAFF', name: 'Sanjay Rawat', email: `admission@${org.email.split('@')[1]}`, password: 'Password@2026', designation: 'ADMISSION_OFFICER' }
+      { roleCode: 'STAFF', name: 'Sunita Roy', email: `reception@${orgAny.email.split('@')[1]}`, password: 'Password@2026', designation: 'RECEPTIONIST' },
+      { roleCode: 'STAFF', name: 'Amit Verma', email: `hr@${orgAny.email.split('@')[1]}`, password: 'Password@2026', designation: 'HR' },
+      { roleCode: 'STAFF', name: 'Rohit Joshi', email: `library@${orgAny.email.split('@')[1]}`, password: 'Password@2026', designation: 'LIBRARY' },
+      { roleCode: 'STAFF', name: 'Manoj Singh', email: `transport@${orgAny.email.split('@')[1]}`, password: 'Password@2026', designation: 'TRANSPORT' },
+      { roleCode: 'STAFF', name: 'Sanjay Rawat', email: `admission@${orgAny.email.split('@')[1]}`, password: 'Password@2026', designation: 'ADMISSION_OFFICER' }
     ];
 
     // Create a default Class for student mappings

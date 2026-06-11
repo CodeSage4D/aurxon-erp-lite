@@ -91,7 +91,13 @@ export default function DashboardPage() {
     setIsImpersonating(localStorage.getItem('aurxon_impersonating') === 'true');
   }, []);
 
-  const handleEndImpersonation = () => {
+  const handleEndImpersonation = async () => {
+    try {
+      const { endImpersonationApi } = await import('@/lib/api');
+      await endImpersonationApi();
+    } catch (err) {
+      console.error('Failed to close impersonation session on backend:', err);
+    }
     const originalToken = localStorage.getItem('aurxon_founder_token');
     if (originalToken) {
       localStorage.setItem('aurxon_token', originalToken);
@@ -216,6 +222,19 @@ export default function DashboardPage() {
       const parsed = JSON.parse(cached);
       setUser(parsed);
       setCurrentRole(parsed.role);
+      if (parsed.role === 'TEACHER') {
+        setActiveCategory('academic');
+      }
+
+      // Redirect student and parent roles immediately to their personal portal workspaces
+      if (parsed.role === 'STUDENT') {
+        router.replace('/student');
+        return;
+      }
+      if (parsed.role === 'PARENT') {
+        router.replace('/parent');
+        return;
+      }
 
       // 2. Setup verification stage
       setAuthStage('checking_setup');
@@ -407,6 +426,11 @@ export default function DashboardPage() {
   // Mutator Actions
   const handleRoleChange = (role: string) => {
     setCurrentRole(role);
+    if (role === 'TEACHER') {
+      setActiveCategory('academic');
+    } else {
+      setActiveCategory('overview');
+    }
     triggerToast(`Switched active view scope to: ${role}`);
   };
 
@@ -625,7 +649,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 text-xs font-sans shrink-0">
+              <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 text-xs font-sans shrink-0">
                 <div className="flex items-center gap-2">
                   {context?.branding?.logoUrl ? (
                     <img src={context.branding.logoUrl} alt="Logo" className="h-6 w-6 object-contain rounded-md shrink-0 border border-zinc-200 dark:border-zinc-800" />
@@ -637,18 +661,33 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold flex-wrap">
-                  <span className="hidden md:inline text-zinc-300 dark:text-zinc-850">•</span>
-                  <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-400 font-black tracking-wide">
-                    {context?.branding?.industryPackName || 'SaaS Workspace'}
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold flex-wrap">
+                  <span className="hidden md:inline text-zinc-300 dark:text-zinc-800">•</span>
+                  
+                  {/* Industry ERP */}
+                  <span className="bg-zinc-100 dark:bg-zinc-900 border border-border px-2.5 py-0.5 rounded-full text-zinc-600 dark:text-zinc-400 font-black tracking-wider uppercase text-[9px]">
+                    {context?.branding?.industryPackName || 'School ERP'}
                   </span>
-                  <span className="text-zinc-300 dark:text-zinc-850">•</span>
-                  <span className="bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded text-blue-600 dark:text-blue-400 font-bold">
+                  
+                  <span className="text-zinc-300 dark:text-zinc-800">•</span>
+                  
+                  {/* Branch/Campus */}
+                  <span className="bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-full text-purple-600 dark:text-purple-400 font-black tracking-wider uppercase text-[9px]">
+                    {branches?.find(b => b.id === context?.campusId || b.id === context?.schoolId)?.name || 'Main Campus'}
+                  </span>
+                  
+                  <span className="text-zinc-300 dark:text-zinc-800">•</span>
+                  
+                  {/* Role */}
+                  <span className="bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-full text-blue-600 dark:text-blue-400 font-black tracking-wider uppercase text-[9px]">
                     {context?.roleName || currentRole}
                   </span>
-                  <span className="hidden lg:inline text-zinc-300 dark:text-zinc-850">•</span>
-                  <span className="hidden lg:inline text-[9px] text-zinc-400 tracking-wide font-black uppercase">
-                    Powered by Aurxon Platform
+                  
+                  <span className="text-zinc-300 dark:text-zinc-800">•</span>
+                  
+                  {/* Academic Session */}
+                  <span className="bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full text-emerald-600 dark:text-emerald-400 font-black tracking-wider uppercase text-[9px]">
+                    AY {settings?.academicYear || '2026-2027'}
                   </span>
                 </div>
               </div>

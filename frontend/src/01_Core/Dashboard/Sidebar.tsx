@@ -68,21 +68,6 @@ const IconMap: Record<string, React.ComponentType<any>> = {
   Settings, Bell, Menu, Sparkles, ShieldAlert, ChevronLeft, ChevronRight, FileText, ClipboardList
 };
 
-interface SidebarProps {
-  user: any;
-  currentRole: string;
-  onRoleChange: (role: string) => void;
-  activeCategory: string;
-  setActiveCategory: (cat: string) => void;
-  sidebarCollapsed: boolean;
-  setSidebarCollapsed: (val: boolean) => void;
-  mobileSidebarOpen: boolean;
-  setMobileSidebarOpen: (val: boolean) => void;
-  notifications: any[];
-  setNotificationsOpen: (val: boolean) => void;
-  handleLogout: () => void;
-}
-
 export default function Sidebar({
   user,
   currentRole,
@@ -99,11 +84,35 @@ export default function Sidebar({
 }: SidebarProps) {
   const unreadCount = notifications.length;
   const [navItems, setNavItems] = React.useState<any[]>([]);
+  const [memberships, setMemberships] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    const memsStr = localStorage.getItem('aurxon_memberships');
+    if (memsStr) {
+      try {
+        const parsed = JSON.parse(memsStr);
+        if (Array.isArray(parsed)) {
+          const activeContextStr = localStorage.getItem('aurxon_context');
+          const activeContext = activeContextStr ? JSON.parse(activeContextStr) : null;
+          const currentOrgId = activeContext?.organizationId || user?.institutionId;
+
+          const filtered = parsed.filter((m: any) => m.organizationId === currentOrgId);
+          setMemberships(filtered);
+        }
+      } catch (err) {
+        console.error('Failed to parse memberships in Sidebar', err);
+      }
+    }
+  }, [user]);
 
   React.useEffect(() => {
     async function fetchNav() {
       try {
-        const items = await getNavigationApi();
+        let items = await getNavigationApi();
+        if (currentRole === 'TEACHER') {
+          const allowedTeacherIds = ['overview', 'academic', 'exams', 'attendance', 'comms', 'library', 'productivity'];
+          items = items.filter((item: any) => allowedTeacherIds.includes(item.id));
+        }
         setNavItems(items);
       } catch (err) {
         console.error('Failed to load navigation', err);
@@ -154,27 +163,61 @@ export default function Sidebar({
       {/* Role Switcher Area */}
       <div className="p-4 border-b border-border bg-muted/30">
         {sidebarCollapsed ? (
-          <div className="flex justify-center">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary border border-primary/20">
+          <div className="flex justify-center" title={`Authenticated Role: ${currentRole}`}>
+            <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-[10px] font-extrabold text-primary border border-primary/30 uppercase">
               {currentRole.slice(0, 2)}
             </div>
           </div>
         ) : (
           <div className="space-y-1.5">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Active Access Role
+            <label className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground/80">
+              Workspace Role
             </label>
-            <select
-              value={currentRole}
-              onChange={(e) => onRoleChange(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground outline-none transition focus:border-primary focus:ring-1 focus:ring-primary glass"
-            >
-              {ROLES_LIST.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
+            {memberships.length > 1 ? (
+              <div className="relative">
+                <select
+                  value={currentRole}
+                  onChange={async (e) => {
+                    const selectedRole = e.target.value;
+                    const selectedMembership = memberships.find((m: any) => m.role === selectedRole);
+                    if (selectedMembership) {
+                      try {
+                        const { switchContextApi } = await import('@/lib/api');
+                        await switchContextApi(
+                          selectedMembership.organizationId,
+                          selectedMembership.schoolId,
+                          selectedMembership.campusId
+                        );
+                        onRoleChange(selectedRole);
+                        window.location.reload();
+                      } catch (err) {
+                        console.error('Failed to switch context:', err);
+                        onRoleChange(selectedRole);
+                      }
+                    } else {
+                      onRoleChange(selectedRole);
+                    }
+                  }}
+                  className="w-full bg-card border border-border text-xs font-bold text-foreground py-2 px-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer hover:bg-muted/50 transition-colors uppercase tracking-wide appearance-none pr-8"
+                >
+                  {memberships.map((m) => (
+                    <option key={m.id} value={m.role}>
+                      {ROLES_LIST.find(r => r.value === m.role)?.label || m.role.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  </svg>
+                </div>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-bold text-primary shadow-sm uppercase tracking-wide">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <span>{ROLES_LIST.find(r => r.value === currentRole)?.label || currentRole.replace(/_/g, ' ')}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

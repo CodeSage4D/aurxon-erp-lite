@@ -68,14 +68,14 @@ async function runValidations() {
   try {
     // 0. Pre-login
     console.log('Logging in test users...');
-    const founderLogin = await logIn('founder@aurxon.com', 'password123');
+    const founderLogin = await logIn('founder@aurxon.com', 'AurxonFuture$136');
     founderToken = founderLogin.token;
 
     // Get DPS and RKMVP ids from memberships
-    const dpsMembership = founderLogin.memberships.find((m: any) => m.organizationName.includes('Delhi'));
+    const dpsMembership = founderLogin.memberships.find((m: any) => m.organizationName.includes('Delhi') || m.organizationName.includes('Sunrise') || m.organizationName.includes('Green'));
     dpsId = dpsMembership?.organizationId;
 
-    const teacherLogin = await logIn('teacher@rkmvp.edu', 'password123');
+    const teacherLogin = await logIn('teacher@rkmvp.edu', 'AurxonFuture$136');
     teacherToken = teacherLogin.token;
     const rkmvpMembership = teacherLogin.memberships.find((m: any) => m.organizationName.includes('Ramakrishna'));
     rkmvpId = rkmvpMembership?.organizationId;

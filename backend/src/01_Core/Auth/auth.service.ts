@@ -24,7 +24,7 @@ export class AuthService {
     private setupService: SetupService,
   ) {}
 
-  async login(email: string, pass: string) {
+  async login(email: string, pass: string, tenantSlug?: string) {
     const sanitizedEmail = (email || '').trim().toLowerCase();
 
     const user = await this.prisma.user.findUnique({
@@ -52,6 +52,64 @@ export class AuthService {
 
     if (user) {
       const isFounderOrTeam = user.role === 'SUPER_ADMIN' || !!user.teamProfile;
+      const isRootDomain = tenantSlug === 'aurxon-erp-lite' || tenantSlug === 'www' || tenantSlug === 'founder' || tenantSlug === 'portal';
+
+      if (isRootDomain) {
+        if (!isFounderOrTeam) {
+          throw new UnauthorizedException('Access Denied: Please log in using your institution\'s custom subdomain.');
+        }
+      } else if (tenantSlug) {
+        if (isFounderOrTeam) {
+          throw new BadRequestException('Access Denied: Administrative and founder credentials cannot log in on the public portal. Please navigate to the secure Founder portal.');
+        }
+
+        // Resolve target institution from tenantSlug
+        let targetInstitutionId: string | null = null;
+        const sanitizedSlug = tenantSlug.trim().toLowerCase();
+
+        const tenantDomain = await this.prisma.tenantDomain.findFirst({
+          where: {
+            OR: [
+              { domain: { equals: sanitizedSlug, mode: 'insensitive' } },
+              { domain: { startsWith: sanitizedSlug + '.', mode: 'insensitive' } },
+            ]
+          },
+          select: { organizationId: true }
+        });
+
+        if (tenantDomain) {
+          targetInstitutionId = tenantDomain.organizationId;
+        } else {
+          const tenant = await this.prisma.tenant.findUnique({
+            where: { slug: sanitizedSlug },
+            select: { institutions: { select: { id: true } } }
+          });
+          if (tenant && tenant.institutions && tenant.institutions.length > 0) {
+            targetInstitutionId = tenant.institutions[0].id;
+          } else {
+            const inst = await this.prisma.institution.findFirst({
+              where: { id: sanitizedSlug },
+              select: { id: true }
+            });
+            if (inst) {
+              targetInstitutionId = inst.id;
+            }
+          }
+        }
+
+        if (targetInstitutionId && user.institutionId !== targetInstitutionId) {
+          await this.prisma.securityEventLog.create({
+            data: {
+              userId: user.id,
+              email: sanitizedEmail,
+              action: 'CROSS_TENANT_ACCESS_BLOCKED',
+              details: `User from institution ${user.institutionId} blocked from logging into tenant ${targetInstitutionId} via subdomain: ${tenantSlug}`,
+            },
+          });
+          throw new UnauthorizedException('Access Denied: Your account does not belong to this institution.');
+        }
+      }
+
       if (isFounderOrTeam) {
         await this.prisma.securityEventLog.create({
           data: {
@@ -636,6 +694,9 @@ export class AuthService {
         orgName: reg.orgName,
         status: 'ACTIVATED',
       };
+    }, {
+      maxWait: 20000,
+      timeout: 40000,
     });
   }
 
@@ -768,6 +829,37 @@ export class AuthService {
         data: { status: 'ACTIVE' },
       });
 
+      // Handle branch customization if passed in comments
+      if (comments && comments.includes('BRANCH_DETAILS:')) {
+        try {
+          const jsonStr = comments.split('BRANCH_DETAILS:')[1];
+          const branchDetails = JSON.parse(jsonStr);
+          if (Array.isArray(branchDetails) && branchDetails.length > 0) {
+            // Remove the default HQ branch so we can create custom ones
+            await tx.branch.deleteMany({
+              where: { institutionId: reg.institutionId! }
+            });
+            for (let i = 0; i < branchDetails.length; i++) {
+              const b = branchDetails[i];
+              await tx.branch.create({
+                data: {
+                  institutionId: reg.institutionId!,
+                  name: b.name || `${reg.orgName} Branch ${i + 1}`,
+                  code: b.code || `BR-${i + 1}`,
+                  phone: b.phone || reg.phone || '+91-1234567890',
+                  address: b.address || reg.address || 'Campus Address',
+                  city: b.city || reg.city || 'City',
+                  state: b.state || reg.state || 'State',
+                  pinCode: b.pinCode || '700001',
+                }
+              });
+            }
+          }
+        } catch (branchErr) {
+          console.warn('Failed to parse branch details from comments:', branchErr.message);
+        }
+      }
+
       // 4. Mark key as USED
       await tx.activationKey.update({
         where: { id: keyRecord!.id },
@@ -832,10 +924,22 @@ export class AuthService {
 
     let inst: any = null;
     // 1. Resolve via custom domain
-    const tenantDomain = await this.prisma.tenantDomain.findFirst({
+    let tenantDomain = await this.prisma.tenantDomain.findFirst({
       where: { domain: { equals: sanitizedSlug, mode: 'insensitive' } },
       include: { organization: true },
     });
+
+    if (!tenantDomain) {
+      tenantDomain = await this.prisma.tenantDomain.findFirst({
+        where: {
+          OR: [
+            { domain: { startsWith: sanitizedSlug + '.', mode: 'insensitive' } },
+            { domain: { equals: sanitizedSlug, mode: 'insensitive' } }
+          ]
+        },
+        include: { organization: true },
+      });
+    }
 
     if (tenantDomain?.organization) {
       inst = tenantDomain.organization;
@@ -927,8 +1031,13 @@ export class AuthService {
     return result;
   }
 
-  async founderLogin(email: string, pass: string) {
+  async founderLogin(email: string, pass: string, tenantSlug?: string) {
     const sanitizedEmail = (email || '').trim().toLowerCase();
+
+    const isRootDomain = !tenantSlug || tenantSlug === 'aurxon-erp-lite' || tenantSlug === 'www' || tenantSlug === 'founder' || tenantSlug === 'portal';
+    if (!isRootDomain) {
+      throw new UnauthorizedException('Access denied. Administrative and founder logins must be performed on the secure root portal (aurxon-erp-lite.vercel.app).');
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { email: sanitizedEmail },

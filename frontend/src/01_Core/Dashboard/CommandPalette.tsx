@@ -70,21 +70,6 @@ export default function CommandPalette({
       desc: "Log school assets, furniture, and supplies" 
     },
     { 
-      title: "Quick Switch Role: Principal", 
-      action: () => { handleRoleChange('PRINCIPAL'); onClose(); }, 
-      desc: "Change ERP permission view" 
-    },
-    { 
-      title: "Quick Switch Role: Accountant", 
-      action: () => { handleRoleChange('ACCOUNTANT'); onClose(); }, 
-      desc: "Access Fees ledger" 
-    },
-    { 
-      title: "Quick Switch Role: Librarian", 
-      action: () => { handleRoleChange('LIBRARIAN'); onClose(); }, 
-      desc: "Borrow lists and book inventory" 
-    },
-    { 
       title: "Ask AI Assistant", 
       action: () => { setAiAssistantOpen(true); onClose(); }, 
       desc: "Open side chat dialog box" 

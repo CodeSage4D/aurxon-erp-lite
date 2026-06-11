@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../Auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../Auth/roles.guard';
 import { DashboardService } from './dashboard.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('dashboard')
 export class DashboardController {
   constructor(private dashboardService: DashboardService) {}
@@ -33,6 +33,7 @@ export class DashboardController {
   }
 
   @Get('founder-stats')
+  @Roles('SUPER_ADMIN')
   async getFounderStats() {
     return this.dashboardService.getFounderStats();
   }

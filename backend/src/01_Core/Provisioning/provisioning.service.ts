@@ -322,15 +322,19 @@ export class ProvisioningService {
       });
       console.log(`[PROVISIONING] Step 7: Subscription created.`);
 
-      // 8. Create License (Using LIC-PROD / LIC-TRIAL prefixes)
-      const licensePrefix = isProd ? 'LIC-PROD' : 'LIC-TRIAL';
-      const licenseKey = `${licensePrefix}-${slug.toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-      
-      console.log(`[PROVISIONING] Step 8: Creating License (Key: ${licenseKey}, Type: ${licenseType})...`);
+      // 8. Generate unified Activation License Key
+      const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+      const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+      const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
+      const actPrefix = isProd ? 'AURX-LIC-PROD' : 'AURX-LIC-TRIAL';
+      const activationKey = `${actPrefix}-${part1}-${part2}-${part3}`;
+      const keyHash = crypto.createHash('sha256').update(activationKey).digest('hex');
+
+      console.log(`[PROVISIONING] Step 8: Creating License (Key: ${activationKey}, Type: ${licenseType})...`);
       await tx.license.create({
         data: {
           organizationId: institution.id,
-          licenseKey,
+          licenseKey: activationKey,
           licenseType,
           status: 'ACTIVE',
           expiresAt: endDate,
@@ -340,16 +344,8 @@ export class ProvisioningService {
       console.log(`[PROVISIONING] Step 8: License created.`);
 
       // 8.5 Create Activation Key
-      let activationKey = '';
       let activationToken = '';
       if (registration.adminPasswordHash) {
-        const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
-        const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
-        const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
-        const actPrefix = isProd ? 'AURX-PROD' : 'AURX-TRIAL';
-        activationKey = `${actPrefix}-${part1}-${part2}-${part3}`;
-        const keyHash = crypto.createHash('sha256').update(activationKey).digest('hex');
-
         activationToken = crypto.randomBytes(48).toString('hex');
         const tokenHash = crypto.createHash('sha256').update(activationToken).digest('hex');
 
@@ -473,7 +469,7 @@ export class ProvisioningService {
         tenantId: tenant.id,
         institutionId: institution.id,
         slug,
-        licenseKey,
+        licenseKey: activationKey,
         activationKey,
         activationToken,
       };
