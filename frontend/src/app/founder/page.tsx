@@ -20,7 +20,7 @@ import {
   getRenewalRequestsApi, approveRenewalRequestApi, founderDirectRenewalApi,
   technicalReviewRegistrationApi, provisionWorkspaceApi,
   verifyRegistrationManualApi, resendVerificationOtpApi,
-  suspendInstitutionApi, resumeInstitutionApi, resetUserPasswordApi
+  suspendInstitutionApi, resumeInstitutionApi, resetSetupWizardApi, resetUserPasswordApi
 } from '@/lib/api';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -436,6 +436,20 @@ export default function FounderDashboardPage() {
       loadDashboardData();
     } catch (err: any) {
       triggerToast(err.message || 'Failed to resume workspace', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetSetupWizard = async (id: string) => {
+    if (!confirm('Are you sure you want to reset the setup wizard for this organization? The admin will be forced to redo onboarding configuration.')) return;
+    setSubmitting(true);
+    try {
+      await resetSetupWizardApi(id);
+      triggerToast('Setup wizard reset successfully', 'success');
+      loadDashboardData();
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to reset setup wizard', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1327,6 +1341,13 @@ export default function FounderDashboardPage() {
                                     className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-[10px] font-black text-primary border border-border"
                                   >
                                     Diagnose
+                                  </button>
+                                  <button
+                                    onClick={() => handleResetSetupWizard(org.id)}
+                                    disabled={submitting}
+                                    className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[10px] font-black text-amber-500 border border-amber-500/20 disabled:opacity-50 transition"
+                                  >
+                                    Reset Setup
                                   </button>
                                 </div>
                               </div>

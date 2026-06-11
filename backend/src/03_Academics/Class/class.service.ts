@@ -10,8 +10,25 @@ export class ClassService {
       where: { institutionId },
       include: {
         classTeacher: { select: { id: true, firstName: true, lastName: true } },
+        sections: true,
       },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  async getSections(classId: string) {
+    return this.prisma.section.findMany({
+      where: { classId },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createSection(classId: string, name: string) {
+    return this.prisma.section.create({
+      data: {
+        classId,
+        name: name.trim().toUpperCase(),
+      },
     });
   }
 

@@ -641,6 +641,40 @@ export class FounderController {
     return updated;
   }
 
+  @Post('institutions/:id/reset-wizard')
+  async resetWizard(@Request() req, @Param('id') id: string) {
+    await this.verifyTeamMember(req.user.id, [
+      'FOUNDER', 'CO_FOUNDER', 'PLATFORM_DIRECTOR', 'TECHNICAL_ADMINISTRATOR'
+    ]);
+    const inst = await this.prisma.institution.findUnique({ where: { id } });
+    if (!inst) throw new NotFoundException('Institution not found');
+
+    const updated = await this.prisma.organizationSetupStatus.upsert({
+      where: { institutionId: id },
+      update: {
+        setupStarted: true,
+        setupCompleted: false,
+        currentStep: 1,
+      },
+      create: {
+        institutionId: id,
+        setupStarted: true,
+        setupCompleted: false,
+        currentStep: 1,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'INSTITUTION_WIZARD_RESET',
+        details: `Reset setup wizard state for institution: ${inst.name} (${id})`,
+      }
+    });
+
+    return { success: true, status: updated };
+  }
+
   @Post('users/:id/reset-password')
   async resetUserPassword(@Request() req, @Param('id') id: string) {
     await this.verifyTeamMember(req.user.id, [

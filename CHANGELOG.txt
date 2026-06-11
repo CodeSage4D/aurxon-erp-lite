@@ -1,28 +1,25 @@
 AURXON Platform OS — Changelog
-Version 1.0 (Stabilization & Operational SaaS Release)
+Version 1.1 (Domain Re-Architecture & Final Stabilization)
 
 ================================================================================
-[1.0.0] - 2026-06-12
+[1.1.0] - 2026-06-12
 ================================================================================
 
 ADDED:
-- Domain Gate Middleware: Enforces subdomains for 'portal', 'register', 'activate', 'support', and dynamic tenant workspace subdomains.
-- Multi-Tenant Isolation Checks: Restricts Super Admins to platform founder consoles, preventing them from logging into customer subdomains.
-- Role-Switcher Component: Allows users with multiple organization memberships to toggle context via the Sidebar dropdown.
-- Impersonation Controls: Support engineers can establish an impersonation session from the Support hub and audit closure on session exit.
-- State-based Impersonation Audit: Saves session start and end times to the database.
-- Wizard draft resilience: Step 1 and Step 2 of the Onboarding Wizard automatically save drafts to Postgres and local storage on transition.
-- Local Offline Fallbacks: Try-catch blocks in frontend API handlers verify setup statuses and activation tokens locally if the backend is unreachable.
+- Domain Schema Models: Added Section and Enrollment tables to replace mutable grouping logic with immutable historical tracking in School ERP.
+- Hospital ERP structure: Added HospitalDepartment, MedicalUnit, Ward, Bed, and PatientEpisode models.
+- Corporate ERP structure: Added CorporateDivision, CorporateDepartment, CorporateTeam, and WorkAssignment models.
+- Onboarding Setup Reset API: Added Post `/founder/institutions/:id/reset-wizard` to allow platform owners to override and reset onboarding wizard progress in Postgres.
+- Setup Reset UI Action: Integrated "Reset Setup" button inside the organization detail cards in the Founder Console.
+- Section API Routes: Implemented endpoints to query and create Sections in Class structures.
+
+MODIFIED:
+- Student Registration: Admitting a student automatically generates a Class Section A and creates an initial Enrollment history record.
+- Student Promotion: Promoting a student registers a new Enrollment history record rather than overwriting historical Class data.
+- Student view detail payload: Student findOne API returns historic enrollment arrays with their respective class, section, and academic year details.
 
 FIXED:
-- Client Hydration Warning: Resolved Next.js router hydration mismatches in setup wizard by adding 'mounted' checks before routing.
-- Accidental Navigation Loss: Implemented browser 'beforeunload' listeners to protect onboarding config drafts from reload/back loss.
-- Command Palette and Sidebar Menu filters: Removed admin dashboard telemetry and settings links for TEACHER roles.
-- Missing UI imports: Fixed AlertTriangle loading errors in the primary directory index page.
-- Prisma Query Safety: Hardened database query scopes, ensuring req.user.institutionId restricts all SQL template parameters.
-
-TESTS & VERIFICATION:
-- Passed 100% NestJS backend controller, service, and E2E unit tests (20/20 specs).
-- Verified production compiler cleanliness for both backend (NestJS) and frontend (Next.js).
-- Verified successful registration, approval, activation, setup, and logout manual customer flows.
+- Local database migration sync successfully applied to Neon master database instance.
+- Verified Next.js Turbopack and NestJS builds compile without warnings.
+- Frontend AuthStage layout gate verified to prevent dashboard UI loading flashes.
 ================================================================================

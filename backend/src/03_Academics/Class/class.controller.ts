@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../../01_Core/Auth/jwt-auth.guard';
 import { ClassService } from './class.service';
 
@@ -15,5 +15,15 @@ export class ClassController {
   @Get('subjects')
   async getSubjects(@Request() req, @Query('classId') classId?: string) {
     return this.classService.getSubjects(req.user.institutionId, classId);
+  }
+
+  @Get(':classId/sections')
+  async getSections(@Param('classId') classId: string) {
+    return this.classService.getSections(classId);
+  }
+
+  @Post(':classId/sections')
+  async createSection(@Param('classId') classId: string, @Body() body: { name: string }) {
+    return this.classService.createSection(classId, body.name);
   }
 }

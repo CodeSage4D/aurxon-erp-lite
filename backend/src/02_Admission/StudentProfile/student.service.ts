@@ -196,6 +196,14 @@ export class StudentService {
             changedBy: { select: { email: true } },
           },
         },
+        enrollments: {
+          include: {
+            class: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            academicYear: { select: { id: true, name: true } },
+          },
+          orderBy: { enrolledAt: 'desc' },
+        },
       },
     });
 
@@ -353,7 +361,55 @@ export class StudentService {
         },
       });
 
-      // 8. Log Timeline milestone
+      // 8. Create dynamic Section & Enrollment entries to protect historic integrity
+      let section = await tx.section.findFirst({
+        where: { classId: data.classId, name: 'A' },
+      });
+      if (!section) {
+        section = await tx.section.create({
+          data: {
+            classId: data.classId,
+            name: 'A',
+          },
+        });
+      }
+
+      const activeAcadYear = await tx.academicYear.findFirst({
+        where: { institutionId, isActive: true },
+      });
+      let finalAcadYearId = activeAcadYear?.id;
+      if (!finalAcadYearId) {
+        const fallbackYear = await tx.academicYear.findFirst({
+          where: { institutionId },
+        });
+        if (fallbackYear) {
+          finalAcadYearId = fallbackYear.id;
+        } else {
+          const newYear = await tx.academicYear.create({
+            data: {
+              institutionId,
+              name: '2026-2027',
+              startDate: new Date('2026-04-01'),
+              endDate: new Date('2027-03-31'),
+              isActive: true,
+              status: 'ACTIVE',
+            },
+          });
+          finalAcadYearId = newYear.id;
+        }
+      }
+
+      await tx.enrollment.create({
+        data: {
+          studentId: student.id,
+          classId: data.classId,
+          sectionId: section.id,
+          academicYearId: finalAcadYearId,
+          status: 'ACTIVE',
+        },
+      });
+
+      // 9. Log Timeline milestone
       await tx.timelineEvent.create({
         data: {
           studentId: student.id,
@@ -362,7 +418,7 @@ export class StudentService {
         },
       });
 
-      // 9. Initial Status History entry
+      // 10. Initial Status History entry
       if (creatorUserId) {
         await tx.studentStatusHistory.create({
           data: {
@@ -536,12 +592,60 @@ export class StudentService {
         const classDigits = targetClass.name.replace(/\D/g, '') || '0';
         const nextRoll = `${classDigits}1${String(classStudents + 1).padStart(2, '0')}`;
 
+        // 8b. Create section and enrollment tracking for promotion history
+        let section = await tx.section.findFirst({
+          where: { classId: data.targetClassId, name: 'A' },
+        });
+        if (!section) {
+          section = await tx.section.create({
+            data: {
+              classId: data.targetClassId,
+              name: 'A',
+            },
+          });
+        }
+
+        const activeAcadYear = await tx.academicYear.findFirst({
+          where: { institutionId, isActive: true },
+        });
+        let finalAcadYearId = activeAcadYear?.id;
+        if (!finalAcadYearId) {
+          const fallbackYear = await tx.academicYear.findFirst({
+            where: { institutionId },
+          });
+          if (fallbackYear) {
+            finalAcadYearId = fallbackYear.id;
+          } else {
+            const newYear = await tx.academicYear.create({
+              data: {
+                institutionId,
+                name: '2026-2027',
+                startDate: new Date('2026-04-01'),
+                endDate: new Date('2027-03-31'),
+                isActive: true,
+                status: 'ACTIVE',
+              },
+            });
+            finalAcadYearId = newYear.id;
+          }
+        }
+
+        await tx.enrollment.create({
+          data: {
+            studentId,
+            classId: data.targetClassId,
+            sectionId: section.id,
+            academicYearId: finalAcadYearId,
+            status: 'PROMOTED',
+          },
+        });
+
         await tx.promotionHistory.create({
           data: {
             studentId,
             fromClassId: student.classId,
             toClassId: data.targetClassId,
-            academicYear: '2026-2027',
+            academicYear: activeAcadYear?.name || '2026-2027',
             promotedById: activePromotedById,
           },
         });

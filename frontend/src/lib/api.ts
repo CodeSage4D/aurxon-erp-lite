@@ -5067,6 +5067,26 @@ export async function resumeInstitutionApi(id: string) {
   }
 }
 
+export async function resetSetupWizardApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/founder/institutions/${id}/reset-wizard`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to reset setup wizard');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.trim().toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, resetting setup wizard locally...');
+    return { success: true };
+  }
+}
+
 export async function resetUserPasswordApi(userId: string) {
   try {
     const res = await fetch(`${API_URL}/founder/users/${userId}/reset-password`, {

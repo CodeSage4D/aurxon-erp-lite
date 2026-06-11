@@ -45,6 +45,8 @@ model Institution {
   modules       OrganizationModule[]
   features      OrganizationFeature[]
   orgSettings   OrganizationSetting[]
+  hospitalDepartments HospitalDepartment[]
+  corporateDivisions  CorporateDivision[]
 
   tenantId               String?
   tenant                 Tenant?                     @relation(fields: [tenantId], references: [id])
@@ -183,6 +185,7 @@ model Student {
   reportCards   ReportCardStatus[]
   homeworkSubs  HomeworkSubmission[]
   statusHistory StudentStatusHistory[]
+  enrollments   Enrollment[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -303,6 +306,8 @@ model Class {
   fromPromotions PromotionHistory[] @relation("FromClassPromotions")
   toPromotions   PromotionHistory[] @relation("ToClassPromotions")
   homework       HomeworkAssignment[]
+  sections      Section[]
+  enrollments   Enrollment[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -706,6 +711,7 @@ model AcademicYear {
   endDate       DateTime
   isActive      Boolean     @default(false)
   status        String      @default("PLANNED") // PLANNED, ACTIVE, CLOSED
+  enrollments   Enrollment[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -1465,6 +1471,144 @@ model OtpVerification {
   createdAt DateTime @default(now())
   attempts  Int      @default(0)
   userId    String?
+}
+
+// ─────────────────────────────────────────────
+// Domain Re-Architecture Models
+// ─────────────────────────────────────────────
+
+model Section {
+  id             String       @id @default(uuid())
+  name           String       // e.g. "A", "B"
+  classId        String
+  class          Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  enrollments    Enrollment[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([classId, name])
+}
+
+model Enrollment {
+  id             String       @id @default(uuid())
+  studentId      String
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId        String
+  class          Class        @relation(fields: [classId], references: [id])
+  sectionId      String?
+  section        Section?     @relation(fields: [sectionId], references: [id])
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  status         String       // Prospect, Applicant, Approved, Enrolled, Active, Promoted, Transferred, Graduated, Alumni
+  enrolledAt     DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model HospitalDepartment {
+  id             String       @id @default(uuid())
+  name           String
+  institutionId  String
+  institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  units          MedicalUnit[]
+  episodes       PatientEpisode[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model MedicalUnit {
+  id             String             @id @default(uuid())
+  name           String
+  departmentId   String
+  department     HospitalDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  wards          Ward[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model Ward {
+  id             String             @id @default(uuid())
+  name           String
+  unitId         String
+  unit           MedicalUnit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  beds           Bed[]
+  episodes       PatientEpisode[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model Bed {
+  id             String             @id @default(uuid())
+  code           String             // e.g. "BED-101"
+  status         String             @default("AVAILABLE") // AVAILABLE, OCCUPIED, MAINTENANCE
+  wardId         String
+  ward           Ward               @relation(fields: [wardId], references: [id], onDelete: Cascade)
+  episodes       PatientEpisode[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model PatientEpisode {
+  id             String             @id @default(uuid())
+  patientId      String
+  patientName    String
+  status         String             @default("ADMITTED") // ADMITTED, TRANSFERRED, DISCHARGED
+  departmentId   String
+  department     HospitalDepartment @relation(fields: [departmentId], references: [id])
+  wardId         String?
+  ward           Ward?              @relation(fields: [wardId], references: [id])
+  bedId          String?
+  bed            Bed?               @relation(fields: [bedId], references: [id])
+  admittedAt     DateTime           @default(now())
+  dischargedAt   DateTime?
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model CorporateDivision {
+  id             String       @id @default(uuid())
+  name           String
+  institutionId  String
+  institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  departments    CorporateDepartment[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model CorporateDepartment {
+  id             String             @id @default(uuid())
+  name           String
+  divisionId     String
+  division       CorporateDivision  @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  teams          CorporateTeam[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model CorporateTeam {
+  id             String             @id @default(uuid())
+  name           String
+  departmentId   String
+  department     CorporateDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  assignments    WorkAssignment[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model WorkAssignment {
+  id             String             @id @default(uuid())
+  employeeId     String
+  employeeName   String
+  role           String             // e.g. "Lead Engineer"
+  status         String             @default("ACTIVE") // ACTIVE, COMPLETED, SUSPENDED
+  teamId         String
+  team           CorporateTeam      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  startDate      DateTime           @default(now())
+  endDate        DateTime?
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 }
 
 
