@@ -6,6 +6,9 @@ import { loginApi, switchContextApi } from '@/services/api';
 import { Shield, Sparkles, LogIn, AlertTriangle, HelpCircle } from 'lucide-react';
 import { useTheme } from '@/providers/ThemeContext';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -49,7 +52,7 @@ export default function LoginPage() {
 
       if (slug && slug !== 'www') {
         try {
-          const res = await fetch(`http://localhost:5000/auth/institution/${encodeURIComponent(slug)}`);
+          const res = await fetch(`${API_URL}/auth/institution/${encodeURIComponent(slug)}`);
           if (res.ok) {
             const data = await res.json();
             setBranding(data);

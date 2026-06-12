@@ -52,6 +52,16 @@ export function middleware(request: NextRequest) {
 
   subdomain = subdomain.trim().toLowerCase();
 
+  // Check if we have a cookie override (useful for Vercel or non-wildcard domains)
+  const tenantCookie = request.cookies.get('aurxon_tenant_slug')?.value || '';
+  const isVercelHost = host.includes('vercel.app') || host.includes('amplifyapp.com');
+
+  if (isVercelHost || !subdomain || subdomain === 'www' || subdomain === 'aurxon-erp-lite') {
+    if (tenantCookie && !['www', 'aurxon-erp-lite'].includes(tenantCookie)) {
+      subdomain = tenantCookie;
+    }
+  }
+
   // 1. Enforce Founder OS boundaries
   if (subdomain === 'portal' || subdomain === 'founder') {
     const allowedFounderPaths = ['/founder', '/founder-console', '/api', '/_next', '/static', '/favicon.ico'];
@@ -92,21 +102,56 @@ export function middleware(request: NextRequest) {
   } 
   // 5. Root domain or empty/www (Platform Directory)
   else if (!subdomain || subdomain === 'www' || subdomain === 'aurxon-erp-lite') {
-    if (url.pathname.startsWith('/register')) {
-      return NextResponse.redirect(new URL(getSubdomainUrl('register', '/register', request)));
-    }
-    if (url.pathname.startsWith('/activate')) {
-      return NextResponse.redirect(new URL(getSubdomainUrl('activate', '/activate', request)));
-    }
-    if (url.pathname.startsWith('/support')) {
-      return NextResponse.redirect(new URL(getSubdomainUrl('support', '/support', request)));
-    }
-    if (url.pathname.startsWith('/founder') || url.pathname.startsWith('/founder-console')) {
-      return NextResponse.redirect(new URL(getSubdomainUrl('portal', '/founder/login', request)));
-    }
-    if (url.pathname.startsWith('/login') || url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/student') || url.pathname.startsWith('/parent')) {
-      url.pathname = '/';
-      return NextResponse.redirect(url);
+    if (isVercelHost) {
+      if (url.pathname.startsWith('/register')) {
+        const requestHeaders = new Headers(request.headers);
+        requestHeaders.set('x-tenant-slug', 'register');
+        const res = NextResponse.next({ request: { headers: requestHeaders } });
+        res.cookies.set('aurxon_tenant_slug', 'register', { path: '/', maxAge: 86400 });
+        return res;
+      }
+      if (url.pathname.startsWith('/activate')) {
+        const requestHeaders = new Headers(request.headers);
+        requestHeaders.set('x-tenant-slug', 'activate');
+        const res = NextResponse.next({ request: { headers: requestHeaders } });
+        res.cookies.set('aurxon_tenant_slug', 'activate', { path: '/', maxAge: 86400 });
+        return res;
+      }
+      if (url.pathname.startsWith('/support')) {
+        const requestHeaders = new Headers(request.headers);
+        requestHeaders.set('x-tenant-slug', 'support');
+        const res = NextResponse.next({ request: { headers: requestHeaders } });
+        res.cookies.set('aurxon_tenant_slug', 'support', { path: '/', maxAge: 86400 });
+        return res;
+      }
+      if (url.pathname.startsWith('/founder') || url.pathname.startsWith('/founder-console')) {
+        const requestHeaders = new Headers(request.headers);
+        requestHeaders.set('x-tenant-slug', 'portal');
+        const res = NextResponse.next({ request: { headers: requestHeaders } });
+        res.cookies.set('aurxon_tenant_slug', 'portal', { path: '/', maxAge: 86400 });
+        return res;
+      }
+      if (url.pathname.startsWith('/login') || url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/student') || url.pathname.startsWith('/parent')) {
+        url.pathname = '/';
+        return NextResponse.redirect(url);
+      }
+    } else {
+      if (url.pathname.startsWith('/register')) {
+        return NextResponse.redirect(new URL(getSubdomainUrl('register', '/register', request)));
+      }
+      if (url.pathname.startsWith('/activate')) {
+        return NextResponse.redirect(new URL(getSubdomainUrl('activate', '/activate', request)));
+      }
+      if (url.pathname.startsWith('/support')) {
+        return NextResponse.redirect(new URL(getSubdomainUrl('support', '/support', request)));
+      }
+      if (url.pathname.startsWith('/founder') || url.pathname.startsWith('/founder-console')) {
+        return NextResponse.redirect(new URL(getSubdomainUrl('portal', '/founder/login', request)));
+      }
+      if (url.pathname.startsWith('/login') || url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/student') || url.pathname.startsWith('/parent')) {
+        url.pathname = '/';
+        return NextResponse.redirect(url);
+      }
     }
   } 
   // 6. Customer Workspaces (tenant-slug)

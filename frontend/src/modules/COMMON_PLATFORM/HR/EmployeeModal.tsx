@@ -5,6 +5,9 @@ import {
 import { Staff, Payroll } from './types';
 import { updateStaffApi, getStaffPayrollsApi } from '@/services/api';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+
 interface EmployeeModalProps {
   employeeId: string;
   onClose: () => void;
@@ -30,7 +33,7 @@ export default function EmployeeModal({ employeeId, onClose, onSaved }: Employee
     try {
       setLoading(true);
       // We will call the detail API
-      const res = await fetch(`http://localhost:5000/staff/${employeeId}`, {
+      const res = await fetch(`${API_URL}/staff/${employeeId}`, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('aurxon_token')}`
@@ -51,7 +54,7 @@ export default function EmployeeModal({ employeeId, onClose, onSaved }: Employee
       console.warn('Backend detail endpoint failed, loading fallback from mock database...');
       // Fallback: get staff list and find the staff
       try {
-        const staffRes = await fetch(`http://localhost:5000/staff`, {
+        const staffRes = await fetch(`${API_URL}/staff`, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${localStorage.getItem('aurxon_token')}`

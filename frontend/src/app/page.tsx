@@ -41,6 +41,12 @@ export default function RootPage() {
     sub = sub.trim().toLowerCase();
     setSubdomain(sub);
 
+    // Clear tenant cookie if on root domain
+    const isRootDomain = !sub || ['www', 'aurxon-erp-lite'].includes(sub);
+    if (isRootDomain) {
+      document.cookie = "aurxon_tenant_slug=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
+
     // If on a workspace subdomain, run auth checks and redirect
     if (sub && !['portal', 'founder', 'register', 'activate', 'support', 'www', 'aurxon-erp-lite'].includes(sub)) {
       const token = localStorage.getItem('aurxon_token');
@@ -60,9 +66,15 @@ export default function RootPage() {
   const getAbsoluteSubdomainUrl = (sub: string, path: string) => {
     if (typeof window === 'undefined') return '';
     const host = window.location.host;
+    const hostname = window.location.hostname;
     const protocol = window.location.protocol;
     const parts = host.split('.');
     const isLocalhost = host.includes('localhost');
+    const isVercel = hostname.includes('vercel.app') || hostname.includes('amplifyapp.com');
+
+    if (isVercel) {
+      return path; // On Vercel, just return relative path
+    }
     
     let baseDomain = '';
     if (isLocalhost) {
@@ -72,6 +84,18 @@ export default function RootPage() {
     }
     
     return `${protocol}//${sub}.${baseDomain}${path}`;
+  };
+
+  const handlePortalClick = (e: React.MouseEvent<HTMLAnchorElement>, sub: string, path: string) => {
+    const host = window.location.hostname;
+    const isVercel = host.includes('vercel.app') || host.includes('amplifyapp.com');
+    
+    if (isVercel) {
+      e.preventDefault();
+      // Set tenant cookie
+      document.cookie = `aurxon_tenant_slug=${sub}; path=/; max-age=86400; SameSite=Lax`;
+      router.push(path);
+    }
   };
 
   const handleAccessWorkspace = (e: React.FormEvent) => {
@@ -94,8 +118,17 @@ export default function RootPage() {
       return;
     }
 
-    // Redirect to subdomain
-    window.location.href = getAbsoluteSubdomainUrl(slug, '/login');
+    const host = window.location.hostname;
+    const isVercel = host.includes('vercel.app') || host.includes('amplifyapp.com');
+
+    if (isVercel) {
+      // Set cookie and navigate locally
+      document.cookie = `aurxon_tenant_slug=${slug}; path=/; max-age=86400; SameSite=Lax`;
+      router.push('/login');
+    } else {
+      // Redirect to subdomain
+      window.location.href = getAbsoluteSubdomainUrl(slug, '/login');
+    }
   };
 
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -210,6 +243,7 @@ export default function RootPage() {
                   <a
                     key={idx}
                     href={getAbsoluteSubdomainUrl(portal.sub, portal.path)}
+                    onClick={(e) => handlePortalClick(e, portal.sub, portal.path)}
                     className={`p-5 rounded-2xl border flex flex-col justify-between text-left transition-all hover-lift
                       ${isDark ? 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]' : 'bg-white border-zinc-200 hover:shadow-md'}`}
                   >

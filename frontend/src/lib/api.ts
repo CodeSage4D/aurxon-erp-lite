@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // Helper to get headers
 function getHeaders() {
@@ -9,9 +9,30 @@ function getHeaders() {
   };
 }
 
-// Helper to resolve the subdomain tenant slug from window hostname
+// Helper to resolve the subdomain tenant slug from window hostname or cookies
 function getTenantSlug(): string | undefined {
   if (typeof window === 'undefined') return undefined;
+
+  // 1. Query parameter override
+  const urlParams = new URLSearchParams(window.location.search);
+  const qTenant = urlParams.get('tenant') || urlParams.get('x-tenant-slug');
+  if (qTenant) {
+    return qTenant.trim().toLowerCase();
+  }
+
+  // 2. Cookie override (useful for Vercel/non-wildcard hosting)
+  const cookies = document.cookie.split(';');
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i].trim();
+    if (cookie.startsWith('aurxon_tenant_slug=')) {
+      const value = cookie.substring('aurxon_tenant_slug='.length).trim();
+      if (value && !['www', 'aurxon-erp-lite'].includes(value)) {
+        return value.toLowerCase();
+      }
+    }
+  }
+
+  // 3. Subdomain extraction
   const host = window.location.hostname;
   const parts = host.split('.');
   
