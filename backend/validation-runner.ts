@@ -173,7 +173,7 @@ async function runValidations() {
   try {
     // Clean up any registrations/users/institutions/tenants from previous runs using this phone/org name
     const existingRegs = await prisma.organizationRegistration.findMany({
-      where: { OR: [{ phone: '9876543210' }, { orgName: 'Lifecycle Test Org' }, { orgName: 'Rejected Org' }] }
+      where: { OR: [{ phone: '9876543210' }, { phone: '9876543211' }, { orgName: 'Lifecycle Test Org' }, { orgName: 'Rejected Org' }] }
     });
     for (const reg of existingRegs) {
       if (reg.institutionId) {
@@ -194,7 +194,7 @@ async function runValidations() {
     }
 
     await prisma.otpVerification.deleteMany({
-      where: { OR: [{ phone: '9876543210' }, { email: { contains: 'lifecycle.com' } }] }
+      where: { OR: [{ phone: '9876543210' }, { phone: '9876543211' }, { email: { contains: 'lifecycle.com' } }] }
     }).catch(() => {});
 
     // Pre-verify phone number via OTP for validation-runner
@@ -238,7 +238,7 @@ async function runValidations() {
         orgName: 'Rejected Org',
         orgType: 'SCHOOL',
         email: rejectEmail,
-        phone: '9876543210',
+        phone: '9876543211',
         industryPackCode: 'SCHOOL_ERP',
       }),
     });
@@ -937,6 +937,22 @@ async function runValidations() {
 
   // --- Scenario 16: Scalability Smoke Test & Performance Verification ---
   try {
+    // Clean up any stale scalability data from previous aborted runs to guarantee idempotency
+    console.log('Cleaning up stale scalability data before seeding...');
+    await prisma.student.deleteMany({
+      where: { scholarNumber: { startsWith: 'SCH-SCALE-' } }
+    });
+    await prisma.user.deleteMany({
+      where: { email: { startsWith: 'scale-' } }
+    });
+    await prisma.class.deleteMany({
+      where: { name: 'Grade 10', institution: { name: { startsWith: 'Scalability Inst' } } }
+    });
+    await prisma.institution.deleteMany({
+      where: { name: { startsWith: 'Scalability Inst' } }
+    });
+    console.log('Stale scalability data cleaned.');
+
     console.log('Seeding 100 Organizations, 5000 Users, and 5000 Student Records for Scalability Test...');
     const startTime = Date.now();
 

@@ -26,6 +26,8 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<PlatformNotification[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,7 +51,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/notifications', {
+      const res = await fetch(`${API_URL}/notifications`, {
         headers: getHeaders(),
       });
       if (res.ok) {
@@ -68,7 +70,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       prev.map(n => (n.id === id ? { ...n, isRead: true } : n))
     );
     try {
-      await fetch(`http://localhost:5000/notifications/${id}/read`, {
+      await fetch(`${API_URL}/notifications/${id}/read`, {
         method: 'PATCH',
         headers: getHeaders(),
       });
@@ -80,7 +82,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const markAllRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     try {
-      await fetch('http://localhost:5000/notifications/read-all', {
+      await fetch(`${API_URL}/notifications/read-all`, {
         method: 'POST',
         headers: getHeaders(),
       });
@@ -92,7 +94,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const clearNotifications = async () => {
     setNotifications([]);
     try {
-      await fetch('http://localhost:5000/notifications/clear', {
+      await fetch(`${API_URL}/notifications/clear`, {
         method: 'DELETE',
         headers: getHeaders(),
       });

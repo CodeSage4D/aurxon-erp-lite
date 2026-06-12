@@ -1742,7 +1742,7 @@ export default function FounderDashboardPage() {
           </div>
 
           {/* Right Panel */}
-          <aside className="w-72 border-l border-border bg-card/10 backdrop-blur-md p-5 space-y-5 overflow-y-auto shrink-0 hidden xl:block">
+          <aside className="w-72 border-l border-border bg-card/10 backdrop-blur-md p-5 space-y-5 overflow-y-auto shrink-0 hidden">
             {/* Hardware Telemetry */}
             <div className="glass rounded-2xl p-4 border border-border space-y-3">
               <div className="flex justify-between items-center border-b border-border pb-2">
