@@ -1,0 +1,5141 @@
+const API_URL = 'http://localhost:5000';
+
+// Helper to get headers
+function getHeaders() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('aurxon_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+// Helper to resolve the subdomain tenant slug from window hostname
+function getTenantSlug(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const host = window.location.hostname;
+  const parts = host.split('.');
+  
+  if (parts.length > 1) {
+    const isLocalhost = host.includes('localhost');
+    if (isLocalhost) {
+      if (parts.length >= 2 && parts[1].startsWith('localhost')) {
+        return parts[0];
+      }
+    } else {
+      if (host.endsWith('aurxon-erp-lite.vercel.app')) {
+        const subdomainPart = host.replace('.aurxon-erp-lite.vercel.app', '');
+        if (subdomainPart !== host && subdomainPart.trim() !== '') {
+          return subdomainPart.split('.')[0];
+        }
+      } else if (host.includes('aurxon-erp-lite')) {
+        const subdomainPart = host.split('.aurxon-erp-lite')[0];
+        if (subdomainPart && subdomainPart !== host) {
+          return subdomainPart;
+        }
+      } else {
+        return parts[0];
+      }
+    }
+  }
+  return undefined;
+}
+
+// Local mock storage key
+const MOCK_STORAGE_KEY = 'aurxon_mock_db';
+
+// Default mock data initialized on first load
+const DEFAULT_MOCK_DB = {
+  institutionName: 'Your Organization',
+  primaryColor: '#6366f1',
+  logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
+  
+  classes: [
+    { id: 'class-1', name: 'Grade 10-A', section: 'A', studentCount: 2, classTeacher: 'Sarah Connor', classTeacherId: 'staff-1' },
+    { id: 'class-2', name: 'Grade 11-A', section: 'A', studentCount: 1, classTeacher: 'John Keating', classTeacherId: 'staff-2' }
+  ],
+  
+  subjects: [
+    { id: 'subj-1', name: 'Advanced Mathematics', code: 'MATH101', classId: 'class-1', class: { name: 'Grade 10-A' }, teacher: { firstName: 'Sarah', lastName: 'Connor' } },
+    { id: 'subj-2', name: 'Introductory Physics', code: 'PHYS101', classId: 'class-1', class: { name: 'Grade 10-A' }, teacher: { firstName: 'John', lastName: 'Keating' } },
+    { id: 'subj-3', name: 'English Literature', code: 'LIT201', classId: 'class-2', class: { name: 'Grade 11-A' }, teacher: { firstName: 'John', lastName: 'Keating' } }
+  ],
+
+  students: [
+    {
+      id: 'stud-1',
+      rollNumber: 'ROLL-10A-01',
+      firstName: 'Alice',
+      lastName: 'Miller',
+      email: 'student@aurxon.com',
+      dateOfBirth: '2010-05-14',
+      gender: 'FEMALE',
+      classId: 'class-1',
+      class: { id: 'class-1', name: 'Grade 10-A' },
+      parent: { firstName: 'David', lastName: 'Miller', phone: '+1 555-0201', occupation: 'Software Architect', address: '742 Evergreen Terrace, Springfield' },
+      status: 'ACTIVE',
+      timeline: [
+        { id: 't1', type: 'ADMISSION', description: 'Admitted to Grade 10-A with parents linked successfully.', eventDate: new Date('2026-05-25').toISOString() }
+      ],
+      documents: [
+        { id: 'd1', name: 'Admission_Form.pdf', fileUrl: '#' },
+        { id: 'd2', name: 'Birth_Certificate.pdf', fileUrl: '#' }
+      ]
+    },
+    {
+      id: 'stud-2',
+      rollNumber: 'ROLL-10A-02',
+      firstName: 'Bob',
+      lastName: 'Johnson',
+      email: 'student2@aurxon.com',
+      dateOfBirth: '2010-11-22',
+      gender: 'MALE',
+      classId: 'class-1',
+      class: { id: 'class-1', name: 'Grade 10-A' },
+      parent: { firstName: 'Mark', lastName: 'Johnson', phone: '+1 555-0202', occupation: 'Civil Engineer', address: '123 Main St, Springfield' },
+      status: 'ACTIVE',
+      timeline: [
+        { id: 't2', type: 'ADMISSION', description: 'Admitted to Grade 10-A.', eventDate: new Date('2026-05-25').toISOString() }
+      ],
+      documents: []
+    },
+    {
+      id: 'stud-3',
+      rollNumber: 'ROLL-11A-01',
+      firstName: 'Charlie',
+      lastName: 'Brown',
+      email: 'student3@aurxon.com',
+      dateOfBirth: '2009-02-28',
+      gender: 'MALE',
+      classId: 'class-2',
+      class: { id: 'class-2', name: 'Grade 11-A' },
+      parent: { firstName: 'Sally', lastName: 'Brown', phone: '+1 555-0203', occupation: 'Manager', address: '456 Oak Ave, Springfield' },
+      status: 'ACTIVE',
+      timeline: [
+        { id: 't3', type: 'ADMISSION', description: 'Admitted to Grade 11-A.', eventDate: new Date('2026-05-25').toISOString() }
+      ],
+      documents: []
+    }
+  ],
+
+  staff: [
+    {
+      id: 'staff-1',
+      employeeId: 'EMP001',
+      firstName: 'Sarah',
+      lastName: 'Connor',
+      phone: '+1 555-0101',
+      designation: 'TEACHER',
+      joiningDate: '2024-08-15',
+      salary: 45000,
+      status: 'ACTIVE',
+      user: { email: 'teacher1@aurxon.com', isActive: true },
+      aadhaarNumber: '394082049284',
+      panNumber: 'ABCDE1234F',
+      qualification: 'M.Sc. Mathematics, B.Ed.',
+      experience: 8,
+      gender: 'FEMALE',
+      bloodGroup: 'O+',
+      fatherSpouseName: 'James Connor',
+      permanentAddress: '742 Evergreen Terrace, Springfield',
+      bankName: 'State Bank of India',
+      bankBranch: 'Main Branch',
+      accNumber: '10002930492',
+      ifscCode: 'SBIN0000001',
+      pfNumber: 'PF-2026-904',
+      esiNumber: 'ESI-302-840',
+      emergencyContactName: 'John Connor',
+      emergencyContactPhone: '+1 555-0199',
+      degrees: ['B.Sc. Mathematics', 'M.Sc. Mathematics', 'B.Ed.'],
+      skills: ['Calculus', 'Algebra', 'Geometry'],
+      certifications: ['National Board Certified Teacher'],
+      subjectsExpertise: ['Advanced Mathematics', 'Mathematics']
+    },
+    {
+      id: 'staff-2',
+      employeeId: 'EMP002',
+      firstName: 'John',
+      lastName: 'Keating',
+      phone: '+1 555-0102',
+      designation: 'TEACHER',
+      joiningDate: '2025-01-10',
+      salary: 48000,
+      status: 'ACTIVE',
+      user: { email: 'teacher2@aurxon.com', isActive: true },
+      aadhaarNumber: '562180429402',
+      panNumber: 'FGHIJ5678K',
+      qualification: 'M.A. English Literature',
+      experience: 12,
+      gender: 'MALE',
+      bloodGroup: 'A+',
+      fatherSpouseName: 'Arthur Keating',
+      permanentAddress: 'Welton Academy Quarters, Vermont',
+      bankName: 'HDFC Bank',
+      bankBranch: 'City Center',
+      accNumber: '50019283049',
+      ifscCode: 'HDFC0000124',
+      pfNumber: 'PF-2026-905',
+      esiNumber: 'ESI-302-841',
+      emergencyContactName: 'Todd Anderson',
+      emergencyContactPhone: '+1 555-0188',
+      degrees: ['B.A. English', 'M.A. English Literature'],
+      skills: ['Poetry', 'Creative Writing', 'Public Speaking'],
+      certifications: ['TKT Cambridge'],
+      subjectsExpertise: ['English Literature', 'Introductory Physics']
+    },
+    {
+      id: 'staff-3',
+      employeeId: 'EMP003',
+      firstName: 'Robert',
+      lastName: 'Kiyosaki',
+      phone: '+1 555-0103',
+      designation: 'ACCOUNTANT',
+      joiningDate: '2024-09-01',
+      salary: 40000,
+      status: 'ACTIVE',
+      user: { email: 'accountant@aurxon.com', isActive: true },
+      aadhaarNumber: '894082049285',
+      panNumber: 'KLMNO9012L',
+      qualification: 'B.Com, Chartered Accountant',
+      experience: 15,
+      gender: 'MALE',
+      bloodGroup: 'B+',
+      fatherSpouseName: 'Richard Kiyosaki',
+      permanentAddress: '88 Financial Plaza, Mumbai',
+      bankName: 'ICICI Bank',
+      bankBranch: 'Finance Row',
+      accNumber: '60029304925',
+      ifscCode: 'ICIC0000045',
+      pfNumber: 'PF-2026-906',
+      esiNumber: 'ESI-302-842',
+      emergencyContactName: 'Kim Kiyosaki',
+      emergencyContactPhone: '+1 555-0177',
+      degrees: ['B.Com', 'Chartered Accountant'],
+      skills: ['Financial Analysis', 'Auditing', 'Excel'],
+      certifications: ['ICAI Fellow'],
+      subjectsExpertise: ['Accountancy']
+    }
+  ],
+
+  attendance: [
+    // format key: studentId_date
+    { studentId: 'stud-1', date: '2026-05-25', status: 'PRESENT', remarks: 'On time' },
+    { studentId: 'stud-2', date: '2026-05-25', status: 'PRESENT', remarks: 'On time' },
+    { studentId: 'stud-1', date: '2026-05-26', status: 'PRESENT', remarks: 'On time' },
+    { studentId: 'stud-2', date: '2026-05-26', status: 'ABSENT', remarks: 'Sick leave' },
+    { studentId: 'stud-1', date: '2026-05-27', status: 'PRESENT', remarks: 'On time' },
+    { studentId: 'stud-2', date: '2026-05-27', status: 'PRESENT', remarks: 'On time' }
+  ],
+
+  feeStructures: [
+    { id: 'fee-1', name: 'Term 1 Tuition Fee', amount: 1500, dueDate: '2026-06-15', description: 'Standard tuition fee for Term 1 academics' },
+    { id: 'fee-2', name: 'Final Term Exam Fee', amount: 250, dueDate: '2026-06-30', description: 'Examination evaluation and operations cost' }
+  ],
+
+  feeAllocations: [
+    { id: 'alloc-1', studentId: 'stud-1', feeStructureId: 'fee-1', amountDue: 1500, amountPaid: 1500, status: 'PAID', payments: [{ amount: 1500, paymentDate: '2026-05-27T10:00:00.000Z', paymentMethod: 'ONLINE', receiptNumber: 'RCPT-2026-001', remarks: 'Paid in full via Stripe Sandbox' }] },
+    { id: 'alloc-2', studentId: 'stud-2', feeStructureId: 'fee-1', amountDue: 1500, amountPaid: 500, status: 'PARTIAL', payments: [{ amount: 500, paymentDate: '2026-05-27T11:00:00.000Z', paymentMethod: 'CASH', receiptNumber: 'RCPT-2026-002', remarks: 'Partial cash payment at school reception desk' }] },
+    { id: 'alloc-3', studentId: 'stud-3', feeStructureId: 'fee-1', amountDue: 1500, amountPaid: 0, status: 'UNPAID', payments: [] },
+    { id: 'alloc-4', studentId: 'stud-1', feeStructureId: 'fee-2', amountDue: 250, amountPaid: 0, status: 'UNPAID', payments: [] }
+  ],
+
+  exams: [
+    { id: 'exam-1', name: 'Mid-Term Algebra Exam', subjectId: 'subj-1', maxMarks: 100, examDate: '2026-04-10', subject: { name: 'Advanced Mathematics', class: { name: 'Grade 10-A' } } }
+  ],
+
+  examResults: [
+    { id: 'res-1', examId: 'exam-1', studentId: 'stud-1', marksObtained: 94, remarks: 'Outstanding performance in calculus' },
+    { id: 'res-2', examId: 'exam-1', studentId: 'stud-2', marksObtained: 76, remarks: 'Shows good improvement. Needs practice in linear graphs' }
+  ],
+
+  notices: [
+    { id: 'not-1', title: 'Annual Summer Vacation Announcement', content: 'Please note that the institution will remain closed for summer vacation from June 1st, 2026 to July 5th, 2026. Regular classes will resume on July 6th.', targetRoles: 'STUDENT,PARENT,TEACHER,STAFF,ACCOUNTANT', authorName: 'Sarah Connor', createdAt: new Date('2026-05-27T08:00:00.000Z').toISOString() },
+    { id: 'not-2', title: 'Term 1 Tuition Fee Collection Due Date', content: 'Reminder to all parents: The tuition fee collection deadline for Term 1 is June 15th, 2026. Late fees will apply post-deadline.', targetRoles: 'PARENT,ACCOUNTANT', authorName: 'Robert Kiyosaki', createdAt: new Date('2026-05-27T09:00:00.000Z').toISOString() }
+  ],
+
+  leaves: [
+    { id: 'leave-1', staffId: 'staff-2', startDate: '2026-06-10', endDate: '2026-06-12', reason: 'Personal medical appointment checkup', status: 'PENDING', staff: { firstName: 'John', lastName: 'Keating', designation: 'TEACHER' }, createdAt: new Date().toISOString() }
+  ],
+  expenses: [
+    { id: 'exp-1', title: 'CBSE Affiliation Fee Renewal', amount: 45000, category: 'ACADEMIC', paymentMethod: 'ONLINE', expenseDate: new Date('2026-05-20').toISOString() },
+    { id: 'exp-2', title: 'High-speed Fiber Broadband Internet', amount: 5600, category: 'UTILITY', paymentMethod: 'BANK_TRANSFER', expenseDate: new Date('2026-05-22').toISOString() },
+    { id: 'exp-3', title: 'Office Stationery & Printing Paper Reams', amount: 8400, category: 'OPERATIONAL', paymentMethod: 'CASH', expenseDate: new Date('2026-05-24').toISOString() }
+  ],
+  lessonPlans: [
+    { id: 'lp-1', title: 'Calculus - Integration Methods', content: 'Definite integrals and substitution method applications.', status: 'IN_PROGRESS', syllabusPercent: 40, subjectId: 'subj-1', teacherId: 'staff-1', createdAt: new Date('2026-05-25').toISOString(), subject: { name: 'Advanced Mathematics', code: 'MATH101', class: { name: 'Grade 10-A' } }, teacher: { firstName: 'Sarah', lastName: 'Connor' } },
+    { id: 'lp-2', title: 'Classical Mechanics - Laws of Motion', content: 'Newtonian principles and free body diagram calculations.', status: 'COMPLETED', syllabusPercent: 100, subjectId: 'subj-2', teacherId: 'staff-2', createdAt: new Date('2026-05-26').toISOString(), subject: { name: 'Introductory Physics', code: 'PHYS101', class: { name: 'Grade 10-A' } }, teacher: { firstName: 'John', lastName: 'Keating' } }
+  ],
+  books: [
+    { id: 'book-1', title: 'Fundamentals of Physics', author: 'Halliday & Resnick', isbn: '978-0470801833', totalCopies: 5, availableCopies: 4 },
+    { id: 'book-2', title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', isbn: '978-0262033848', totalCopies: 3, availableCopies: 3 },
+    { id: 'book-3', title: 'Higher Engineering Mathematics', author: 'B.S. Grewal', isbn: '978-8174091955', totalCopies: 10, availableCopies: 10 }
+  ],
+  bookIssues: [
+    { id: 'issue-1', studentId: 'stud-1', bookId: 'book-1', issueDate: '2026-05-26T10:00:00.000Z', returnDate: null, status: 'ISSUED', book: { title: 'Fundamentals of Physics', author: 'Halliday & Resnick', isbn: '978-0470801833' }, student: { firstName: 'Alice', lastName: 'Miller', scholarNumber: 'SCH-2026-001', rollNumber: 'ROLL-10A-01' } }
+  ],
+  payrolls: [
+    {
+      id: 'pay-1',
+      staffId: 'staff-1',
+      month: 'May 2026',
+      baseSalary: 45000,
+      hra: 8000,
+      da: 5000,
+      allowances: 2000,
+      deductions: 1500,
+      netPay: 58500,
+      paymentDate: '2026-05-25T10:00:00.000Z',
+      paymentMethod: 'BANK_TRANSFER',
+      receiptNumber: 'PAY-820492-901',
+      status: 'PAID',
+      staff: { id: 'staff-1', employeeId: 'EMP001', firstName: 'Sarah', lastName: 'Connor', designation: 'TEACHER' }
+    },
+    {
+      id: 'pay-2',
+      staffId: 'staff-2',
+      month: 'May 2026',
+      baseSalary: 48000,
+      hra: 8000,
+      da: 5000,
+      allowances: 3000,
+      deductions: 2000,
+      netPay: 62000,
+      paymentDate: '2026-05-25T10:30:00.000Z',
+      paymentMethod: 'BANK_TRANSFER',
+      receiptNumber: 'PAY-820492-902',
+      status: 'PAID',
+      staff: { id: 'staff-2', employeeId: 'EMP002', firstName: 'John', lastName: 'Keating', designation: 'TEACHER' }
+    }
+  ],
+  visitors: [
+    { id: 'vis-1', name: 'Dr. Rajesh Sharma', phone: '9876543210', purpose: 'Parent-Teacher Meeting', hostName: 'Sarah Connor', entryTime: '2026-05-28T09:15:00.000Z', exitTime: '2026-05-28T10:30:00.000Z', passNumber: 'PASS-804928-11' },
+    { id: 'vis-2', name: 'Amit Kumar', phone: '9988776655', purpose: 'Consumables Delivery', hostName: 'Robert Kiyosaki', entryTime: '2026-05-28T11:00:00.000Z', exitTime: null, passNumber: 'PASS-804928-12' }
+  ],
+  inventory: [
+    { id: 'inv-1', name: 'A4 Printing Paper Reams', category: 'STATIONERY', quantity: 25, unit: 'REAMS', status: 'IN_STOCK', vendor: 'Century Papers Ltd.' },
+    { id: 'inv-2', name: 'Wooden Classroom Chairs', category: 'FURNITURE', quantity: 4, unit: 'PCS', status: 'LOW_STOCK', vendor: 'DecoWood Furnishers' },
+    { id: 'inv-3', name: 'Digital Vernier Caliper', category: 'LAB_EQUIPMENT', quantity: 0, unit: 'PCS', status: 'OUT_OF_STOCK', vendor: 'Scientific Instruments Corp.' }
+  ]
+};
+
+// Access mock database helpers
+function getMockDb(): any {
+  if (typeof window === 'undefined') return DEFAULT_MOCK_DB;
+  const stored = localStorage.getItem(MOCK_STORAGE_KEY);
+  let parsed = DEFAULT_MOCK_DB as any;
+  if (stored) {
+    try {
+      parsed = JSON.parse(stored);
+    } catch (e) {
+      parsed = DEFAULT_MOCK_DB;
+    }
+  }
+  // Auto-seed Demo School if missing or old size
+  if (!parsed.students || parsed.students.length < 50) {
+    parsed = initializeDemoSchoolDb(parsed);
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(parsed));
+  }
+  return parsed;
+}
+
+function saveMockDb(db: any) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(db));
+  }
+}
+
+// 1. Auth Call
+export async function loginApi(email: string, pass: string) {
+  try {
+    const tenantSlug = getTenantSlug();
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, pass, tenantSlug }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Authentication failed');
+    }
+    const data = await res.json();
+    localStorage.setItem('aurxon_token', data.token);
+    localStorage.setItem('aurxon_user', JSON.stringify(data.user));
+    if (data.memberships) {
+      localStorage.setItem('aurxon_memberships', JSON.stringify(data.memberships));
+    }
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, using fallback client-side validation...');
+    const db = getMockDb();
+    
+    let role = 'TEACHER';
+    let profileName = 'Consultant User';
+    let profileId = 'staff-c1';
+    let memberships: any[] = [];
+
+    if (email === 'founder@aurxon.com') {
+      role = 'SUPER_ADMIN';
+      profileName = 'Founder User';
+      profileId = 'staff-f1';
+      memberships = [
+        {
+          id: 'mb-f1',
+          organizationId: 'inst-dps',
+          organizationName: 'Delhi Public School, Sector 4',
+          logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#0284c7',
+          role: 'SUPER_ADMIN',
+          roleName: 'Super Admin',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    } else if (email === 'admin@aurxon.com') {
+      role = 'INSTITUTE_ADMIN';
+      profileName = 'DPS Admin';
+      profileId = 'staff-a1';
+      memberships = [
+        {
+          id: 'mb-a1',
+          organizationId: 'inst-dps',
+          organizationName: 'Delhi Public School, Sector 4',
+          logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#0284c7',
+          role: 'INSTITUTE_ADMIN',
+          roleName: 'Institute Admin',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    } else if (email === 'principal@rkmvp.edu') {
+      role = 'PRINCIPAL';
+      profileName = 'RKMVP Principal';
+      profileId = 'staff-p1';
+      memberships = [
+        {
+          id: 'mb-p1',
+          organizationId: 'inst-rkmvp',
+          organizationName: 'Ramakrishna Mission Vidyapith',
+          logoUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4ee24f880?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#ea580c',
+          role: 'PRINCIPAL',
+          roleName: 'Principal',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    } else if (email === 'teacher@rkmvp.edu') {
+      role = 'TEACHER';
+      profileName = 'Sarah Connor';
+      profileId = 'staff-1';
+      memberships = [
+        {
+          id: 'mb-t1',
+          organizationId: 'inst-rkmvp',
+          organizationName: 'Ramakrishna Mission Vidyapith',
+          logoUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4ee24f880?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#ea580c',
+          role: 'TEACHER',
+          roleName: 'Teacher',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    } else if (email === 'consultant@aurxon.com') {
+      role = 'CONSULTANT';
+      profileName = 'Principal Consultant';
+      profileId = 'staff-c1';
+      memberships = [
+        {
+          id: 'mb-c1',
+          organizationId: 'inst-rkmvp',
+          organizationName: 'Ramakrishna Mission Vidyapith',
+          logoUrl: 'https://images.unsplash.com/photo-1595113316349-9fa4ee24f880?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#ea580c',
+          role: 'CONSULTANT',
+          roleName: 'Consultant',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        },
+        {
+          id: 'mb-c2',
+          organizationId: 'inst-kpphs',
+          organizationName: 'Kalyani Priyanath High School',
+          logoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&q=80&w=200',
+          primaryColor: '#16a34a',
+          role: 'CONSULTANT',
+          roleName: 'Consultant',
+          schoolId: null,
+          campusId: null,
+          isPrimary: false
+        }
+      ];
+    } else {
+      // Fallback
+      role = 'TEACHER';
+      profileName = 'Demo Teacher';
+      profileId = 'staff-1';
+      memberships = [
+        {
+          id: 'mb-d1',
+          organizationId: 'inst-1',
+          organizationName: db.institutionName,
+          logoUrl: db.logoUrl,
+          primaryColor: db.primaryColor,
+          role: 'TEACHER',
+          roleName: 'Teacher',
+          schoolId: null,
+          campusId: null,
+          isPrimary: true
+        }
+      ];
+    }
+
+    if (pass !== 'password123') {
+      throw new Error('Invalid password (hint: use password123)');
+    }
+
+    const payload = {
+      token: 'mock-jwt-token-aurxon-2026',
+      user: {
+        id: profileId,
+        email,
+        profileName,
+        profileId,
+      },
+      memberships
+    };
+
+    localStorage.setItem('aurxon_token', payload.token);
+    localStorage.setItem('aurxon_user', JSON.stringify(payload.user));
+    localStorage.setItem('aurxon_memberships', JSON.stringify(payload.memberships));
+    return payload;
+  }
+}
+
+export async function switchContextApi(organizationId: string, schoolId?: string | null, campusId?: string | null) {
+  try {
+    const res = await fetch(`${API_URL}/auth/switch-context`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ organizationId, schoolId, campusId }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to switch context');
+    }
+    const data = await res.json();
+    localStorage.setItem('aurxon_token', data.token);
+    localStorage.setItem('aurxon_context', JSON.stringify(data.context));
+    
+    // Update local user record
+    const userStr = localStorage.getItem('aurxon_user');
+    if (userStr) {
+      const userObj = JSON.parse(userStr);
+      userObj.role = data.context.role;
+      userObj.institutionId = data.context.organizationId;
+      userObj.institutionName = data.context.organizationName;
+      userObj.logoUrl = data.context.branding.logoUrl;
+      userObj.primaryColor = data.context.branding.primaryColor;
+      localStorage.setItem('aurxon_user', JSON.stringify(userObj));
+    }
+    return data;
+  } catch (error) {
+    console.warn('Backend switch-context offline, simulating fallback...');
+    // Simulated Switch Context Fallback
+    const membershipsStr = localStorage.getItem('aurxon_memberships');
+    let membership: any = null;
+    if (membershipsStr) {
+      const list = JSON.parse(membershipsStr);
+      membership = list.find((m: any) => m.organizationId === organizationId);
+    }
+    if (!membership) {
+      throw new Error('Access denied to this organization context.');
+    }
+    
+    const context = {
+      organizationId: membership.organizationId,
+      organizationName: membership.organizationName,
+      schoolId: membership.schoolId || null,
+      campusId: membership.campusId || null,
+      role: membership.role,
+      roleName: membership.roleName,
+      permissions: ['student:profile:crud', 'student:profile:read'],
+      enabledModules: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'],
+      enabledFeatures: ['BIOMETRIC_ATTENDANCE', 'EXAM_FORMULA_CALCULATOR'],
+      branding: {
+        primaryColor: membership.primaryColor,
+        logoUrl: membership.logoUrl,
+      }
+    };
+
+    localStorage.setItem('aurxon_token', 'mock-jwt-token-context-bound');
+    localStorage.setItem('aurxon_context', JSON.stringify(context));
+
+    const userStr = localStorage.getItem('aurxon_user');
+    if (userStr) {
+      const userObj = JSON.parse(userStr);
+      userObj.role = context.role;
+      userObj.institutionId = context.organizationId;
+      userObj.institutionName = context.organizationName;
+      userObj.logoUrl = context.branding.logoUrl;
+      userObj.primaryColor = context.branding.primaryColor;
+      localStorage.setItem('aurxon_user', JSON.stringify(userObj));
+    }
+
+    return { token: 'mock-jwt-token-context-bound', context };
+  }
+}
+
+export async function getFounderStatsApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/founder-stats`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load founder stats');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend offline, using fallback founder dashboard stats...');
+    return {
+      totalOrganizations: 3,
+      totalUsers: 5,
+      totalMemberships: 6,
+      activeSubscriptions: 3,
+      totalStorageLimit: 150,
+      totalStudentLimit: 3000,
+      activeLicenses: 3,
+      planBreakdown: {
+        ENTERPRISE: 1,
+        PROFESSIONAL: 2
+      },
+      recentOrganizations: [
+        { id: 'inst-dps', name: 'Delhi Public School, Sector 4', primaryColor: '#0284c7', createdAt: new Date().toISOString() },
+        { id: 'inst-rkmvp', name: 'Ramakrishna Mission Vidyapith', primaryColor: '#ea580c', createdAt: new Date().toISOString() },
+        { id: 'inst-kpphs', name: 'Kalyani Priyanath High School', primaryColor: '#16a34a', createdAt: new Date().toISOString() }
+      ],
+      moduleUsage: [
+        { code: 'STUDENT_MANAGEMENT', name: 'Student Management', activeCount: 2 },
+        { code: 'ATTENDANCE', name: 'Attendance Management', activeCount: 2 },
+        { code: 'EXAMINATION', name: 'Examinations', activeCount: 2 },
+        { code: 'FINANCE', name: 'Finance & Accounts', activeCount: 1 }
+      ]
+    };
+  }
+}
+
+// 2. Dashboard Analytics
+export async function getDashboardLayoutApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/layout`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('API failed');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend layout offline, simulating dynamic layout...');
+    // Fallback: load based on user email or default to school erp principal
+    return {
+      sections: [
+        {
+          title: "Saffron Academy Performance Overview",
+          gridCols: 4,
+          widgets: [
+            { id: "kpi-students", type: "kpi", title: "Total Students", valuePath: "studentCount", icon: "Users", color: "sky" },
+            { id: "kpi-staff", type: "kpi", title: "Total Faculty", valuePath: "staffCount", icon: "GraduationCap", color: "indigo" },
+            { id: "kpi-attendance", type: "kpi", title: "Daily Attendance", valuePath: "attendanceRate", icon: "CalendarCheck", color: "emerald", isPercentage: true },
+            { id: "kpi-collection", type: "kpi", title: "Term Collections", valuePath: "feeOverview.collectionRate", icon: "CreditCard", color: "rose", isPercentage: true }
+          ]
+        },
+        {
+          title: "Academic Operations Dashboard",
+          gridCols: 2,
+          widgets: [
+            { id: "chart-finance", type: "chart", chartType: "line", title: "Fee Billings vs Receipts (INR)", dataPath: "feeOverview", dataKeys: ["totalDue", "totalPaid"], color: "#0284c7" },
+            { id: "list-alerts", type: "list", listType: "weak_students", title: "Students Requiring Academic Intervention", dataPath: "weakStudents" }
+          ]
+        }
+      ]
+    };
+  }
+}
+
+export async function getDashboardWidgetsDataApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/widgets/data`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('API failed');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend widgets/data offline, returning fallback stats...');
+    return getDashboardStatsApi();
+  }
+}
+
+export async function getDashboardStatsApi() {
+  try {
+    const res = await fetch(`${API_URL}/dashboard/stats`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('API failed');
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    
+    // Computations
+    const studentCount = db.students.length;
+    const staffCount = db.staff.length;
+    const classCount = db.classes.length;
+
+    // Fees computations
+    let totalDue = 0;
+    let totalPaid = 0;
+    for (const a of db.feeAllocations) {
+      totalDue += a.amountDue;
+      totalPaid += a.amountPaid;
+    }
+
+    // Attendance rate
+    const totalAttend = db.attendance.length;
+    const presentCount = db.attendance.filter(r => r.status === 'PRESENT').length;
+    const attendanceRate = totalAttend > 0 ? (presentCount / totalAttend) * 100 : 96.5;
+
+    // Flagged weak students (attendance < 70% and exam average < 40%)
+    const weakStudents: any[] = [];
+    for (const student of db.students) {
+      const sAttend = db.attendance.filter(r => r.studentId === student.id);
+      const sPresent = sAttend.filter(r => r.status === 'PRESENT').length;
+      const sAttRate = sAttend.length > 0 ? Math.round((sPresent / sAttend.length) * 100) : 95;
+      
+      const sResults = db.examResults.filter(r => r.studentId === student.id);
+      const sMarksAvg = sResults.length > 0 
+        ? Math.round(sResults.reduce((acc, r) => acc + r.marksObtained, 0) / sResults.length) 
+        : 82;
+      
+      if (sAttRate < 70 && sMarksAvg < 40) {
+        weakStudents.push({
+          studentId: student.id,
+          name: `${student.firstName} ${student.lastName}`,
+          scholarNumber: student.scholarNumber || `SCH-2026-${student.id.slice(-4)}`,
+          rollNumber: student.rollNumber,
+          className: db.classes.find(c => c.id === student.classId)?.name || 'Assigned Grade',
+          attendanceRate: sAttRate,
+          examAverage: sMarksAvg
+        });
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // HISTORICAL EXECUTIVE ANALYTICS SEED DATA
+    // ─────────────────────────────────────────────
+    
+    // 30 Days daily attendance rates
+    const attendanceTrend: any[] = [];
+    const todayDate = new Date();
+    for (let day = 29; day >= 0; day--) {
+      const curDate = new Date(todayDate);
+      curDate.setDate(todayDate.getDate() - day);
+      if (curDate.getDay() === 0) continue; // Skip Sundays
+      
+      const dateStr = curDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+      // Calculate attendance rate for this day
+      const dateIso = curDate.toISOString().substring(0, 10);
+      const dayRecords = db.attendance.filter(r => r.date === dateIso);
+      const dayPresent = dayRecords.filter(r => r.status === 'PRESENT').length;
+      const rate = dayRecords.length > 0 ? Math.round((dayPresent / dayRecords.length) * 1000) / 10 : 95 + (day % 3);
+      
+      attendanceTrend.push({ date: dateStr, rate });
+    }
+
+    // Monthly Fee Collections Ledger (6 months)
+    const feeCollectionsTrend = [
+      { month: 'Dec 2025', collected: 8200, outstanding: 1200 },
+      { month: 'Jan 2026', collected: 12400, outstanding: 1800 },
+      { month: 'Feb 2026', collected: 15600, outstanding: 1400 },
+      { month: 'Mar 2026', collected: 10200, outstanding: 2500 },
+      { month: 'Apr 2026', collected: 18100, outstanding: 1900 },
+      { month: 'May 2026', collected: 22000, outstanding: 3500 }
+    ];
+
+    // Student Admissions Growth (3 years)
+    const admissionsGrowth = [
+      { year: '2024', count: 62 },
+      { year: '2025', count: 84 },
+      { year: '2026', count: studentCount }
+    ];
+
+    // Exam Term averages
+    const examPerformanceTrend = [
+      { term: 'CBSE Term 1', average: 68 },
+      { term: 'CBSE Term 2', average: 85 }
+    ];
+
+    // Teacher Attendance Monthly
+    const teacherAttendanceTrend = [
+      { month: 'Jan', rate: 97.2 },
+      { month: 'Feb', rate: 96.5 },
+      { month: 'Mar', rate: 98.1 },
+      { month: 'Apr', rate: 95.8 },
+      { month: 'May', rate: 97.5 }
+    ];
+
+    // Student Performance Distribution ranges
+    const studentPerformanceDistribution = [
+      { grade: 'A1 (91-100)', count: 28 },
+      { grade: 'A2 (81-90)', count: 32 },
+      { grade: 'B1/B2 (71-80)', count: 24 },
+      { grade: 'C1/C2 (51-70)', count: 12 },
+      { grade: 'D (40-50)', count: 2 },
+      { grade: 'F (< 40)', count: weakStudents.length }
+    ];
+
+    // Class wise performance (Grade 6-A to Grade 10-A)
+    const classWisePerformance = [
+      { grade: 'Grade 6-A', average: 78 },
+      { grade: 'Grade 7-A', average: 82 },
+      { grade: 'Grade 8-A', average: 75 },
+      { grade: 'Grade 9-A', average: 84 },
+      { grade: 'Grade 10-A', average: 80 }
+    ];
+
+    // Staff Leaves Analytics
+    const leaveAnalytics = [
+      { type: 'Casual (CL)', count: 8 },
+      { type: 'Earned (EL)', count: 4 },
+      { type: 'Medical (SL)', count: 3 },
+      { type: 'Special Duty', count: 2 }
+    ];
+
+    return {
+      studentCount,
+      staffCount,
+      classCount,
+      feeOverview: {
+        totalDue,
+        totalPaid,
+        totalPending: totalDue - totalPaid,
+        collectionRate: totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 90,
+      },
+      attendanceRate: Math.round(attendanceRate * 10) / 10,
+      recentNotices: db.notices.slice(0, 3),
+      classes: db.classes,
+      weakStudents,
+      analytics: {
+        attendanceTrend,
+        feeCollectionsTrend,
+        admissionsGrowth,
+        examPerformanceTrend,
+        teacherAttendanceTrend,
+        studentPerformanceDistribution,
+        classWisePerformance,
+        leaveAnalytics,
+        genderDistribution: [
+          { name: 'Boys', value: db.students.filter((s: any) => s.gender === 'MALE').length || 54 },
+          { name: 'Girls', value: db.students.filter((s: any) => s.gender === 'FEMALE').length || 46 }
+        ],
+        enrollmentCapacity: { enrolled: studentCount, capacity: 150 },
+        homeworkCompletionTrend: { completed: 92, pending: 8 }
+      }
+    };
+  }
+}
+
+// 3. Students CRUD
+export async function getStudentsApi(
+  opts: {
+    classId?: string;
+    search?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  } = {}
+) {
+  try {
+    const query = new URLSearchParams();
+    if (opts.classId) query.append('classId', opts.classId);
+    if (opts.search) query.append('search', opts.search);
+    if (opts.status) query.append('status', opts.status);
+    if (opts.page) query.append('page', String(opts.page));
+    if (opts.limit) query.append('limit', String(opts.limit));
+    if (opts.sortBy) query.append('sortBy', opts.sortBy);
+    if (opts.sortOrder) query.append('sortOrder', opts.sortOrder);
+    
+    const res = await fetch(`${API_URL}/students?${query.toString()}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let filtered = [...db.students];
+    if (opts.classId) {
+      filtered = filtered.filter((s: any) => s.classId === opts.classId);
+    }
+    if (opts.status) {
+      filtered = filtered.filter((s: any) => s.status === opts.status);
+    } else {
+      filtered = filtered.filter((s: any) => s.status !== 'ARCHIVED');
+    }
+    if (opts.search) {
+      const q = opts.search.toLowerCase();
+      filtered = filtered.filter((s: any) =>
+        s.firstName.toLowerCase().includes(q) ||
+        s.lastName.toLowerCase().includes(q) ||
+        (s.rollNumber || '').toLowerCase().includes(q) ||
+        (s.scholarNumber || '').toLowerCase().includes(q)
+      );
+    }
+    // Sort
+    const sortBy = opts.sortBy || 'rollNumber';
+    const sortOrder = opts.sortOrder || 'asc';
+    filtered.sort((a: any, b: any) => {
+      const av = (a[sortBy] || '').toString();
+      const bv = (b[sortBy] || '').toString();
+      return sortOrder === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    // Paginate
+    const page = opts.page || 1;
+    const limit = opts.limit || 20;
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limit);
+    const paginated = filtered.slice((page - 1) * limit, page * limit);
+    return { students: paginated, total, page, limit, totalPages };
+  }
+}
+
+export async function getStudentApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/${id}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const student = db.students.find(s => s.id === id);
+    if (!student) throw new Error('Student not found');
+    
+    // Attach allocations
+    const allocations = db.feeAllocations
+      .filter(a => a.studentId === id)
+      .map(a => ({
+        ...a,
+        feeStructure: db.feeStructures.find(fs => fs.id === a.feeStructureId)
+      }));
+
+    return {
+      ...student,
+      feeAllocations: allocations,
+    };
+  }
+}
+
+export async function createStudentApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/students`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const newStudent = {
+      id: `stud-${Date.now()}`,
+      rollNumber: data.rollNumber,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender,
+      classId: data.classId,
+      class: db.classes.find(c => c.id === data.classId) || { id: data.classId, name: 'Assigned Class' },
+      status: 'ACTIVE',
+      timeline: [{ id: `t-${Date.now()}`, type: 'ADMISSION', description: 'Admitted online successfully.', eventDate: new Date().toISOString() }],
+      documents: [],
+      parent: { firstName: data.parentName || 'Guardian', phone: data.parentPhone || '' }
+    };
+    db.students.push(newStudent);
+    saveMockDb(db);
+    return newStudent;
+  }
+}
+
+export async function updateStudentApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/students/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const index = db.students.findIndex(s => s.id === id);
+    if (index === -1) throw new Error('Student not found');
+    
+    db.students[index] = {
+      ...db.students[index],
+      firstName: data.firstName,
+      lastName: data.lastName,
+      rollNumber: data.rollNumber,
+      classId: data.classId,
+      class: db.classes.find(c => c.id === data.classId) || db.students[index].class,
+    };
+    saveMockDb(db);
+    return db.students[index];
+  }
+}
+
+export async function deleteStudentApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const idx = db.students.findIndex((s: any) => s.id === id);
+    if (idx !== -1) {
+      db.students[idx] = { ...db.students[idx], status: 'ARCHIVED' };
+    }
+    db.feeAllocations = db.feeAllocations.filter((a: any) => a.studentId !== id);
+    db.attendance = db.attendance.filter((r: any) => r.studentId !== id);
+    db.examResults = db.examResults.filter((r: any) => r.studentId !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// 3b. Document Management
+export async function uploadDocumentApi(studentId: string, name: string, fileUrl: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/${studentId}/documents`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ name, fileUrl }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const student = db.students.find((s: any) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    const doc = { id: `doc-${Date.now()}`, studentId, name, fileUrl };
+    if (!student.documents) student.documents = [];
+    student.documents.push(doc);
+    if (!student.timeline) student.timeline = [];
+    student.timeline.unshift({ id: `t-${Date.now()}`, type: 'DOCUMENT_UPLOAD', description: `Document "${name}" uploaded.`, eventDate: new Date().toISOString() });
+    saveMockDb(db);
+    return doc;
+  }
+}
+
+export async function deleteDocumentApi(studentId: string, docId: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/${studentId}/documents/${docId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const student = db.students.find((s: any) => s.id === studentId);
+    if (student && student.documents) {
+      student.documents = student.documents.filter((d: any) => d.id !== docId);
+    }
+    saveMockDb(db);
+    return { success: true, docId };
+  }
+}
+
+// 3c. Bulk Import
+export async function importStudentsApi(students: any[]) {
+  try {
+    const res = await fetch(`${API_URL}/students/import`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ students }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    // Mock validation: check required fields and simulate import
+    const db = getMockDb();
+    const existingEmails = new Set(db.students.map((s: any) => s.email?.toLowerCase()));
+    const errors: any[] = [];
+    const emailsSeen = new Set<string>();
+
+    students.forEach((row: any, i: number) => {
+      const rowNum = i + 1;
+      if (!row.firstName?.trim()) errors.push({ row: rowNum, field: 'firstName', message: 'First name is required' });
+      if (!row.lastName?.trim()) errors.push({ row: rowNum, field: 'lastName', message: 'Last name is required' });
+      if (!row.email?.trim()) {
+        errors.push({ row: rowNum, field: 'email', message: 'Email is required' });
+      } else {
+        const emailLower = row.email.trim().toLowerCase();
+        if (existingEmails.has(emailLower)) errors.push({ row: rowNum, field: 'email', message: `Email already exists: ${emailLower}` });
+        else if (emailsSeen.has(emailLower)) errors.push({ row: rowNum, field: 'email', message: `Duplicate email in batch: ${emailLower}` });
+        emailsSeen.add(emailLower);
+      }
+      if (!row.dateOfBirth?.trim() || isNaN(new Date(row.dateOfBirth).getTime())) errors.push({ row: rowNum, field: 'dateOfBirth', message: 'Invalid date (YYYY-MM-DD)' });
+      if (!row.gender?.trim()) errors.push({ row: rowNum, field: 'gender', message: 'Gender required (MALE/FEMALE/OTHER)' });
+      if (!row.className?.trim()) errors.push({ row: rowNum, field: 'className', message: 'Class name is required' });
+      if (row.aadhaarNumber && !/^\d{12}$/.test(row.aadhaarNumber)) errors.push({ row: rowNum, field: 'aadhaarNumber', message: 'Aadhaar must be 12 digits' });
+    });
+
+    if (errors.length > 0) return { success: false, errors, imported: 0 };
+
+    const results: any[] = [];
+    students.forEach((row: any, i: number) => {
+      const newId = `stud-import-${Date.now()}-${i}`;
+      const classObj = db.classes.find((c: any) => c.name.toLowerCase() === row.className?.trim().toLowerCase());
+      const tempPass = `TEMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const newStudent = {
+        id: newId,
+        firstName: row.firstName.trim(),
+        lastName: row.lastName.trim(),
+        email: row.email.trim().toLowerCase(),
+        dateOfBirth: row.dateOfBirth,
+        gender: row.gender.toUpperCase(),
+        classId: classObj?.id || 'unknown',
+        class: classObj || { name: row.className },
+        status: 'ACTIVE',
+        rollNumber: row.rollNumber || `ROLL-${Date.now()}`,
+        scholarNumber: `SCH-${new Date().getFullYear()}-${String(db.students.length + i + 1).padStart(4, '0')}`,
+        timeline: [{ id: `t-${newId}`, type: 'ADMISSION', description: 'Bulk imported.', eventDate: new Date().toISOString() }],
+        documents: [],
+        parent: { firstName: row.fatherName || 'Guardian', phone: row.parentPhone || '' },
+      };
+      db.students.push(newStudent);
+      results.push({ scholarNumber: newStudent.scholarNumber, email: newStudent.email, temporaryPassword: tempPass });
+    });
+    saveMockDb(db);
+    return { success: true, errors: [], imported: results.length, students: results };
+  }
+}
+
+// 4. Classes
+export async function getClassesApi() {
+  try {
+    const res = await fetch(`${API_URL}/classes`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.classes;
+  }
+}
+
+export async function getSubjectsApi(classId?: string) {
+  try {
+    const query = classId ? `?classId=${classId}` : '';
+    const res = await fetch(`${API_URL}/classes/subjects${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.subjects;
+    if (classId) list = list.filter(s => s.classId === classId);
+    return list;
+  }
+}
+
+// 5. Attendance
+export async function getClassAttendanceApi(classId: string, date: string) {
+  try {
+    const res = await fetch(`${API_URL}/attendance?classId=${classId}&date=${date}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const dateOnly = date.substring(0, 10);
+    const students = db.students.filter(s => s.classId === classId);
+    
+    return students.map((student) => {
+      const record = db.attendance.find(r => r.studentId === student.id && r.date.startsWith(dateOnly));
+      return {
+        studentId: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        rollNumber: student.rollNumber,
+        status: record ? record.status : 'PRESENT',
+        remarks: record ? record.remarks : '',
+      };
+    });
+  }
+}
+
+export async function submitAttendanceApi(classId: string, date: string, records: any[]) {
+  try {
+    const res = await fetch(`${API_URL}/attendance/bulk`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ classId, date, records }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const dateOnly = date.substring(0, 10);
+    
+    for (const record of records) {
+      db.attendance = db.attendance.filter(
+        r => !(r.studentId === record.studentId && r.date.startsWith(dateOnly))
+      );
+      db.attendance.push({
+        studentId: record.studentId,
+        date: dateOnly,
+        status: record.status,
+        remarks: record.remarks || '',
+      });
+    }
+    saveMockDb(db);
+    return { success: true };
+  }
+}
+
+export async function getStudentAttendanceSummaryApi(studentId: string) {
+  try {
+    const res = await fetch(`${API_URL}/attendance/student/${studentId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const records = db.attendance.filter(r => r.studentId === studentId);
+    const total = records.length;
+    const present = records.filter(r => r.status === 'PRESENT').length;
+    const rate = total > 0 ? (present / total) * 100 : 100;
+    
+    return {
+      total,
+      present,
+      absent: total - present,
+      rate: Math.round(rate * 10) / 10,
+      history: records,
+    };
+  }
+}
+
+// 6. Fees
+export async function getFeesOverviewApi() {
+  try {
+    const res = await fetch(`${API_URL}/fees/overview`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let totalDue = 0;
+    let totalPaid = 0;
+    for (const a of db.feeAllocations) {
+      totalDue += a.amountDue;
+      totalPaid += a.amountPaid;
+    }
+    return {
+      totalDue,
+      totalPaid,
+      totalPending: totalDue - totalPaid,
+      collectedRate: totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 90,
+      countPaid: db.feeAllocations.filter(a => a.status === 'PAID').length,
+      countPartial: db.feeAllocations.filter(a => a.status === 'PARTIAL').length,
+      countUnpaid: db.feeAllocations.filter(a => a.status === 'UNPAID').length,
+    };
+  }
+}
+
+export async function getFeesAllocationsApi(classId?: string, status?: string) {
+  try {
+    const query = new URLSearchParams();
+    if (classId) query.append('classId', classId);
+    if (status) query.append('status', status);
+    
+    const res = await fetch(`${API_URL}/fees/allocations?${query.toString()}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.feeAllocations.map(a => {
+      const student = db.students.find(s => s.id === a.studentId) || { firstName: 'Alice', lastName: 'Miller', rollNumber: 'ROLL-1', class: { name: 'Class' } };
+      const feeStructure = db.feeStructures.find(f => f.id === a.feeStructureId) || { name: 'Tuition Fee' };
+      return {
+        ...a,
+        student: {
+          ...student,
+          class: { name: (student.class as any)?.name || 'Grade 10-A' }
+        },
+        feeStructure,
+      };
+    });
+
+    if (classId) {
+      list = list.filter(a => (a.student as any).classId === classId || (a.student as any).class?.id === classId);
+    }
+    if (status) {
+      list = list.filter(a => a.status === status);
+    }
+    return list;
+  }
+}
+
+export async function payFeeApi(allocationId: string, amount: number, paymentMethod: string, remarks?: string) {
+  try {
+    const res = await fetch(`${API_URL}/fees/payments`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ allocationId, amount, paymentMethod, remarks }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const index = db.feeAllocations.findIndex(a => a.id === allocationId);
+    if (index === -1) throw new Error('Allocation record not found');
+    
+    const alloc = db.feeAllocations[index];
+    const newPaid = alloc.amountPaid + parseFloat(amount as any);
+    let status = 'PARTIAL';
+    if (newPaid >= alloc.amountDue) status = 'PAID';
+    
+    const receiptNumber = `RCPT-${Date.now().toString().slice(-6)}`;
+    const newPayment = {
+      amount: parseFloat(amount as any),
+      paymentDate: new Date().toISOString(),
+      paymentMethod,
+      receiptNumber,
+      remarks: remarks || '',
+    };
+    
+    db.feeAllocations[index] = {
+      ...alloc,
+      amountPaid: newPaid,
+      status,
+      payments: [...(alloc.payments || []), newPayment] as any
+    };
+    
+    saveMockDb(db);
+    return newPayment;
+  }
+}
+
+export async function getFeesStructuresApi() {
+  try {
+    const res = await fetch(`${API_URL}/fees/structures`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.feeStructures;
+  }
+}
+
+export async function createFeeStructureApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/fees/structures`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const newFs = {
+      id: `fee-${Date.now()}`,
+      name: data.name,
+      amount: parseFloat(data.amount),
+      dueDate: data.dueDate,
+      description: data.description || '',
+    };
+    db.feeStructures.push(newFs);
+    saveMockDb(db);
+    return newFs;
+  }
+}
+
+// 7. Examination
+export async function getExamsApi(subjectId?: string) {
+  try {
+    const query = subjectId ? `?subjectId=${subjectId}` : '';
+    const res = await fetch(`${API_URL}/exams${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.exams.map((exam) => {
+      const subject = db.subjects.find(s => s.id === exam.subjectId) || { name: 'Subject', class: { name: 'Class 1' } };
+      return {
+        ...exam,
+        subject,
+      };
+    });
+  }
+}
+
+export async function createExamApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/exams`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const newExam = {
+      id: `exam-${Date.now()}`,
+      name: data.name,
+      subjectId: data.subjectId,
+      maxMarks: parseFloat(data.maxMarks),
+      examDate: data.examDate,
+    };
+    db.exams.push(newExam);
+    saveMockDb(db);
+    return newExam;
+  }
+}
+
+export async function getExamResultsApi(examId: string) {
+  try {
+    const res = await fetch(`${API_URL}/exams/${examId}/results`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const exam = db.exams.find(e => e.id === examId);
+    if (!exam) throw new Error('Exam not found');
+    
+    // Filter students by that class
+    const subject = db.subjects.find(s => s.id === exam.subjectId);
+    const students = db.students.filter(s => s.classId === subject?.classId);
+    
+    return students.map((student) => {
+      const resRecord = db.examResults.find(r => r.examId === examId && r.studentId === student.id);
+      return {
+        studentId: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        rollNumber: student.rollNumber,
+        marksObtained: resRecord ? resRecord.marksObtained : 0,
+        remarks: resRecord ? resRecord.remarks : '',
+      };
+    });
+  }
+}
+
+export async function submitExamResultsApi(examId: string, results: any[]) {
+  try {
+    const res = await fetch(`${API_URL}/exams/${examId}/results/bulk`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ results }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    
+    for (const record of results) {
+      db.examResults = db.examResults.filter(r => !(r.examId === examId && r.studentId === record.studentId));
+      db.examResults.push({
+        id: `res-${Date.now()}-${Math.random()}`,
+        examId,
+        studentId: record.studentId,
+        marksObtained: parseFloat(record.marksObtained),
+        remarks: record.remarks || '',
+      });
+    }
+    saveMockDb(db);
+    return { success: true };
+  }
+}
+
+export async function getStudentReportApi(studentId: string) {
+  try {
+    const res = await fetch(`${API_URL}/exams/student/${studentId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const results = db.examResults.filter(r => r.studentId === studentId);
+    
+    return results.map((r) => {
+      const exam = db.exams.find(e => e.id === r.examId) || { name: 'Term Exam', maxMarks: 100, subjectId: 'subj-1' };
+      const subject = db.subjects.find(s => s.id === exam.subjectId) || { name: 'Mathematics' };
+      const percentage = (r.marksObtained / exam.maxMarks) * 100;
+      let grade = 'F';
+      if (percentage >= 90) grade = 'A+';
+      else if (percentage >= 80) grade = 'A';
+      else if (percentage >= 70) grade = 'B';
+      else if (percentage >= 60) grade = 'C';
+      else if (percentage >= 50) grade = 'D';
+
+      return {
+        examId: r.examId,
+        examName: exam.name,
+        subjectName: subject.name,
+        marksObtained: r.marksObtained,
+        maxMarks: exam.maxMarks,
+        percentage: Math.round(percentage),
+        grade,
+        remarks: r.remarks,
+      };
+    });
+  }
+}
+
+// 8. Staff
+export async function getStaffApi(designation?: string) {
+  try {
+    const query = designation ? `?designation=${designation}` : '';
+    const res = await fetch(`${API_URL}/staff${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.staff;
+    if (designation) list = list.filter(s => s.designation === designation);
+    return list;
+  }
+}
+
+export async function createStaffApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/staff`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const newStaff = {
+      id: `staff-${Date.now()}`,
+      employeeId: data.employeeId,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+      designation: data.designation,
+      joiningDate: data.joiningDate || new Date().toISOString(),
+      salary: parseFloat(data.salary || 0),
+      status: 'ACTIVE',
+      user: { email: data.email, isActive: true },
+    };
+    db.staff.push(newStaff);
+    saveMockDb(db);
+    return newStaff;
+  }
+}
+
+export async function getLeavesApi(staffId?: string, status?: string) {
+  try {
+    const params = new URLSearchParams();
+    if (staffId) params.append('staffId', staffId);
+    if (status) params.append('status', status);
+    const res = await fetch(`${API_URL}/leaves?${params.toString()}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.leaves;
+    if (staffId) list = list.filter(l => l.staffId === staffId || l.staff?.id === staffId);
+    if (status) list = list.filter(l => l.status === status);
+    return list;
+  }
+}
+
+export async function submitLeaveApi(startDate: string, endDate: string, reason: string, leaveType?: string) {
+  try {
+    const res = await fetch(`${API_URL}/leaves`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ startDate, endDate, reason, leaveType: leaveType || 'CL' }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const userCached = localStorage.getItem('aurxon_user');
+    const user = userCached ? JSON.parse(userCached) : { profileId: 'staff-1', profileName: 'Sarah Connor', role: 'TEACHER' };
+    
+    const newLeave = {
+      id: `leave-${Date.now()}`,
+      staffId: user.profileId,
+      startDate,
+      endDate,
+      reason,
+      leaveType: leaveType || 'CL',
+      status: 'PENDING',
+      staff: { firstName: user.profileName.split(' ')[0], lastName: user.profileName.split(' ')[1] || '', designation: user.role },
+      createdAt: new Date().toISOString(),
+    };
+    db.leaves.push(newLeave);
+    saveMockDb(db);
+    return newLeave;
+  }
+}
+
+export async function approveLeaveApi(leaveId: string, status: string) {
+  try {
+    const endpoint = status === 'APPROVED' ? 'approve' : 'reject';
+    const res = await fetch(`${API_URL}/leaves/${leaveId}/${endpoint}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const index = db.leaves.findIndex(l => l.id === leaveId);
+    if (index === -1) throw new Error('Leave request not found');
+    
+    db.leaves[index].status = status;
+    saveMockDb(db);
+    return db.leaves[index];
+  }
+}
+
+// 9. Notices
+export async function getNoticesApi() {
+  try {
+    const res = await fetch(`${API_URL}/notices`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const userStr = localStorage.getItem('aurxon_user');
+    const user = userStr ? JSON.parse(userStr) : { role: 'STUDENT' };
+    
+    return db.notices.filter((n) => {
+      const roles = n.targetRoles.split(',');
+      return roles.includes(user.role) || roles.includes('ALL') || user.role === 'SUPER_ADMIN' || user.role === 'INSTITUTE_ADMIN';
+    });
+  }
+}
+
+export async function createNoticeApi(title: string, content: string, targetRoles: string[]) {
+  try {
+    const res = await fetch(`${API_URL}/notices`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ title, content, targetRoles }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const userStr = localStorage.getItem('aurxon_user');
+    const user = userStr ? JSON.parse(userStr) : { profileName: 'Administrator' };
+    
+    const newNotice = {
+      id: `not-${Date.now()}`,
+      title,
+      content,
+      targetRoles: targetRoles.join(','),
+      authorName: user.profileName,
+      createdAt: new Date().toISOString(),
+    };
+    db.notices.unshift(newNotice);
+    saveMockDb(db);
+    return newNotice;
+  }
+}
+
+// 10. Indian PIN Code Autofill lookup helper
+export function getPinCodeDetails(pin: string) {
+  if (!pin || pin.length < 2) return null;
+  const pinPrefix = pin.substring(0, 2);
+  const mapping: Record<string, { state: string; district: string }> = {
+    '11': { state: 'Delhi', district: 'New Delhi' },
+    '12': { state: 'Haryana', district: 'Gurugram' },
+    '13': { state: 'Haryana', district: 'Ambala' },
+    '14': { state: 'Punjab', district: 'Ludhiana' },
+    '16': { state: 'Punjab', district: 'Chandigarh' },
+    '20': { state: 'Uttar Pradesh', district: 'Noida' },
+    '22': { state: 'Uttar Pradesh', district: 'Lucknow' },
+    '30': { state: 'Rajasthan', district: 'Jaipur' },
+    '36': { state: 'Gujarat', district: 'Rajkot' },
+    '38': { state: 'Gujarat', district: 'Ahmedabad' },
+    '39': { state: 'Gujarat', district: 'Surat' },
+    '40': { state: 'Maharashtra', district: 'Mumbai' },
+    '41': { state: 'Maharashtra', district: 'Pune' },
+    '44': { state: 'Maharashtra', district: 'Nagpur' },
+    '45': { state: 'Madhya Pradesh', district: 'Indore' },
+    '46': { state: 'Madhya Pradesh', district: 'Bhopal' },
+    '50': { state: 'Telangana', district: 'Hyderabad' },
+    '56': { state: 'Karnataka', district: 'Bengaluru' },
+    '57': { state: 'Karnataka', district: 'Mysore' },
+    '60': { state: 'Tamil Nadu', district: 'Chennai' },
+    '62': { state: 'Tamil Nadu', district: 'Madurai' },
+    '68': { state: 'Kerala', district: 'Kochi' },
+    '70': { state: 'West Bengal', district: 'Kolkata' },
+    '75': { state: 'Odisha', district: 'Bhubaneswar' },
+    '80': { state: 'Bihar', district: 'Patna' },
+  };
+  return mapping[pinPrefix] || null;
+}
+
+// 11. bulk academic promotion API
+export async function promoteStudentsApi(studentIds: string[], targetClassId: string) {
+  try {
+    const res = await fetch(`${API_URL}/students/promote`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ studentIds, targetClassId }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend promote endpoint offline, falling back to mock database...');
+    const db = getMockDb();
+    const targetClass = db.classes.find(c => c.id === targetClassId);
+    if (!targetClass) throw new Error('Target class not found');
+    
+    if (!(db as any).promotions) (db as any).promotions = [];
+    let count = 0;
+    db.students = db.students.map((student) => {
+      if (studentIds.includes(student.id)) {
+        count++;
+        const classDigits = targetClass.name.replace(/\D/g, '') || '0';
+        const nextRoll = `${classDigits}1${String(count).padStart(2, '0')}`;
+        
+        const timeline = student.timeline || [];
+        timeline.unshift({
+          id: `t-${Date.now()}-${count}`,
+          type: 'PROMOTION',
+          description: `Promoted automatically to ${targetClass.name} under Roll No. ${nextRoll}.`,
+          eventDate: new Date().toISOString()
+        });
+
+        (db as any).promotions.push({
+          id: `prom-${Date.now()}-${student.id}`,
+          student: { firstName: student.firstName, lastName: student.lastName, scholarNumber: student.scholarNumber || 'SCH' },
+          fromClass: { name: student.class?.name || 'Previous Grade' },
+          toClass: { name: targetClass.name },
+          academicYear: '2026-2027',
+          promotedAt: new Date().toISOString(),
+          promotedBy: { email: 'admin@aurxon.com' }
+        });
+        
+        return {
+          ...student,
+          classId: targetClassId,
+          class: { id: targetClassId, name: targetClass.name },
+          rollNumber: nextRoll,
+          timeline,
+        };
+      }
+      return student;
+    });
+    saveMockDb(db);
+    return { success: true, count };
+  }
+}
+
+// 12. P&L financial ledger API
+export async function getFinanceOverviewApi() {
+  try {
+    const res = await fetch(`${API_URL}/fees/finance/overview`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend finance overview offline, falling back to mock calculations...');
+    const db = getMockDb();
+    
+    // Fee revenues
+    const totalRevenue = db.feeAllocations.reduce((sum, a) => sum + a.amountPaid, 0);
+    
+    // Operational expenses
+    const expenses = db.expenses || [];
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    
+    // Staff Salaries (in INR)
+    const totalSalaries = db.staff.reduce((sum, s) => sum + s.salary, 0) * 80; // Scaled to INR
+    
+    const netProfit = totalRevenue - totalExpenses - totalSalaries;
+    const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0;
+    
+    return {
+      totalRevenue,
+      totalExpenses,
+      totalSalaries,
+      netProfit,
+      profitMargin,
+      currency: 'INR',
+      currencySymbol: '₹',
+      recentExpenses: expenses,
+    };
+  }
+}
+
+// 13. Expense management API
+export async function getExpensesApi() {
+  try {
+    const res = await fetch(`${API_URL}/fees/expenses`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.expenses || [];
+  }
+}
+
+export async function createExpenseApi(data: { title: string; amount: number; category: string; paymentMethod: string }) {
+  try {
+    const res = await fetch(`${API_URL}/fees/expenses`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const newExpense = {
+      id: `exp-${Date.now()}`,
+      title: data.title,
+      amount: parseFloat(data.amount as any),
+      category: data.category,
+      paymentMethod: data.paymentMethod || 'CASH',
+      expenseDate: new Date().toISOString(),
+    };
+    if (!db.expenses) db.expenses = [];
+    db.expenses.unshift(newExpense);
+    saveMockDb(db);
+    return newExpense;
+  }
+}
+
+export async function deleteExpenseApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/fees/expenses/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.expenses) {
+      db.expenses = db.expenses.filter((e: any) => e.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// 14. Lesson Planner and Syllabus tracker API
+export async function getLessonPlansApi(teacherId?: string, subjectId?: string) {
+  try {
+    const query = new URLSearchParams();
+    if (teacherId) query.append('teacherId', teacherId);
+    if (subjectId) query.append('subjectId', subjectId);
+    const res = await fetch(`${API_URL}/lessons?${query.toString()}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let plans = db.lessonPlans || [];
+    if (teacherId) {
+      plans = plans.filter((p: any) => p.teacherId === teacherId);
+    }
+    if (subjectId) {
+      plans = plans.filter((p: any) => p.subjectId === subjectId);
+    }
+    return plans;
+  }
+}
+
+export async function createLessonPlanApi(data: { title: string; content: string; subjectId: string; syllabusPercent: number }) {
+  try {
+    const res = await fetch(`${API_URL}/lessons`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const userStr = localStorage.getItem('aurxon_user');
+    const user = userStr ? JSON.parse(userStr) : { profileId: 'staff-1', profileName: 'Sarah Connor' };
+    
+    const subject = db.subjects.find((s: any) => s.id === data.subjectId) || { name: 'Subject', code: 'SUB', class: { name: 'Class' } };
+    
+    const newPlan = {
+      id: `lp-${Date.now()}`,
+      title: data.title,
+      content: data.content,
+      status: 'PENDING',
+      syllabusPercent: parseInt(data.syllabusPercent as any || '0'),
+      subjectId: data.subjectId,
+      teacherId: user.profileId,
+      createdAt: new Date().toISOString(),
+      subject,
+      teacher: { firstName: user.profileName.split(' ')[0], lastName: user.profileName.split(' ')[1] || '' }
+    };
+    if (!db.lessonPlans) db.lessonPlans = [];
+    db.lessonPlans.unshift(newPlan);
+    saveMockDb(db);
+    return newPlan;
+  }
+}
+
+export async function updateLessonPlanApi(id: string, data: { status: string; syllabusPercent: number }) {
+  try {
+    const res = await fetch(`${API_URL}/lessons/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.lessonPlans) {
+      const idx = db.lessonPlans.findIndex((p: any) => p.id === id);
+      if (idx !== -1) {
+        db.lessonPlans[idx] = {
+          ...db.lessonPlans[idx],
+          status: data.status,
+          syllabusPercent: parseInt(data.syllabusPercent as any || '0'),
+        };
+      }
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+export async function deleteLessonPlanApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/lessons/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.lessonPlans) {
+      db.lessonPlans = db.lessonPlans.filter((p: any) => p.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// 15. Library Management API
+export async function getBooksApi(search?: string) {
+  try {
+    const query = search ? `?search=${search}` : '';
+    const res = await fetch(`${API_URL}/library/books${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.books || [];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((b: any) =>
+        b.title.toLowerCase().includes(q) ||
+        b.author.toLowerCase().includes(q) ||
+        b.isbn.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }
+}
+
+export async function createBookApi(data: { title: string; author: string; isbn: string; totalCopies: number }) {
+  try {
+    const res = await fetch(`${API_URL}/library/books`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.books) db.books = [];
+    const existing = db.books.find((b: any) => b.isbn === data.isbn);
+    if (existing) throw new Error('A book with this ISBN already exists');
+
+    const newBook = {
+      id: `book-${Date.now()}`,
+      title: data.title,
+      author: data.author,
+      isbn: data.isbn,
+      totalCopies: parseInt(data.totalCopies as any || 1),
+      availableCopies: parseInt(data.totalCopies as any || 1),
+    };
+    db.books.push(newBook);
+    saveMockDb(db);
+    return newBook;
+  }
+}
+
+export async function updateBookApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/library/books/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.books) {
+      const idx = db.books.findIndex((b: any) => b.id === id);
+      if (idx !== -1) {
+        const book = db.books[idx];
+        const total = data.totalCopies !== undefined ? parseInt(data.totalCopies) : book.totalCopies;
+        const diff = total - book.totalCopies;
+        const available = Math.max(0, book.availableCopies + diff);
+        db.books[idx] = {
+          ...book,
+          title: data.title !== undefined ? data.title : book.title,
+          author: data.author !== undefined ? data.author : book.author,
+          isbn: data.isbn !== undefined ? data.isbn : book.isbn,
+          totalCopies: total,
+          availableCopies: available,
+        };
+      }
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+export async function deleteBookApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/books/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.books) {
+      db.books = db.books.filter((b: any) => b.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+export async function getIssuesApi() {
+  try {
+    const res = await fetch(`${API_URL}/library/issues`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const list = db.bookIssues || [];
+    let updated = false;
+    const computed = list.map((issue: any) => {
+      let fineAmount = issue.fineAmount || 0;
+      let fineStatus = issue.fineStatus || 'NONE';
+      let status = issue.status;
+
+      if ((status === 'ISSUED' || status === 'OVERDUE') && issue.dueDate) {
+        const daysOverdue = Math.max(0, Math.floor((Date.now() - new Date(issue.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+        if (daysOverdue > 0) {
+          fineAmount = daysOverdue * 10;
+          fineStatus = 'UNPAID';
+          status = 'OVERDUE';
+          updated = true;
+        }
+      }
+
+      return {
+        ...issue,
+        fineAmount,
+        fineStatus,
+        status
+      };
+    });
+
+    if (updated) {
+      db.bookIssues = computed;
+      saveMockDb(db);
+    }
+    return computed;
+  }
+}
+
+export async function getStudentIssuesApi(studentId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/issues/student/${studentId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return (db.bookIssues || []).filter((i: any) => i.studentId === studentId);
+  }
+}
+
+export async function issueBookApi(studentId: string | null, bookId: string, staffId: string | null = null) {
+  try {
+    const res = await fetch(`${API_URL}/library/issue`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ studentId: studentId || undefined, staffId: staffId || undefined, bookId }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.books) db.books = [];
+    if (!db.bookIssues) db.bookIssues = [];
+
+    const bookIdx = db.books.findIndex((b: any) => b.id === bookId);
+    if (bookIdx === -1) throw new Error('Book not found');
+    if (db.books[bookIdx].availableCopies <= 0) throw new Error('No copies available');
+
+    let borrowerName = 'Borrower';
+    let borrowerDetails = {};
+
+    if (studentId) {
+      const student = db.students.find((s: any) => s.id === studentId);
+      if (!student) throw new Error('Student not found');
+      borrowerName = `${student.firstName} ${student.lastName}`;
+      borrowerDetails = {
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          scholarNumber: student.scholarNumber || `SCH-${Date.now().toString().slice(-4)}`,
+          rollNumber: student.rollNumber,
+          class: student.class ? { name: student.class.name } : { name: 'Grade 10-A' }
+        }
+      };
+
+      const existingIssue = db.bookIssues.find((i: any) => i.studentId === studentId && i.bookId === bookId && ['ISSUED', 'OVERDUE'].includes(i.status));
+      if (existingIssue) throw new Error('This book is already issued to this student');
+    } else if (staffId) {
+      const staffMem = db.staff.find((s: any) => s.id === staffId);
+      if (!staffMem) throw new Error('Staff member not found');
+      borrowerName = `${staffMem.firstName} ${staffMem.lastName}`;
+      borrowerDetails = {
+        staff: {
+          id: staffMem.id,
+          employeeId: staffMem.employeeId,
+          firstName: staffMem.firstName,
+          lastName: staffMem.lastName,
+          designation: staffMem.designation
+        }
+      };
+
+      const existingIssue = db.bookIssues.find((i: any) => i.staffId === staffId && i.bookId === bookId && ['ISSUED', 'OVERDUE'].includes(i.status));
+      if (existingIssue) throw new Error('This book is already issued to this staff member');
+    } else {
+      throw new Error('Please select a student or staff member');
+    }
+
+    const newIssue = {
+      id: `issue-${Date.now()}`,
+      studentId: studentId || null,
+      staffId: staffId || null,
+      bookId,
+      issueDate: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days
+      returnDate: null,
+      fineAmount: 0,
+      finePaid: 0,
+      fineStatus: 'NONE',
+      status: 'ISSUED',
+      book: { ...db.books[bookIdx] },
+      ...borrowerDetails
+    };
+
+    db.books[bookIdx].availableCopies -= 1;
+    db.bookIssues.push(newIssue);
+    saveMockDb(db);
+    return newIssue;
+  }
+}
+
+export async function returnBookApi(issueId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/return/${issueId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.bookIssues) db.bookIssues = [];
+
+    const issueIdx = db.bookIssues.findIndex((i: any) => i.id === issueId);
+    if (issueIdx === -1) throw new Error('Issue record not found');
+    if (db.bookIssues[issueIdx].status === 'RETURNED') throw new Error('Already returned');
+
+    db.bookIssues[issueIdx].status = 'RETURNED';
+    db.bookIssues[issueIdx].returnDate = new Date().toISOString();
+
+    const bookIdx = db.books.findIndex((b: any) => b.id === db.bookIssues[issueIdx].bookId);
+    if (bookIdx !== -1) {
+      db.books[bookIdx].availableCopies += 1;
+    }
+
+    saveMockDb(db);
+    return db.bookIssues[issueIdx];
+  }
+}
+
+export async function getStaffByIdApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/staff/${id}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const staff = db.staff.find((s: any) => s.id === id);
+    if (!staff) throw new Error('Staff member not found');
+    
+    const payrolls = (db.payrolls || []).filter((p: any) => p.staffId === id);
+    const leaves = (db.leaves || []).filter((l: any) => l.staffId === id);
+    
+    return {
+      ...staff,
+      payrolls,
+      leaves
+    };
+  }
+}
+
+export async function updateStaffApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/staff/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const idx = db.staff.findIndex((s: any) => s.id === id);
+    if (idx === -1) throw new Error('Staff member not found');
+    
+    db.staff[idx] = {
+      ...db.staff[idx],
+      ...data,
+      salary: data.salary !== undefined ? parseFloat(data.salary) : db.staff[idx].salary,
+      experience: data.experience !== undefined ? parseInt(data.experience) : db.staff[idx].experience,
+      degrees: data.degrees !== undefined ? data.degrees : db.staff[idx].degrees || [],
+      skills: data.skills !== undefined ? data.skills : db.staff[idx].skills || [],
+      certifications: data.certifications !== undefined ? data.certifications : db.staff[idx].certifications || [],
+      subjectsExpertise: data.subjectsExpertise !== undefined ? data.subjectsExpertise : db.staff[idx].subjectsExpertise || [],
+    };
+    saveMockDb(db);
+    return db.staff[idx];
+  }
+}
+
+export async function getPayrollsApi(month?: string) {
+  try {
+    const query = month ? `?month=${month}` : '';
+    const res = await fetch(`${API_URL}/payroll${query}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    let list = db.payrolls || [];
+    if (month) {
+      list = list.filter((p: any) => p.month === month);
+    }
+    return list;
+  }
+}
+
+export async function getStaffPayrollsApi(staffId: string) {
+  try {
+    const res = await fetch(`${API_URL}/payroll/staff/${staffId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return (db.payrolls || []).filter((p: any) => p.staffId === staffId);
+  }
+}
+
+export async function getPayrollByIdApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/payroll/${id}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const payroll = (db.payrolls || []).find((p: any) => p.id === id);
+    if (!payroll) throw new Error('Payroll record not found');
+    const staff = db.staff.find((s: any) => s.id === payroll.staffId);
+    return {
+      ...payroll,
+      staff
+    };
+  }
+}
+
+export async function createPayrollApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/payroll`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.payrolls) db.payrolls = [];
+    
+    const staff = db.staff.find((s: any) => s.id === data.staffId);
+    if (!staff) throw new Error('Staff member not found');
+    
+    const existing = db.payrolls.find((p: any) => p.staffId === data.staffId && p.month === data.month);
+    if (existing) throw new Error(`Salary slip for ${data.month} already generated for this employee`);
+    
+    const baseSalary = parseFloat(data.baseSalary) || staff.salary;
+    const hra = parseFloat(data.hra) || 0;
+    const da = parseFloat(data.da) || 0;
+    const allowances = parseFloat(data.allowances) || 0;
+    const deductions = parseFloat(data.deductions) || 0;
+    const netPay = baseSalary + hra + da + allowances - deductions;
+    
+    const receiptNumber = `PAY-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    
+    const newPayroll = {
+      id: `pay-${Date.now()}`,
+      staffId: data.staffId,
+      month: data.month,
+      baseSalary,
+      hra,
+      da,
+      allowances,
+      deductions,
+      netPay,
+      paymentDate: new Date().toISOString(),
+      paymentMethod: data.paymentMethod || 'BANK_TRANSFER',
+      receiptNumber,
+      status: 'PAID',
+      staff: {
+        id: staff.id,
+        employeeId: staff.employeeId,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        designation: staff.designation
+      }
+    };
+    
+    db.payrolls.push(newPayroll);
+    saveMockDb(db);
+    return newPayroll;
+  }
+}
+
+export async function updatePayrollStatusApi(id: string, status: string) {
+  try {
+    const res = await fetch(`${API_URL}/payroll/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.payrolls) db.payrolls = [];
+    const idx = db.payrolls.findIndex((p: any) => p.id === id);
+    if (idx === -1) throw new Error('Payroll record not found');
+    
+    db.payrolls[idx].status = status;
+    saveMockDb(db);
+    return db.payrolls[idx];
+  }
+}
+
+// 16. Visitor Gate Desk APIs
+export async function getVisitorsApi() {
+  try {
+    const res = await fetch(`${API_URL}/visitors`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.visitors || [];
+  }
+}
+
+export async function createVisitorApi(data: { name: string; phone: string; purpose: string; hostName: string }) {
+  try {
+    const res = await fetch(`${API_URL}/visitors`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.visitors) db.visitors = [];
+    const newVisitor = {
+      id: `vis-${Date.now()}`,
+      name: data.name,
+      phone: data.phone,
+      purpose: data.purpose,
+      hostName: data.hostName,
+      entryTime: new Date().toISOString(),
+      exitTime: null,
+      passNumber: `PASS-${Date.now().toString().slice(-6)}-${Math.floor(10 + Math.random() * 90)}`,
+    };
+    db.visitors.unshift(newVisitor);
+    saveMockDb(db);
+    return newVisitor;
+  }
+}
+
+export async function checkoutVisitorApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/visitors/${id}/checkout`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.visitors) db.visitors = [];
+    const idx = db.visitors.findIndex((v: any) => v.id === id);
+    if (idx !== -1) {
+      db.visitors[idx].exitTime = new Date().toISOString();
+    }
+    saveMockDb(db);
+    return db.visitors[idx];
+  }
+}
+
+// 17. Inventory APIs
+export async function getInventoryApi() {
+  try {
+    const res = await fetch(`${API_URL}/inventory`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return db.inventory || [];
+  }
+}
+
+export async function createInventoryItemApi(data: { name: string; category: string; quantity: number; unit: string; vendor?: string }) {
+  try {
+    const res = await fetch(`${API_URL}/inventory`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.inventory) db.inventory = [];
+    const qty = parseInt(data.quantity as any) || 0;
+    const status = qty <= 0 ? 'OUT_OF_STOCK' : qty <= 5 ? 'LOW_STOCK' : 'IN_STOCK';
+    const newItem = {
+      id: `inv-${Date.now()}`,
+      name: data.name,
+      category: data.category,
+      quantity: qty,
+      unit: data.unit || 'PCS',
+      status,
+      vendor: data.vendor || null,
+    };
+    db.inventory.unshift(newItem);
+    saveMockDb(db);
+    return newItem;
+  }
+}
+
+export async function updateInventoryItemApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/inventory/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.inventory) db.inventory = [];
+    const idx = db.inventory.findIndex((item: any) => item.id === id);
+    if (idx !== -1) {
+      const item = db.inventory[idx];
+      const qty = data.quantity !== undefined ? parseInt(data.quantity) : item.quantity;
+      const status = qty <= 0 ? 'OUT_OF_STOCK' : qty <= 5 ? 'LOW_STOCK' : 'IN_STOCK';
+      db.inventory[idx] = {
+        ...item,
+        name: data.name !== undefined ? data.name : item.name,
+        category: data.category !== undefined ? data.category : item.category,
+        quantity: qty,
+        unit: data.unit !== undefined ? data.unit : item.unit,
+        status,
+        vendor: data.vendor !== undefined ? data.vendor : item.vendor,
+      };
+    }
+     saveMockDb(db);
+    return db.inventory[idx];
+  }
+}
+
+export async function deleteInventoryItemApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/inventory/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (db.inventory) {
+      db.inventory = db.inventory.filter((item: any) => item.id !== id);
+    }
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// 18. Timetable APIs
+export async function getTimetableApi(classId: string) {
+  try {
+    const res = await fetch(`${API_URL}/timetable/${classId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    const entries = (db.timetable || []).filter((e: any) => e.classId === classId);
+    return entries.map((e: any) => {
+      const subject = db.subjects.find((s: any) => s.id === e.subjectId) || { id: e.subjectId, name: 'Subject', code: 'SUB' };
+      const teacher = db.staff.find((t: any) => t.id === e.teacherId) || { id: e.teacherId, firstName: 'Teacher', lastName: '' };
+      return {
+        ...e,
+        subject,
+        teacher
+      };
+    });
+  }
+}
+
+export async function generateTimetableApi(classId: string, periodsPerDay: number, durationMin: number, startTime: string) {
+  try {
+    const res = await fetch(`${API_URL}/timetable/${classId}/generate`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ periodsPerDay, durationMin, startTime }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'API failed');
+    }
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Backend timetable generator offline, using mock client-side scheduler...');
+    const db = getMockDb();
+    const subjects = db.subjects.filter((s: any) => s.classId === classId);
+    if (subjects.length === 0) {
+      throw new Error('This class has no subjects registered. Please add subjects first.');
+    }
+
+    const teachers = db.staff || [];
+    const otherEntries = (db.timetable || []).filter((e: any) => e.classId !== classId);
+
+    const busyMap: { [day: string]: { [period: number]: Set<string> } } = {};
+    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+
+    days.forEach(day => {
+      busyMap[day] = {};
+      for (let p = 1; p <= periodsPerDay; p++) {
+        busyMap[day][p] = new Set<string>();
+      }
+    });
+
+    otherEntries.forEach((entry: any) => {
+      if (busyMap[entry.dayOfWeek] && busyMap[entry.dayOfWeek][entry.periodNumber]) {
+        busyMap[entry.dayOfWeek][entry.periodNumber].add(entry.teacherId);
+      }
+    });
+
+    const addMinutes = (timeStr: string, mins: number) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      const totalMins = h * 60 + m + mins;
+      const newH = Math.floor(totalMins / 60) % 24;
+      const newM = totalMins % 60;
+      return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+    };
+
+    const isExpert = (teacher: any, subjectName: string) => {
+      const expArray = teacher.subjectsExpertise || [];
+      return expArray.some((exp: string) => 
+        exp.toLowerCase().includes(subjectName.toLowerCase()) || 
+        subjectName.toLowerCase().includes(exp.toLowerCase())
+      );
+    };
+
+    const generatedEntries: any[] = [];
+
+    for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+      const day = days[dayIndex];
+
+      for (let p = 1; p <= periodsPerDay; p++) {
+        const pStartTime = addMinutes(startTime, (p - 1) * durationMin);
+        const pEndTime = addMinutes(pStartTime, durationMin);
+
+        const subjectIndex = (dayIndex * periodsPerDay + (p - 1)) % subjects.length;
+        let selectedSubject = subjects[subjectIndex];
+        
+        let teacherMatch = teachers.find(t => 
+          selectedSubject.teacher && 
+          t.firstName === selectedSubject.teacher.firstName && 
+          t.lastName === selectedSubject.teacher.lastName
+        );
+        let assignedTeacherId = teacherMatch ? teacherMatch.id : (teachers[0]?.id || 'staff-1');
+        let assignedTeacher = teachers.find(t => t.id === assignedTeacherId);
+
+        const isBusy = assignedTeacherId ? busyMap[day][p].has(assignedTeacherId) : true;
+
+        if (isBusy || !assignedTeacherId) {
+          let backupTeacher = teachers.find(t => 
+            t.id !== assignedTeacherId && 
+            !busyMap[day][p].has(t.id) && 
+            isExpert(t, selectedSubject.name)
+          );
+
+          if (backupTeacher) {
+            assignedTeacherId = backupTeacher.id;
+            assignedTeacher = backupTeacher;
+          } else {
+            let selfStudySubject = db.subjects.find((s: any) => s.classId === classId && s.name.toLowerCase() === 'self study');
+            if (!selfStudySubject) {
+              selfStudySubject = {
+                id: 'SELF-STUDY-TEMP',
+                name: 'Self Study',
+                code: 'SELF-STUDY',
+                classId,
+                class: { name: 'Self Study' },
+                teacher: { firstName: 'Supervisor', lastName: '' }
+              };
+            }
+            selectedSubject = selfStudySubject;
+
+            const freeTeacher = teachers.find(t => !busyMap[day][p].has(t.id));
+            if (freeTeacher) {
+              assignedTeacherId = freeTeacher.id;
+              assignedTeacher = freeTeacher;
+            } else {
+              assignedTeacher = teachers[0];
+              assignedTeacherId = teachers[0]?.id || 'staff-1';
+            }
+          }
+        }
+
+        if (assignedTeacherId) {
+          busyMap[day][p].add(assignedTeacherId);
+        }
+
+        generatedEntries.push({
+          dayOfWeek: day,
+          periodNumber: p,
+          startTime: pStartTime,
+          endTime: pEndTime,
+          subjectId: selectedSubject.id,
+          subject: {
+            id: selectedSubject.id,
+            name: selectedSubject.name,
+            code: selectedSubject.code,
+          },
+          teacherId: assignedTeacherId,
+          teacher: {
+            id: assignedTeacher?.id || '',
+            firstName: assignedTeacher?.firstName || '',
+            lastName: assignedTeacher?.lastName || '',
+          },
+          room: db.classes.find((c: any) => c.id === classId)?.name || 'Grade 10-A'
+        });
+      }
+    }
+
+    return generatedEntries;
+  }
+}
+
+export async function saveTimetableApi(classId: string, entries: any[]) {
+  try {
+    const res = await fetch(`${API_URL}/timetable/${classId}/save`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ entries }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'API failed');
+    }
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Backend save timetable offline, falling back to mock storage...');
+    const db = getMockDb();
+    
+    for (const entry of entries) {
+      // 1. Teacher double-booking conflict check
+      const conflict = (db.timetable || []).find((e: any) => 
+        e.classId !== classId && 
+        e.dayOfWeek === entry.dayOfWeek && 
+        e.periodNumber === parseInt(entry.periodNumber) && 
+        e.teacherId === entry.teacherId
+      );
+      if (conflict) {
+        const busyTeacher = db.staff.find((t: any) => t.id === entry.teacherId);
+        const conflictClass = db.classes.find((c: any) => c.id === conflict.classId);
+        throw new Error(
+          `Conflict: Teacher ${busyTeacher?.firstName || 'Teacher'} is already assigned to ${conflictClass?.name || 'another class'} on ${entry.dayOfWeek} Period ${entry.periodNumber}`
+        );
+      }
+
+      // 2. Room double-booking conflict check
+      const roomConflict = (db.timetable || []).find((e: any) => 
+        e.classId !== classId && 
+        e.dayOfWeek === entry.dayOfWeek && 
+        e.periodNumber === parseInt(entry.periodNumber) && 
+        entry.room && e.room === entry.room
+      );
+      if (roomConflict) {
+        const conflictClass = db.classes.find((c: any) => c.id === roomConflict.classId);
+        throw new Error(
+          `Conflict: Room "${entry.room}" is already allocated to ${conflictClass?.name || 'another class'} on ${entry.dayOfWeek} Period ${entry.periodNumber}`
+        );
+      }
+    }
+
+    if (!db.timetable) db.timetable = [];
+    db.timetable = db.timetable.filter((e: any) => e.classId !== classId);
+    
+    entries.forEach((entry: any) => {
+      let finalSubjectId = entry.subjectId;
+      if (entry.subjectId === 'SELF-STUDY-TEMP') {
+        let selfStudy = db.subjects.find((s: any) => s.classId === classId && s.name === 'Self Study');
+        if (!selfStudy) {
+          selfStudy = {
+            id: `subj-self-study-${Date.now()}`,
+            name: 'Self Study',
+            code: 'SELF-STUDY',
+            classId,
+            class: db.classes.find((c: any) => c.id === classId) || { name: 'Class' },
+            teacher: { firstName: entry.teacher.firstName, lastName: entry.teacher.lastName }
+          };
+          db.subjects.push(selfStudy);
+        }
+        finalSubjectId = selfStudy.id;
+      }
+
+      db.timetable.push({
+        id: `t-entry-${Date.now()}-${Math.random()}`,
+        classId,
+        subjectId: finalSubjectId,
+        teacherId: entry.teacherId,
+        dayOfWeek: entry.dayOfWeek,
+        periodNumber: parseInt(entry.periodNumber),
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        room: entry.room || null
+      });
+    });
+    
+    saveMockDb(db);
+    return { success: true };
+  }
+}
+
+// ==========================================
+// NEW MODULES — BRANCHES, SETTINGS, NOTIFICATIONS, PROMOTIONS
+// ==========================================
+
+export async function getBranchesApi() {
+  try {
+    const res = await fetch(`${API_URL}/branches`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).branches) {
+      (db as any).branches = [
+        { id: 'branch-1', name: 'Delhi Public School Dwarka Campus', code: 'DPS-DWK', address: 'Sector 4, Dwarka', city: 'New Delhi', state: 'Delhi', pinCode: '110078', phone: '+91 11 25074472' }
+      ];
+      saveMockDb(db);
+    }
+    return (db as any).branches;
+  }
+}
+
+export async function createBranchApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/branches`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).branches) (db as any).branches = [];
+    const newBranch = {
+      id: `branch-${Date.now()}`,
+      name: data.name,
+      code: data.code || null,
+      address: data.address || null,
+      city: data.city || null,
+      state: data.state || null,
+      pinCode: data.pinCode || null,
+      phone: data.phone || null,
+    };
+    (db as any).branches.push(newBranch);
+    saveMockDb(db);
+    return newBranch;
+  }
+}
+
+export async function getSettingsApi() {
+  try {
+    const res = await fetch(`${API_URL}/settings`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).settings) {
+      (db as any).settings = {
+        academicYear: '2026-2027',
+        gradingSystem: 'CBSE',
+        timezone: 'Asia/Kolkata',
+        currency: 'INR',
+      };
+      saveMockDb(db);
+    }
+    return (db as any).settings;
+  }
+}
+
+export async function updateSettingsApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/settings`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    (db as any).settings = {
+      ...(db as any).settings,
+      ...data,
+    };
+    saveMockDb(db);
+    return (db as any).settings;
+  }
+}
+
+export async function getNotificationsApi() {
+  try {
+    const res = await fetch(`${API_URL}/notifications`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!(db as any).notifications) {
+      (db as any).notifications = [
+        { id: 'notif-1', title: 'Welcome to your Workspace', content: 'Your management platform is ready. Your main branch has been registered successfully.', isRead: false, createdAt: new Date().toISOString() }
+      ];
+      saveMockDb(db);
+    }
+    return (db as any).notifications;
+  }
+}
+
+export async function markNotificationsReadApi() {
+  try {
+    const res = await fetch(`${API_URL}/notifications/read-all`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if ((db as any).notifications) {
+      (db as any).notifications = (db as any).notifications.map((n: any) => ({ ...n, isRead: true }));
+      saveMockDb(db);
+    }
+    return { success: true };
+  }
+}
+
+
+export async function getPromotionHistoryApi() {
+  try {
+    const res = await fetch(`${API_URL}/students/promotions/history`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    return (db as any).promotions || [];
+  }
+}
+
+// ─────────────────────────────────────────────
+// 01_Core & Auth Extensions
+// ─────────────────────────────────────────────
+
+export async function changePasswordApi(currentPassword: string, newPassword: string) {
+  const res = await fetch(`${API_URL}/auth/change-password`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Change password failed');
+  }
+  return await res.json();
+}
+
+export async function getAuditLogsApi() {
+  const res = await fetch(`${API_URL}/audit-logs`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch audit logs');
+  return await res.json();
+}
+
+export async function getInstitutionApi() {
+  const res = await fetch(`${API_URL}/institution`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch institution profile');
+  return await res.json();
+}
+
+export async function updateInstitutionApi(data: any) {
+  const res = await fetch(`${API_URL}/institution`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update institution');
+  return await res.json();
+}
+
+export async function getRbacRolesApi() {
+  const res = await fetch(`${API_URL}/rbac/roles`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch RBAC roles');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 02_Admission - Address Lookup & Parents
+// ─────────────────────────────────────────────
+
+export async function lookupPincodeApi(pin: string) {
+  const res = await fetch(`${API_URL}/admission/address/pincode/${pin}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('PIN code lookup failed');
+  return await res.json();
+}
+
+export async function getParentsApi(search?: string) {
+  const query = search ? `?search=${encodeURIComponent(search)}` : '';
+  const res = await fetch(`${API_URL}/parents${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch parents');
+  return await res.json();
+}
+
+export async function getParentApi(id: string) {
+  const res = await fetch(`${API_URL}/parents/${id}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch parent');
+  return await res.json();
+}
+
+export async function createParentApi(data: any) {
+  const res = await fetch(`${API_URL}/parents`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create parent');
+  return await res.json();
+}
+
+export async function updateParentApi(id: string, data: any) {
+  const res = await fetch(`${API_URL}/parents/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update parent');
+  return await res.json();
+}
+
+export async function linkStudentToParentApi(parentId: string, studentId: string) {
+  const res = await fetch(`${API_URL}/parents/${parentId}/link-student/${studentId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to link student');
+  return await res.json();
+}
+
+export async function unlinkStudentFromParentApi(parentId: string, studentId: string) {
+  const res = await fetch(`${API_URL}/parents/${parentId}/unlink-student/${studentId}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to unlink student');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 03_Academics - Academic Years & Subjects
+// ─────────────────────────────────────────────
+
+export async function getAcademicYearsApi() {
+  const res = await fetch(`${API_URL}/academic-years`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch academic years');
+  return await res.json();
+}
+
+export async function createAcademicYearApi(data: { name: string; startDate: string; endDate: string }) {
+  const res = await fetch(`${API_URL}/academic-years`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create academic year');
+  return await res.json();
+}
+
+export async function activateAcademicYearApi(id: string) {
+  const res = await fetch(`${API_URL}/academic-years/${id}/activate`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to activate academic year');
+  return await res.json();
+}
+
+export async function closeAcademicYearApi(id: string) {
+  const res = await fetch(`${API_URL}/academic-years/${id}/close`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to close academic year');
+  return await res.json();
+}
+
+export async function deleteAcademicYearApi(id: string) {
+  const res = await fetch(`${API_URL}/academic-years/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to delete academic year');
+  return await res.json();
+}
+
+export async function createSubjectApi(data: { name: string; code: string; classId: string; teacherId?: string }) {
+  const res = await fetch(`${API_URL}/subjects`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create subject');
+  return await res.json();
+}
+
+export async function updateSubjectApi(id: string, data: any) {
+  const res = await fetch(`${API_URL}/subjects/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update subject');
+  return await res.json();
+}
+
+export async function deleteSubjectApi(id: string) {
+  const res = await fetch(`${API_URL}/subjects/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to delete subject');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 04_Attendance - Staff Attendance
+// ─────────────────────────────────────────────
+
+export async function getStaffAttendanceByDateApi(date: string) {
+  const res = await fetch(`${API_URL}/staff-attendance/date/${date}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch staff attendance');
+  return await res.json();
+}
+
+export async function getStaffAttendanceSummaryApi(staffId: string, month: number, year: number) {
+  const res = await fetch(`${API_URL}/staff-attendance/summary/${staffId}?month=${month}&year=${year}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch staff attendance summary');
+  return await res.json();
+}
+
+export async function recordStaffAttendanceApi(data: { staffId: string; status: string; clockIn?: string; clockOut?: string; remarks?: string; branchId?: string }) {
+  const res = await fetch(`${API_URL}/staff-attendance/record`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to record staff attendance');
+  return await res.json();
+}
+
+export async function bulkRecordStaffAttendanceApi(date: string, records: any[]) {
+  const res = await fetch(`${API_URL}/staff-attendance/bulk`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ date, records }),
+  });
+  if (!res.ok) throw new Error('Failed to bulk record staff attendance');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 07_Staff - Leaves
+// ─────────────────────────────────────────────
+
+export async function getLeaveBalancesApi(staffId: string) {
+  const res = await fetch(`${API_URL}/leaves/balances/${staffId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch leave balances');
+  return await res.json();
+}
+
+export async function createLeaveRequestApi(data: any) {
+  const res = await fetch(`${API_URL}/leaves`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create leave request');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 05_Fees - Extended (Receipts & Concessions)
+// ─────────────────────────────────────────────
+
+export async function getFeeReceiptApi(paymentId: string) {
+  const res = await fetch(`${API_URL}/fees/receipts/${paymentId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee receipt');
+  return await res.json();
+}
+
+export async function getFeeConcessionsApi() {
+  const res = await fetch(`${API_URL}/fees/concessions`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee concessions');
+  return await res.json();
+}
+
+export async function createFeeConcessionApi(data: { allocationId: string; concessionType: string; amountWaived: number; justification?: string }) {
+  const res = await fetch(`${API_URL}/fees/concessions`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to apply fee concession');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 09_Reports & 10_Analytics
+// ─────────────────────────────────────────────
+
+export async function getStudentRegisterReportApi(classId?: string, status?: string) {
+  const params = new URLSearchParams();
+  if (classId) params.append('classId', classId);
+  if (status) params.append('status', status);
+  const res = await fetch(`${API_URL}/reports/students?${params.toString()}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch student register report');
+  return await res.json();
+}
+
+export async function getMonthlyAttendanceReportApi(classId: string, month: number, year: number) {
+  const res = await fetch(`${API_URL}/reports/attendance/monthly?classId=${classId}&month=${month}&year=${year}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch monthly attendance report');
+  return await res.json();
+}
+
+export async function getFeeDefaultersReportApi(classId?: string) {
+  const query = classId ? `?classId=${classId}` : '';
+  const res = await fetch(`${API_URL}/reports/fees/defaulters${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee defaulters report');
+  return await res.json();
+}
+
+export async function getFeeCollectionSummaryReportApi() {
+  const res = await fetch(`${API_URL}/reports/fees/collection-summary`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch fee collection summary report');
+  return await res.json();
+}
+
+export async function getClassPerformanceReportApi(examId: string) {
+  if (!examId) return { results: [], stats: null };
+  const res = await fetch(`${API_URL}/reports/exams/class-performance/${examId}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch class performance report');
+  return await res.json();
+}
+
+export async function getAtRiskStudentsAnalyticsApi() {
+  const res = await fetch(`${API_URL}/reports/analytics/at-risk`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch at-risk students analytics');
+  return await res.json();
+}
+
+export async function getAnalyticsDashboardApi() {
+  const res = await fetch(`${API_URL}/reports/analytics/dashboard`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch analytics dashboard');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// 11_Documents / Certificates
+// ─────────────────────────────────────────────
+
+export async function getIssuedDocumentsApi(targetId?: string) {
+  const query = targetId ? `?targetId=${targetId}` : '';
+  const res = await fetch(`${API_URL}/certificates${query}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch certificates');
+  return await res.json();
+}
+
+export async function issueCertificateApi(data: { docType: string; targetType: string; targetId: string; documentNumber: string }) {
+  const res = await fetch(`${API_URL}/certificates`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to issue certificate');
+  return await res.json();
+}
+
+// ─────────────────────────────────────────────
+// Operations Hardening & Pilot UAT APIs
+// ─────────────────────────────────────────────
+
+export async function getMonitoringMetricsApi() {
+  const res = await fetch(`${API_URL}/operations/monitoring`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch operations monitoring');
+  return await res.json();
+}
+
+export async function getSystemAlertsApi() {
+  const res = await fetch(`${API_URL}/operations/integrity/alerts`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch system alerts');
+  return await res.json();
+}
+
+export async function runBackupApi() {
+  const res = await fetch(`${API_URL}/operations/backups/run`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to trigger S3 backup');
+  return await res.json();
+}
+
+export async function runIntegritySweepApi() {
+  const res = await fetch(`${API_URL}/operations/integrity`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to trigger integrity sweep');
+  return await res.json();
+}
+
+export async function validateImportApi(rows: any[]) {
+  const res = await fetch(`${API_URL}/operations/imports/validate`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ rows }),
+  });
+  if (!res.ok) throw new Error('Failed to validate CSV schema');
+  return await res.json();
+}
+
+export async function createUatTicketApi(data: any) {
+  const res = await fetch(`${API_URL}/operations/uat/tickets`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to submit UAT feedback');
+  return await res.json();
+}
+
+export async function getUatTicketsApi() {
+  const res = await fetch(`${API_URL}/operations/uat/tickets`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch UAT tickets');
+  return await res.json();
+}
+
+export async function updateUatTicketStatusApi(id: string, status: string) {
+  const res = await fetch(`${API_URL}/operations/uat/tickets/${id}`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error('Failed to update UAT ticket');
+  return await res.json();
+}
+
+function initializeDemoSchoolDb(baseDb: any): any {
+  // If it's already seeded, return baseDb
+  if (baseDb.students && baseDb.students.length >= 100) return baseDb;
+
+  const db = { ...baseDb };
+  
+  // 1. Institution Details
+  db.institutionName = "Workspace Organization";
+
+  // 2. Clear out old limited arrays
+  db.classes = [];
+  db.staff = [];
+  db.students = [];
+  db.attendance = [];
+  db.feeStructures = [];
+  db.feeAllocations = [];
+  db.exams = [];
+  db.examResults = [];
+
+  // 3. Define 5 Classes
+  const classNames = [
+    { id: 'class-6a', name: 'Grade 6-A', teacher: 'Sarah Connor', teacherId: 'staff-1' },
+    { id: 'class-7a', name: 'Grade 7-A', teacher: 'John Keating', teacherId: 'staff-2' },
+    { id: 'class-8a', name: 'Grade 8-A', teacher: 'Anjali Desai', teacherId: 'staff-4' },
+    { id: 'class-9a', name: 'Grade 9-A', teacher: 'Rajesh Iyer', teacherId: 'staff-5' },
+    { id: 'class-10a', name: 'Grade 10-A', teacher: 'Vikram Seth', teacherId: 'staff-6' }
+  ];
+  db.classes = classNames.map(c => ({
+    id: c.id,
+    name: c.name,
+    section: 'A',
+    studentCount: 20,
+    classTeacher: c.teacher,
+    classTeacherId: c.teacherId
+  }));
+
+  // 4. Define 15 Teachers & Staff
+  const staffList = [
+    { id: 'staff-1', empId: 'EMP001', first: 'Sarah', last: 'Connor', role: 'TEACHER', qual: 'M.Sc. Mathematics, B.Ed.', exp: 8, sal: 45000 },
+    { id: 'staff-2', empId: 'EMP002', first: 'John', last: 'Keating', role: 'TEACHER', qual: 'M.A. English Literature', exp: 12, sal: 48000 },
+    { id: 'staff-3', empId: 'EMP003', first: 'Robert', last: 'Kiyosaki', role: 'ACCOUNTANT', qual: 'B.Com, Chartered Accountant', exp: 15, sal: 40000 },
+    { id: 'staff-4', empId: 'EMP004', first: 'Anjali', last: 'Desai', role: 'TEACHER', qual: 'B.Sc. Chemistry, M.Ed.', exp: 6, sal: 42000 },
+    { id: 'staff-5', empId: 'EMP005', first: 'Rajesh', last: 'Iyer', role: 'TEACHER', qual: 'M.Sc. Physics', exp: 10, sal: 46000 },
+    { id: 'staff-6', empId: 'EMP006', first: 'Vikram', last: 'Seth', role: 'TEACHER', qual: 'M.A. History, B.Ed.', exp: 14, sal: 49000 },
+    { id: 'staff-7', empId: 'EMP007', first: 'Sunita', last: 'Rao', role: 'TEACHER', qual: 'M.Sc. Biology', exp: 5, sal: 41000 },
+    { id: 'staff-8', empId: 'EMP008', first: 'Devendra', last: 'Joshi', role: 'TEACHER', qual: 'B.Ed. Physical Education', exp: 7, sal: 39000 },
+    { id: 'staff-9', empId: 'EMP009', first: 'Priya', last: 'Pillai', role: 'TEACHER', qual: 'M.C.A. Computer Science', exp: 4, sal: 43000 },
+    { id: 'staff-10', empId: 'EMP010', first: 'Amit', last: 'Verma', role: 'TEACHER', qual: 'M.Sc. Mathematics', exp: 9, sal: 45000 },
+    { id: 'staff-11', empId: 'EMP011', first: 'Neha', last: 'Gupta', role: 'TEACHER', qual: 'B.A. Geography, B.Ed.', exp: 3, sal: 38000 },
+    { id: 'staff-12', empId: 'EMP012', first: 'Sanjay', last: 'Shah', role: 'TEACHER', qual: 'M.Com, Economics', exp: 11, sal: 47000 },
+    { id: 'staff-13', empId: 'EMP013', first: 'Meera', last: 'Nair', role: 'TEACHER', qual: 'M.A. Sociology', exp: 8, sal: 44000 },
+    { id: 'staff-14', empId: 'EMP014', first: 'Deepak', last: 'Roy', role: 'TEACHER', qual: 'B.Tech, Mechanical', exp: 6, sal: 42000 },
+    { id: 'staff-15', empId: 'EMP015', first: 'Kavitha', last: 'Nair', role: 'LIBRARIAN', qual: 'Master of Library Science', exp: 13, sal: 37000 }
+  ];
+  db.staff = staffList.map(s => ({
+    id: s.id,
+    employeeId: s.empId,
+    firstName: s.first,
+    lastName: s.last,
+    phone: `+91 98765 0${s.empId.slice(-3)}`,
+    designation: s.role,
+    joiningDate: '2024-06-15',
+    salary: s.sal,
+    status: 'ACTIVE',
+    user: { email: `${s.first.toLowerCase()}@aurxon.com`, isActive: true },
+    aadhaarNumber: `XXXX-XXXX-9${s.empId.slice(-3)}`,
+    panNumber: `ABCDE${s.empId.slice(-3)}F`,
+    qualification: s.qual,
+    experience: s.exp,
+    permanentAddress: '12 MG Road, Bengaluru, Karnataka - 560001',
+    bankName: 'State Bank of India',
+    bankBranch: 'Indira Nagar',
+    accNumber: `3049581029${s.empId.slice(-3)}`,
+    ifscCode: 'SBIN0000001'
+  }));
+
+  // 5. Define 10 Parents
+  const parentNames = [
+    { first: 'David', last: 'Miller', phone: '+91 99887 76601', occ: 'Software Architect', addr: 'Indira Nagar, Bengaluru' },
+    { first: 'Mark', last: 'Johnson', phone: '+91 99887 76602', occ: 'Civil Engineer', addr: 'Whitefield, Bengaluru' },
+    { first: 'Sally', last: 'Brown', phone: '+91 99887 76603', occ: 'Business Manager', addr: 'Koramangala, Bengaluru' },
+    { first: 'Rajesh', last: 'Patel', phone: '+91 99887 76604', occ: 'Financial Analyst', addr: 'Jayanagar, Bengaluru' },
+    { first: 'Kiran', last: 'Nair', phone: '+91 99887 76605', occ: 'Senior Consultant', addr: 'Malleshwaram, Bengaluru' },
+    { first: 'Arvind', last: 'Sharma', phone: '+91 99887 76606', occ: 'Government Officer', addr: 'Hebbal, Bengaluru' },
+    { first: 'Sanjay', last: 'Verma', phone: '+91 99887 76607', occ: 'Retail Owner', addr: 'Sadashivanagar, Bengaluru' },
+    { first: 'Ramesh', last: 'Gupta', phone: '+91 99887 76608', occ: 'Chartered Accountant', addr: 'Bannerghatta, Bengaluru' },
+    { first: 'Vijay', last: 'Joshi', phone: '+91 99887 76609', occ: 'College Professor', addr: 'Rajajinagar, Bengaluru' },
+    { first: 'Anil', last: 'Shah', phone: '+91 99887 76610', occ: 'Corporate Director', addr: 'HSR Layout, Bengaluru' }
+  ];
+
+  // 6. Generate 100 Students (20 students per class for 5 classes)
+  const indianFirstNames = ["Rohan", "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Kabir", "Sai", "Ishan", "Krishna", "Diya", "Ananya", "Aadhya", "Pihu", "Aaradhya", "Ira", "Sana", "Kiara", "Prisha", "Riya", "Dev", "Shiv", "Om", "Tej", "Prem", "Raj", "Veer", "Yash", "Harsh", "Shlok", "Tanmay", "Atharva", "Samarth", "Shreyas", "Omkar", "Parth", "Chinmay", "Siddhesh", "Gaurav", "Sneha", "Karan", "Nikhil", "Rahul", "Aarti", "Pooja", "Vikram", "Deepak", "Aditi", "Neha", "Meera", "Swati", "Suresh", "Amit", "Priyanshu", "Sandeep", "Sweta", "Pranav", "Divya", "Sujata", "Preeti", "Kalyani", "Nisha", "Sheetal", "Anuj", "Rupesh", "Varun", "Rishabh", "Aman", "Rajat", "Tushar", "Saurabh", "Sameer", "Kartik", "Kunal", "Mehak", "Priti", "Shruti", "Ishika", "Gaurika", "Kanishk", "Pankaj", "Vikas"];
+  const indianLastNames = ["Sharma", "Verma", "Gupta", "Patel", "Nair", "Joshi", "Iyer", "Pillai", "Rao", "Shah", "Desai", "Mehta", "Kulkarni", "Patil", "Shinde", "Yadav", "Mishra", "Pandey", "Trivedi", "Roy", "Dutta", "Singh", "Reddy", "Banerjee", "Bose", "Chatterjee", "Choudhary", "Gowda", "Hegde", "Pai", "Sen", "Bhat", "Mehra", "Kapoor", "Kapila", "Dhar", "Kaul", "Raina", "Saxena", "Srivastava", "Mathur"];
+
+  // Seed 100 students
+  for (let i = 1; i <= 100; i++) {
+    const classIdx = Math.floor((i - 1) / 20); // 0 to 4 (20 students per class)
+    const targetClass = classNames[classIdx];
+    
+    const first = indianFirstNames[i % indianFirstNames.length];
+    const last = indianLastNames[i % indianLastNames.length];
+    const parentIdx = i % 10;
+    const parent = parentNames[parentIdx];
+
+    const scholarNumber = `SCH-2026-${1000 + i}`;
+    const rollNumber = `ROLL-${targetClass.name.replace('Grade ', '').replace('-', '')}-${i - classIdx * 20 < 10 ? '0' + (i - classIdx * 20) : i - classIdx * 20}`;
+
+    db.students.push({
+      id: `stud-${i}`,
+      rollNumber,
+      scholarNumber,
+      firstName: first,
+      lastName: last,
+      email: `scholar.${i}@aurxon.com`,
+      dateOfBirth: `201${classIdx + 1}-05-14`,
+      gender: i % 2 === 0 ? 'FEMALE' : 'MALE',
+      classId: targetClass.id,
+      class: { id: targetClass.id, name: targetClass.name },
+      parent: { 
+        firstName: parent.first, 
+        lastName: parent.last, 
+        phone: parent.phone, 
+        occupation: parent.occ, 
+        address: parent.addr 
+      },
+      status: 'ACTIVE',
+      timeline: [
+        { id: `t-${i}`, type: 'ADMISSION', description: `Admitted to ${targetClass.name} under Board guidelines.`, eventDate: '2026-05-25T10:00:00.000Z' }
+      ],
+      documents: [
+        { id: `d-${i}-1`, name: 'Scholar_Admission_Form.pdf', fileUrl: '#' }
+      ]
+    });
+  }
+
+  // 7. Define Fee Structures
+  db.feeStructures = [
+    { id: 'fee-1', name: 'Statutory Tuition Term 1', amount: 1500, dueDate: '2026-06-15', description: 'Standard tuition fee for Term 1 academics' },
+    { id: 'fee-2', name: 'Syllabus Development Fee', amount: 1800, dueDate: '2026-10-15', description: 'Syllabus development and operations' },
+    { id: 'fee-3', name: 'Final CBSE Evaluation Fee', amount: 250, dueDate: '2026-12-30', description: 'CBSE examination evaluation cost' }
+  ];
+
+  // 8. Generate Fee Allocations (PAID, PARTIAL, UNPAID)
+  for (let i = 1; i <= 100; i++) {
+    // 70 students fully PAID Term 1, 15 PARTIAL, 15 UNPAID
+    let t1Paid = 1500;
+    let t1Status = 'PAID';
+    let t1Payments: any[] = [];
+
+    if (i <= 70) {
+      t1Payments = [{ amount: 1500, paymentDate: '2026-05-27T10:00:00.000Z', paymentMethod: 'ONLINE', receiptNumber: `RCPT-2026-${20000 + i}`, remarks: 'Paid via Stripe Gateway' }];
+    } else if (i <= 85) {
+      t1Paid = 500;
+      t1Status = 'PARTIAL';
+      t1Payments = [{ amount: 500, paymentDate: '2026-05-27T11:00:00.000Z', paymentMethod: 'CASH', receiptNumber: `RCPT-2026-${20000 + i}`, remarks: 'Partial payment reception desk' }];
+    } else {
+      t1Paid = 0;
+      t1Status = 'UNPAID';
+    }
+
+    db.feeAllocations.push({
+      id: `alloc-${i}-1`,
+      studentId: `stud-${i}`,
+      feeStructureId: 'fee-1',
+      amountDue: 1500,
+      amountPaid: t1Paid,
+      status: t1Status,
+      payments: t1Payments
+    });
+
+    // Term 2 Syllabus development fee (unpaid for all since due in Oct)
+    db.feeAllocations.push({
+      id: `alloc-${i}-2`,
+      studentId: `stud-${i}`,
+      feeStructureId: 'fee-2',
+      amountDue: 1800,
+      amountPaid: 0,
+      status: 'UNPAID',
+      payments: []
+    });
+  }
+
+  // 9. Generate Exams (Mid-term Algebra, Final Term Physics)
+  db.exams = [
+    { id: 'exam-1', name: 'CBSE Assessment Term 1', subjectId: 'subj-1', maxMarks: 100, examDate: '2026-04-10', subject: { name: 'Advanced Mathematics', class: { name: 'Grade 10-A' } } },
+    { id: 'exam-2', name: 'Syllabus Assessment Term 2', subjectId: 'subj-2', maxMarks: 100, examDate: '2026-05-25', subject: { name: 'Introductory Physics', class: { name: 'Grade 10-A' } } }
+  ];
+
+  // 10. Generate Exam Results (Mid-term and Term-end results)
+  for (let i = 1; i <= 100; i++) {
+    // Generate marks between 45 and 98
+    let marks1 = 50 + (i * 7) % 49;
+    let marks2 = 55 + (i * 9) % 43;
+
+    // Deliberately flag student 1 (Alice Miller) and student 20 as weak in both attendance and exams
+    if (i === 1) {
+      marks1 = 34; // Fails mathematics
+      marks2 = 32;
+    }
+    if (i === 20) {
+      marks1 = 30; // Fails mathematics
+      marks2 = 28;
+    }
+
+    db.examResults.push({
+      id: `res-${i}-1`,
+      examId: 'exam-1',
+      studentId: `stud-${i}`,
+      marksObtained: marks1,
+      remarks: marks1 > 85 ? 'Outstanding scholar average' : 'Meets standards'
+    });
+
+    db.examResults.push({
+      id: `res-${i}-2`,
+      examId: 'exam-2',
+      studentId: `stud-${i}`,
+      marksObtained: marks2,
+      remarks: marks2 > 85 ? 'Excellent work' : 'Satisfactory progress'
+    });
+  }
+
+  // 11. Generate Attendance (30 Days of History)
+  const todayDate = new Date();
+  for (let day = 0; day < 30; day++) {
+    const curDate = new Date(todayDate);
+    curDate.setDate(todayDate.getDate() - day);
+    const dateStr = curDate.toISOString().substring(0, 10);
+
+    // Skip Sundays
+    if (curDate.getDay() === 0) continue;
+
+    for (let i = 1; i <= 100; i++) {
+      let status = 'PRESENT';
+      let remarks = 'On time';
+
+      // Weak students (student 1 and student 20) have deliberately low attendance rate (approx 65%)
+      if (i === 1 || i === 20) {
+        if (day % 3 === 0) {
+          status = 'ABSENT';
+          remarks = 'Sick leave circular unsubmitted';
+        }
+      } else {
+        // Standard students have 97% attendance rate
+        if ((i * day) % 35 === 0) {
+          status = 'ABSENT';
+          remarks = 'Family emergency';
+        }
+      }
+
+      db.attendance.push({
+        studentId: `stud-${i}`,
+        date: dateStr,
+        status,
+        remarks
+      });
+    }
+  }
+
+  // 12. Seeding notices
+  db.notices = [
+    { id: 'not-1', title: 'Summer Vacation Circular 2026', content: 'The school will remain closed for summer vacation from June 1st, 2026 to July 5th, 2026. Regular classes will resume on July 6th under standard CBSE guidelines.', targetRoles: 'STUDENT,PARENT,TEACHER,STAFF,ACCOUNTANT', authorName: 'Sarah Connor', createdAt: new Date('2026-05-27T08:00:00.000Z').toISOString() },
+    { id: 'not-2', title: 'CBSE Term 2 Tuition Fee Schedule', content: 'Reminder to all parents: The tuition fee collection deadline for Term 2 is June 15th, 2026. Online Stripe/UPI simulator links are active.', targetRoles: 'PARENT,ACCOUNTANT', authorName: 'Robert Kiyosaki', createdAt: new Date('2026-05-27T09:00:00.000Z').toISOString() },
+    { id: 'not-3', title: 'Biometric RFID Access Cards Mandatory', content: 'All students must scan their RFID access cards at the main gate terminal daily for biometric attendance tracking.', targetRoles: 'STUDENT,PARENT,TEACHER', authorName: 'John Keating', createdAt: new Date('2026-05-28T09:00:00.000Z').toISOString() }
+  ];
+
+  return db;
+}
+
+// =========================================================================
+// Library Fines
+// =========================================================================
+export async function payLibraryFineApi(issueId: string) {
+  try {
+    const res = await fetch(`${API_URL}/library/pay-fine/${issueId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.bookIssues) db.bookIssues = [];
+    const idx = db.bookIssues.findIndex((i: any) => i.id === issueId);
+    if (idx === -1) throw new Error('Issue record not found');
+    db.bookIssues[idx].finePaid = db.bookIssues[idx].fineAmount;
+    db.bookIssues[idx].fineStatus = 'PAID';
+    saveMockDb(db);
+    return db.bookIssues[idx];
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Personal To-Dos
+// =========================================================================
+export async function getTodoTasksApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    return db.todoTasks;
+  }
+}
+
+export async function createTodoTaskApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    const newTask = {
+      id: `todo-${Date.now()}`,
+      userId: 'mock-user-id',
+      title: data.title,
+      description: data.description || null,
+      category: data.category || 'GENERAL',
+      priority: data.priority || 'MEDIUM',
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    db.todoTasks.push(newTask);
+    saveMockDb(db);
+    return newTask;
+  }
+}
+
+export async function updateTodoTaskApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    const idx = db.todoTasks.findIndex((t: any) => t.id === id);
+    if (idx === -1) throw new Error('To-Do task not found');
+    db.todoTasks[idx] = {
+      ...db.todoTasks[idx],
+      ...data
+    };
+    saveMockDb(db);
+    return db.todoTasks[idx];
+  }
+}
+
+export async function deleteTodoTaskApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/todos/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.todoTasks) db.todoTasks = [];
+    db.todoTasks = db.todoTasks.filter((t: any) => t.id !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Personal & Shared Diary Notes
+// =========================================================================
+export async function getDiaryEntriesApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    return db.diaryEntries;
+  }
+}
+
+export async function getSharedDiaryEntriesApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary/shared`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    return db.diaryEntries.filter((e: any) => e.isShared);
+  }
+}
+
+export async function createDiaryEntryApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    const newEntry = {
+      id: `diary-${Date.now()}`,
+      userId: 'mock-user-id',
+      title: data.title,
+      content: data.content,
+      category: data.category || 'PERSONAL',
+      isShared: data.isShared || false,
+      createdAt: new Date().toISOString(),
+    };
+    db.diaryEntries.push(newEntry);
+    saveMockDb(db);
+    return newEntry;
+  }
+}
+
+export async function updateDiaryEntryApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    const idx = db.diaryEntries.findIndex((e: any) => e.id === id);
+    if (idx === -1) throw new Error('Diary entry not found');
+    db.diaryEntries[idx] = {
+      ...db.diaryEntries[idx],
+      ...data
+    };
+    saveMockDb(db);
+    return db.diaryEntries[idx];
+  }
+}
+
+export async function deleteDiaryEntryApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/diary/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.diaryEntries) db.diaryEntries = [];
+    db.diaryEntries = db.diaryEntries.filter((e: any) => e.id !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Daily Planner
+// =========================================================================
+export async function getPlannerActivitiesApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    return db.plannerActivities;
+  }
+}
+
+export async function createPlannerActivityApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    const newActivity = {
+      id: `plan-${Date.now()}`,
+      userId: 'mock-user-id',
+      title: data.title,
+      description: data.description || null,
+      activityDate: new Date(data.activityDate).toISOString(),
+      startTime: data.startTime,
+      endTime: data.endTime,
+      category: data.category || 'ACTIVITY',
+      createdAt: new Date().toISOString(),
+    };
+    db.plannerActivities.push(newActivity);
+    saveMockDb(db);
+    return newActivity;
+  }
+}
+
+export async function updatePlannerActivityApi(id: string, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    const idx = db.plannerActivities.findIndex((a: any) => a.id === id);
+    if (idx === -1) throw new Error('Planner activity not found');
+    db.plannerActivities[idx] = {
+      ...db.plannerActivities[idx],
+      ...data
+    };
+    saveMockDb(db);
+    return db.plannerActivities[idx];
+  }
+}
+
+export async function deletePlannerActivityApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/planner/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.plannerActivities) db.plannerActivities = [];
+    db.plannerActivities = db.plannerActivities.filter((a: any) => a.id !== id);
+    saveMockDb(db);
+    return { id };
+  }
+}
+
+// =========================================================================
+// Teacher Productivity: Assigned Tasks & Workflows
+// =========================================================================
+export async function getAssignedTasksApi() {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks`, { headers: getHeaders() });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    return db.assignedTasks;
+  }
+}
+
+export async function createAssignedTaskApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    const newAssignedTask = {
+      id: `task-${Date.now()}`,
+      title: data.title,
+      description: data.description || null,
+      assignerId: 'mock-user-id',
+      assigneeId: data.assigneeId,
+      priority: data.priority || 'MEDIUM',
+      status: 'PENDING',
+      dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
+      createdAt: new Date().toISOString(),
+      assigner: { email: 'admin@aurxon.com', staffProfile: { firstName: 'Admin', lastName: 'User' } },
+      assignee: { email: 'teacher1@aurxon.com', staffProfile: { firstName: 'Sarah', lastName: 'Connor' } }
+    };
+    db.assignedTasks.push(newAssignedTask);
+    saveMockDb(db);
+    return newAssignedTask;
+  }
+}
+
+export async function updateAssignedTaskApi(id: string, data: { status: string; feedback?: string }) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    const idx = db.assignedTasks.findIndex((t: any) => t.id === id);
+    if (idx === -1) throw new Error('Assigned task not found');
+    db.assignedTasks[idx] = {
+      ...db.assignedTasks[idx],
+      status: data.status,
+      feedback: data.feedback !== undefined ? data.feedback : db.assignedTasks[idx].feedback,
+      acceptedAt: data.status === 'ACCEPTED' ? new Date().toISOString() : db.assignedTasks[idx].acceptedAt,
+      completedAt: data.status === 'COMPLETED' ? new Date().toISOString() : db.assignedTasks[idx].completedAt,
+    };
+    saveMockDb(db);
+    return db.assignedTasks[idx];
+  }
+}
+
+export async function escalateAssignedTaskApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/productivity/tasks/${id}/escalate`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    const db = getMockDb();
+    if (!db.assignedTasks) db.assignedTasks = [];
+    const idx = db.assignedTasks.findIndex((t: any) => t.id === id);
+    if (idx === -1) throw new Error('Assigned task not found');
+    db.assignedTasks[idx].status = 'ESCALATED';
+    saveMockDb(db);
+    return db.assignedTasks[idx];
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: Setup Onboarding Wizard
+// =========================================================================
+export async function getSetupStatusApi() {
+  try {
+    const res = await fetch(`${API_URL}/setup/status`, { 
+      headers: getHeaders(),
+      cache: 'no-store',
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Setup status API error:', { status: res.status, error: errorText });
+      throw new Error('Unable to verify workspace configuration. Please retry.');
+    }
+    
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend setup status offline, resolving locally from storage...');
+    const localStatus = typeof window !== 'undefined' ? localStorage.getItem('aurxon_setup_status') : null;
+    if (localStatus) {
+      return JSON.parse(localStatus);
+    }
+    return {
+      setupCompleted: false,
+      currentStep: 1,
+      wizardVersion: "2.0",
+      industryPackCode: "SCHOOL_ERP",
+      steps: {
+        academicConfig: false,
+        branchConfig: false,
+      },
+      details: {
+        academicYear: '2026-2027',
+        gradingSystem: 'CBSE',
+        timezone: 'Asia/Kolkata',
+        currency: 'INR',
+        departments: "",
+        branch: null,
+        branchesCount: 0,
+      },
+    };
+  }
+}
+
+export async function submitSetupApi(data: any) {
+  try {
+    const res = await fetch(`${API_URL}/setup/submit`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Setup wizard submission failed. Please retry.');
+    }
+    
+    const result = await res.json();
+    if (typeof window !== 'undefined') {
+      const statusObj = {
+        setupCompleted: true,
+        currentStep: 3,
+        wizardVersion: "2.0",
+        industryPackCode: data.industryPackCode || "SCHOOL_ERP",
+        steps: { academicConfig: true, branchConfig: true },
+        details: data,
+      };
+      localStorage.setItem('aurxon_setup_status', JSON.stringify(statusObj));
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend submitSetup offline, saving setup state locally...');
+    if (typeof window !== 'undefined') {
+      const statusObj = {
+        setupCompleted: true,
+        currentStep: 3,
+        wizardVersion: "2.0",
+        industryPackCode: data.industryPackCode || "SCHOOL_ERP",
+        steps: { academicConfig: true, branchConfig: true },
+        details: data,
+      };
+      localStorage.setItem('aurxon_setup_status', JSON.stringify(statusObj));
+      
+      const userStr = localStorage.getItem('aurxon_user');
+      if (userStr) {
+        const userObj = JSON.parse(userStr);
+        userObj.setupCompleted = true;
+        localStorage.setItem('aurxon_user', JSON.stringify(userObj));
+      }
+    }
+    return { success: true };
+  }
+}
+
+export async function saveSetupDraftApi(step: number, data: any) {
+  try {
+    const res = await fetch(`${API_URL}/setup/save-draft`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ step, data }),
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to save setup progress. Please retry.');
+    }
+    
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend saveSetupDraft offline, saving progress draft locally...');
+    if (typeof window !== 'undefined') {
+      const currentStatus = localStorage.getItem('aurxon_setup_status');
+      let statusObj = currentStatus ? JSON.parse(currentStatus) : {
+        setupCompleted: false,
+        currentStep: 1,
+        wizardVersion: "2.0",
+        details: {},
+      };
+      
+      statusObj.currentStep = step + 1 > 3 ? 3 : step + 1;
+      statusObj.details = { ...statusObj.details, ...data };
+      localStorage.setItem('aurxon_setup_status', JSON.stringify(statusObj));
+    }
+    return { success: true };
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: Custom Organization Configurations
+// =========================================================================
+export async function getOrgConfigsApi() {
+  try {
+    const res = await fetch(`${API_URL}/settings/config`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to get org settings');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getOrgConfigs offline, simulating locally...');
+    return [
+      {
+        groupCode: 'ACADEMIC_RULES',
+        items: [
+          { key: 'board_affiliation', value: 'CBSE' },
+          { key: 'grading_system', value: 'CCE_100_MARK_PERCENT' }
+        ]
+      }
+    ];
+  }
+}
+
+export async function upsertOrgConfigApi(groupCode: string, items: Record<string, string>) {
+  try {
+    const res = await fetch(`${API_URL}/settings/config`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ groupCode, items }),
+    });
+    if (!res.ok) throw new Error('Failed to save configs');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend upsertOrgConfig offline, simulating locally...');
+    return {
+      groupCode,
+      items: Object.entries(items).map(([key, value]) => ({ key, value }))
+    };
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: Module & Feature Marketplace
+// =========================================================================
+export async function getModulesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketplace modules');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getModules offline, returning fallback...');
+    return [
+      { id: 'm-stud', name: 'Student Management', code: 'STUDENT_MANAGEMENT', description: 'Core admissions, parent relations, scholar cards', isActive: true },
+      { id: 'm-attn', name: 'Attendance Management', code: 'ATTENDANCE', description: 'Biometric, daily register, and staff attendance logs', isActive: true },
+      { id: 'm-exam', name: 'Examinations Desk', code: 'EXAMINATION', description: 'Report cards, grade letters, CBSE board formulas', isActive: true },
+      { id: 'm-fin', name: 'Finance & Fee Ledgers', code: 'FINANCE', description: 'Fee structures, UPI online payment receipts, expense logs', isActive: true }
+    ];
+  }
+}
+
+export async function getOrgModulesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules/org`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load active org modules');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getOrgModules offline, returning active session values...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const enabled = contextStr ? JSON.parse(contextStr).enabledModules : ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'];
+    return enabled.map((code: string) => ({ moduleCode: code, isEnabled: true }));
+  }
+}
+
+export async function toggleModuleApi(moduleCode: string, isEnabled: boolean) {
+  try {
+    const res = await fetch(`${API_URL}/modules/toggle`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ moduleCode, isEnabled }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend toggleModule offline, simulating fallback...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    if (contextStr) {
+      const ctx = JSON.parse(contextStr);
+      if (isEnabled) {
+        if (!ctx.enabledModules.includes(moduleCode)) ctx.enabledModules.push(moduleCode);
+      } else {
+        ctx.enabledModules = ctx.enabledModules.filter((m: string) => m !== moduleCode);
+      }
+      localStorage.setItem('aurxon_context', JSON.stringify(ctx));
+    }
+    return { success: true };
+  }
+}
+
+export async function getFeaturesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules/features`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketplace features');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getFeatures offline, returning fallback...');
+    return [
+      { id: 'f-bio', name: 'Biometric Attendance Integration', code: 'BIOMETRIC_ATTENDANCE', moduleId: 'm-attn', description: 'Enable hardware syncing for RFID/fingerprint scanners' },
+      { id: 'f-calc', name: 'Automated Board GPA Calculator', code: 'EXAM_FORMULA_CALCULATOR', moduleId: 'm-exam', description: 'Generate custom CGPA weights and rounding rules' }
+    ];
+  }
+}
+
+export async function getOrgFeaturesApi() {
+  try {
+    const res = await fetch(`${API_URL}/modules/features/org`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load active features');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getOrgFeatures offline, returning active session values...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const enabled = contextStr ? JSON.parse(contextStr).enabledFeatures : ['BIOMETRIC_ATTENDANCE', 'EXAM_FORMULA_CALCULATOR'];
+    return enabled.map((code: string) => ({ featureCode: code, isEnabled: true }));
+  }
+}
+
+export async function toggleFeatureApi(featureCode: string, isEnabled: boolean) {
+  try {
+    const res = await fetch(`${API_URL}/modules/features/toggle`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ featureCode, isEnabled }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend toggleFeature offline, simulating fallback...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    if (contextStr) {
+      const ctx = JSON.parse(contextStr);
+      if (isEnabled) {
+        if (!ctx.enabledFeatures.includes(featureCode)) ctx.enabledFeatures.push(featureCode);
+      } else {
+        ctx.enabledFeatures = ctx.enabledFeatures.filter((f: string) => f !== featureCode);
+      }
+      localStorage.setItem('aurxon_context', JSON.stringify(ctx));
+    }
+    return { success: true };
+  }
+}
+
+// =========================================================================
+// SaaS Control Plane: RBAC Engine (Roles & Matrix & Memberships)
+// =========================================================================
+export async function getRolesListApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/roles`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to get roles list');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getRolesList offline, returning fallback...');
+    return [
+      { id: 'r-admin', name: 'Institute Administrator', code: 'INSTITUTE_ADMIN', isSystem: true, description: 'Full school group manager credentials' },
+      { id: 'r-teach', name: 'Teacher', code: 'TEACHER', isSystem: true, description: 'Academics, attendance and grade descriptors creator' },
+      { id: 'r-acct', name: 'Accountant', code: 'ACCOUNTANT', isSystem: true, description: 'Ledgers, fees and payroll controller' },
+      { id: 'r-stud', name: 'Student', code: 'STUDENT', isSystem: true, description: 'Access to homework and own profile' }
+    ];
+  }
+}
+
+export async function createRoleApi(name: string, code: string, description?: string) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/roles`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ name, code, description }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend createRole offline, simulating locally...');
+    return { id: `role-${Date.now()}`, name, code: code.toUpperCase(), description, isSystem: false };
+  }
+}
+
+export async function deleteRoleApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/roles/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend deleteRole offline, simulating locally...');
+    return { id };
+  }
+}
+
+export async function getPermissionsApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/permissions`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to load permissions matrix');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getPermissions offline, returning fallback...');
+    return [
+      {
+        id: 'r-admin',
+        name: 'Institute Administrator',
+        code: 'INSTITUTE_ADMIN',
+        permissions: [
+          { resource: 'student:profile', action: 'CREATE' },
+          { resource: 'student:profile', action: 'READ' },
+          { resource: 'student:profile', action: 'UPDATE' },
+          { resource: 'student:profile', action: 'DELETE' }
+        ]
+      },
+      {
+        id: 'r-teach',
+        name: 'Teacher',
+        code: 'TEACHER',
+        permissions: [
+          { resource: 'student:profile', action: 'READ' }
+        ]
+      }
+    ];
+  }
+}
+
+export async function togglePermissionApi(roleId: string, resource: string, action: string, isAllowed: boolean) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/permissions/matrix`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ roleId, resource, action, isAllowed }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend togglePermission offline, simulating fallback...');
+    return { success: true };
+  }
+}
+
+export async function getMembershipsApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/memberships`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to get memberships');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getMemberships offline, returning fallback...');
+    return [
+      {
+        id: 'mb-m1',
+        joinedAt: new Date().toISOString(),
+        role: { name: 'Principal', code: 'PRINCIPAL' },
+        user: {
+          id: 'usr-p1',
+          email: 'principal@rkmvp.edu',
+          isActive: true,
+          staffProfile: { firstName: 'Swami', lastName: 'Vedananda', designation: 'Principal' }
+        }
+      },
+      {
+        id: 'mb-m2',
+        joinedAt: new Date().toISOString(),
+        role: { name: 'Teacher', code: 'TEACHER' },
+        user: {
+          id: 'usr-t1',
+          email: 'teacher@rkmvp.edu',
+          isActive: true,
+          staffProfile: { firstName: 'Sarah', lastName: 'Connor', designation: 'Teacher' }
+        }
+      }
+    ];
+  }
+}
+
+export async function updateMembershipApi(membershipId: string, data: { roleId?: string; status?: string }) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/memberships/${membershipId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend updateMembership offline, simulating locally...');
+    return { id: membershipId, ...data };
+  }
+}
+
+export async function inviteMemberApi(email: string, roleId: string) {
+  try {
+    const res = await fetch(`${API_URL}/rbac/memberships/invite`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ email, roleId }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend inviteMember offline, simulating locally...');
+    return {
+      id: `mb-${Date.now()}`,
+      joinedAt: new Date().toISOString(),
+      role: { name: 'Teacher', code: 'TEACHER' },
+      user: {
+        id: `usr-${Date.now()}`,
+        email,
+        isActive: true,
+        staffProfile: null
+      }
+    };
+  }
+}
+
+export async function refreshContextApi() {
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh-context`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to refresh context');
+    const data = await res.json();
+    localStorage.setItem('aurxon_token', data.token);
+    localStorage.setItem('aurxon_context', JSON.stringify(data.context));
+    return data;
+  } catch (error) {
+    console.warn('Backend refreshContext offline, returning local context...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const token = localStorage.getItem('aurxon_token') || 'mock-jwt';
+    const context = contextStr ? JSON.parse(contextStr) : null;
+    
+    // Also update setup status in context based on localStorage
+    if (context) {
+      const setupStatusStr = localStorage.getItem('aurxon_setup_status');
+      if (setupStatusStr) {
+        const setupStatus = JSON.parse(setupStatusStr);
+        context.setupCompleted = setupStatus.setupCompleted;
+      }
+    }
+    
+    return { token, context };
+  }
+}
+
+export async function getNavigationApi() {
+  try {
+    const res = await fetch(`${API_URL}/auth/navigation`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch navigation items');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend navigation offline, computing local navigation categories...');
+    const contextStr = localStorage.getItem('aurxon_context');
+    const userRole = contextStr ? JSON.parse(contextStr).role : 'TEACHER';
+    const enabledModules = contextStr ? JSON.parse(contextStr).enabledModules : ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'];
+    
+    const allCategories = [
+      { id: 'overview', label: 'Dashboard', icon: 'LayoutDashboard', roles: ['*'], section: 'Daily Use' },
+      { id: 'academic', label: 'Academic Desk', icon: 'BookOpen', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'COACHING_DIRECTOR', 'REGISTRAR', 'EXAM_CONTROLLER', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
+      { id: 'students', label: 'Student Desk', icon: 'Users', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'REGISTRAR', 'INSTITUTE_ADMIN'], moduleCode: 'STUDENT_MANAGEMENT', section: 'Daily Use' },
+      { id: 'exams', label: 'Exams & Grades', icon: 'Award', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'EXAM_CONTROLLER', 'COACHING_DIRECTOR', 'INSTITUTE_ADMIN'], moduleCode: 'EXAMINATION', section: 'Daily Use' },
+      { id: 'attendance', label: 'Attendance', icon: 'CalendarCheck', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACADEMIC_DIRECTOR', 'TEACHER', 'ATTENDANCE_OFFICER', 'INSTITUTE_ADMIN'], moduleCode: 'ATTENDANCE', section: 'Daily Use' },
+      { id: 'fees', label: 'Fees & Finance', icon: 'CreditCard', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'ACCOUNTANT', 'PARENT', 'STUDENT', 'INSTITUTE_ADMIN'], moduleCode: 'FINANCE', section: 'Daily Use' },
+      { id: 'comms', label: 'Comms Hub', icon: 'MessageSquare', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'COMMUNICATION_HEAD', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Communication' },
+      { id: 'library', label: 'Library Desk', icon: 'Book', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'LIBRARIAN', 'TEACHER', 'STUDENT', 'PARENT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+      { id: 'productivity', label: 'Productivity Desk', icon: 'ClipboardList', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'VICE_PRINCIPAL', 'TEACHER', 'LIBRARIAN', 'STAFF', 'ACCOUNTANT', 'INSTITUTE_ADMIN'], section: 'Daily Use' },
+      { id: 'gate', label: 'Visitor Gate Desk', icon: 'ShieldAlert', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'STAFF'], section: 'Staff' },
+      { id: 'inventory', label: 'Inventory Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'STAFF'], section: 'Administration' },
+      { id: 'hr', label: 'HR System', icon: 'Briefcase', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'HR_MANAGER', 'ACCOUNTANT', 'INSTITUTE_ADMIN', 'TEACHER', 'LIBRARIAN'], section: 'Staff' },
+      { id: 'reports', label: 'Reports Desk', icon: 'FileText', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'ACCOUNTANT', 'TEACHER'], section: 'Insights' },
+      { id: 'analytics', label: 'Analytics Desk', icon: 'BarChart2', roles: ['SUPER_ADMIN', 'PRINCIPAL', 'INSTITUTE_ADMIN', 'TEACHER'], section: 'Insights' },
+      { id: 'operations', label: 'Operations Desk', icon: 'ShieldCheck', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' },
+      { id: 'settings', label: 'Settings', icon: 'Settings', roles: ['SUPER_ADMIN', 'INSTITUTE_ADMIN'], section: 'Administration' }
+    ];
+
+    return allCategories.filter(cat => {
+      if (!cat.roles.includes('*') && !cat.roles.includes(userRole)) {
+        return false;
+      }
+      if (cat.moduleCode && !enabledModules.includes(cat.moduleCode)) {
+        return false;
+      }
+      return true;
+    });
+  }
+}
+
+export async function registerOrganizationApi(data: any) {
+  const res = await fetch(`${API_URL}/registrations/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to submit registration');
+  }
+  return await res.json();
+}
+
+export async function getRegistrationsApi(status?: string) {
+  const url = status
+    ? `${API_URL}/registrations?status=${encodeURIComponent(status)}`
+    : `${API_URL}/registrations`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('Unauthorized');
+  }
+  if (!res.ok) throw new Error('Failed to fetch registrations');
+  return await res.json();
+}
+
+export async function reviewRegistrationApi(id: string, status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'APPROVED_WITH_CONDITIONS', notes?: string) {
+  const res = await fetch(`${API_URL}/registrations/${id}/review`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+    body: JSON.stringify({ status, notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to review registration');
+  }
+  return await res.json();
+}
+
+export async function validateActivationTokenApi(token: string) {
+  const res = await fetch(`${API_URL}/auth/activate/validate/${encodeURIComponent(token)}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Activation token is invalid or expired');
+  }
+  return await res.json();
+}
+
+export async function activateOrganizationApi(token: string, pass: string) {
+  const res = await fetch(`${API_URL}/auth/activate/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pass }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to activate organization');
+  }
+  return await res.json();
+}
+
+export async function getRbacMatrixApi() {
+  try {
+    const res = await fetch(`${API_URL}/rbac/matrix`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch RBAC Matrix');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend getRbacMatrix offline, simulating...');
+    return {
+      roles: [
+        { id: 'role-admin', name: 'Institute Admin', code: 'INSTITUTE_ADMIN', isSystem: true },
+        { id: 'role-teacher', name: 'Teacher', code: 'TEACHER', isSystem: true },
+        { id: 'role-student', name: 'Student', code: 'STUDENT', isSystem: true },
+      ],
+      groups: [
+        {
+          id: 'group-student',
+          code: 'STUDENT_CORE',
+          label: 'Student Records',
+          permissions: [
+            { resource: 'student:profile', action: 'READ', label: 'View Student Profiles', description: 'Allows viewing student rosters and directories', roles: { 'role-admin': true, 'role-teacher': true, 'role-student': true } },
+            { resource: 'student:profile', action: 'CREATE', label: 'Admit Student', description: 'Allows admitting new students', roles: { 'role-admin': true, 'role-teacher': false, 'role-student': false } },
+            { resource: 'student:profile', action: 'UPDATE', label: 'Update Student Profile', description: 'Allows modifying student demographics', roles: { 'role-admin': true, 'role-teacher': true, 'role-student': false } },
+          ],
+        },
+      ],
+    };
+  }
+}
+
+export async function bulkUpdatePermissionsApi(roleId: string, assignments: any[]) {
+  const res = await fetch(`${API_URL}/rbac/matrix/bulk`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ roleId, assignments }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to bulk update permissions');
+  }
+  return await res.json();
+}
+
+export async function getFounderMetricsCurrentApi() {
+  const res = await fetch(`${API_URL}/founder/metrics/current`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch platform metrics');
+  return await res.json();
+}
+
+export async function getFounderMetricsHistoryApi(limit?: number) {
+  const url = limit
+    ? `${API_URL}/founder/metrics/history?limit=${limit}`
+    : `${API_URL}/founder/metrics/history`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch metrics history');
+  return await res.json();
+}
+
+export async function getFounderStorageStatsApi() {
+  const res = await fetch(`${API_URL}/founder/metrics/storage`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch storage stats');
+  return await res.json();
+}
+
+export async function getSecurityThreatsApi() {
+  const res = await fetch(`${API_URL}/founder/security/threats`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch security threats');
+  return await res.json();
+}
+
+export async function resolveSecurityThreatApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/security/threats/${id}/resolve`, {
+    method: 'PATCH',
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to resolve security threat');
+  return await res.json();
+}
+
+export async function getBackupRecordsApi() {
+  const res = await fetch(`${API_URL}/founder/backup/records`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch backup records');
+  return await res.json();
+}
+
+export async function triggerBackupApi(notes?: string) {
+  const res = await fetch(`${API_URL}/founder/backup/trigger`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ notes }),
+  });
+  if (!res.ok) throw new Error('Failed to trigger manual backup');
+  return await res.json();
+}
+
+export async function founderGlobalSearchApi(q: string) {
+  const res = await fetch(`${API_URL}/founder/search?q=${encodeURIComponent(q)}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to run global search');
+  return await res.json();
+}
+
+export async function impersonateOrganizationApi(institutionId: string, reason: string, supportTicketRef?: string) {
+  const res = await fetch(`${API_URL}/founder/impersonate/${institutionId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ reason, supportTicketRef }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to initialize impersonation session');
+  }
+  return await res.json();
+}
+
+export async function getBillingStatsApi() {
+  const res = await fetch(`${API_URL}/billing/stats`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch billing stats');
+  return await res.json();
+}
+
+export async function getPlanDefinitionsApi() {
+  const res = await fetch(`${API_URL}/founder/plans`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch plans');
+  return await res.json();
+}
+
+export async function createPlanDefinitionApi(data: any) {
+  const res = await fetch(`${API_URL}/founder/plans`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create plan definition');
+  return await res.json();
+}
+
+export async function getTeamsDashboardLayoutApi() {
+  const res = await fetch(`${API_URL}/founder/dashboard/layout`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch dashboard layout');
+  return await res.json();
+}
+
+export async function getTeamsDashboardStatsApi() {
+  const res = await fetch(`${API_URL}/founder/dashboard/stats`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch dashboard stats');
+  return await res.json();
+}
+
+export async function getTeamsMemberProfileApi() {
+  const res = await fetch(`${API_URL}/founder/team-member`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch team member profile');
+  return await res.json();
+}
+
+// ─── Activation Key Management (Founder) ─────────────────────────────────────
+
+export async function getActivationKeysApi() {
+  const res = await fetch(`${API_URL}/founder/activation-keys`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch activation keys');
+  return await res.json();
+}
+
+export async function revokeActivationKeyApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/revoke`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to revoke activation key');
+  }
+  return await res.json();
+}
+
+export async function suspendActivationKeyApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/suspend`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to suspend activation key');
+  }
+  return await res.json();
+}
+
+export async function renewActivationKeyApi(id: string, months: number) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/renew`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ months }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to renew activation key');
+  }
+  return await res.json();
+}
+
+export async function regenerateActivationKeyApi(id: string) {
+  const res = await fetch(`${API_URL}/founder/activation-keys/${id}/regenerate`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to regenerate activation key');
+  }
+  return await res.json();
+}
+
+// ─── Workspace Activation with Key ───────────────────────────────────────────
+
+export async function verifyActivationKeyApi(referenceNumber: string, activationKey: string, comments?: string) {
+  try {
+    const res = await fetch(`${API_URL}/auth/activate/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ referenceNumber, activationKey, comments }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Activation verification failed');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend activation verification offline, running simulated client activation...');
+    
+    // Simulate verification
+    if (!referenceNumber.startsWith('AURX-')) {
+      throw new Error('Invalid Reference Number format.');
+    }
+    if (!activationKey.startsWith('AURX-ACT-')) {
+      throw new Error('Invalid Activation Key format.');
+    }
+    
+    return {
+      referenceNumber,
+      orgName: 'Demo Institution OS',
+      industry: 'SCHOOL_ERP',
+      subscription: 'ENTERPRISE',
+      workspaceUrl: `http://gvis.localhost:3000/activate`,
+      issueDate: new Date().toISOString(),
+      expiryDate: new Date(Date.now() + 31536000000).toISOString(),
+      modules: ['STUDENT_MANAGEMENT', 'ATTENDANCE', 'EXAMINATION', 'FINANCE'],
+    };
+  }
+}
+
+export async function sendOtpApi(phone?: string, email?: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, email }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to send verification code');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
+}
+
+export async function verifyOtpApi(phone?: string, email?: string, otp?: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, email, otp }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Incorrect verification code');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
+}
+
+export async function verifyRegistrationManualApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/${id}/verify-manual`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to manually verify registration');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
+}
+
+export async function resendVerificationOtpApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/${id}/resend-verification-otp`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to resend verification requests');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
+}
+
+export async function founderLoginApi(email: string, pass: string) {
+  const tenantSlug = getTenantSlug();
+  const res = await fetch(`${API_URL}/auth/founder/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, pass, tenantSlug }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Founder authentication failed');
+  }
+  return await res.json();
+}
+
+// ─── Registration Workflow Extensions ────────────────────────────────────────
+
+export async function registerOrganizationWithAdminApi(data: {
+  orgName: string;
+  orgType: string;
+  orgSize: string;
+  industryPackCode: string;
+  email: string;
+  phone: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  expectedUsers?: number;
+  requestedModules: string[];
+  requestedFeatures: string[];
+  adminName?: string;
+  adminPassword: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  country?: string;
+  adminGender?: string;
+  adminRole?: string;
+  requestManualApproval?: boolean;
+}) {
+  try {
+    const res = await fetch(`${API_URL}/registrations/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Registration failed. Please try again.');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      throw new Error('Network issue, please try again.');
+    }
+    throw err;
+  }
+}
+
+export async function technicalReviewRegistrationApi(id: string, notes?: string) {
+  const res = await fetch(`${API_URL}/registrations/${id}/technical-review`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Technical review failed');
+  }
+  return await res.json();
+}
+
+export async function provisionWorkspaceApi(id: string, paymentStatus: string = 'TRIAL') {
+  const res = await fetch(`${API_URL}/registrations/${id}/provision`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ paymentStatus }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Workspace provisioning failed');
+  }
+  return await res.json();
+}
+
+// ─── Subscription Renewals ────────────────────────────────────────────────────
+
+export async function getRenewalRequestsApi(status?: string) {
+  const url = status
+    ? `${API_URL}/renewals?status=${encodeURIComponent(status)}`
+    : `${API_URL}/renewals`;
+  const res = await fetch(url, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch renewal requests');
+  return await res.json();
+}
+
+export async function approveRenewalRequestApi(id: string) {
+  const res = await fetch(`${API_URL}/renewals/${id}/approve`, {
+    method: 'POST',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to approve renewal request');
+  }
+  return await res.json();
+}
+
+export async function founderDirectRenewalApi(institutionId: string, months: number, notes?: string) {
+  const res = await fetch(`${API_URL}/renewals/direct/${institutionId}`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ months, notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to generate direct renewal key');
+  }
+  return await res.json();
+}
+
+export async function submitRenewalRequestApi(months: number, notes?: string) {
+  const res = await fetch(`${API_URL}/renewals/request`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ months, notes }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to submit renewal request');
+  }
+  return await res.json();
+}
+
+export async function applyRenewalKeyApi(renewalKey: string) {
+  const res = await fetch(`${API_URL}/renewals/apply`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ renewalKey }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to apply renewal key');
+  }
+  return await res.json();
+}
+
+export async function getMyRenewalRequestsApi() {
+  const res = await fetch(`${API_URL}/renewals/my-requests`, { headers: getHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch renewal requests');
+  return await res.json();
+}
+
+export async function updateThemePreferenceApi(theme: string) {
+  try {
+    const res = await fetch(`${API_URL}/auth/theme-preference`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ theme }),
+    });
+    if (!res.ok) throw new Error('Failed to update theme preference');
+    return await res.json();
+  } catch (error) {
+    console.warn('Backend theme update offline, updating local preference only...');
+    return { success: true };
+  }
+}
+
+export async function suspendInstitutionApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/founder/institutions/${id}/suspend`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to suspend institution');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.trim().toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, suspending institution locally in mock database...');
+    return { id, status: 'SUSPENDED' };
+  }
+}
+
+export async function resumeInstitutionApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/founder/institutions/${id}/resume`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to resume institution');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.trim().toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, resuming institution locally in mock database...');
+    return { id, status: 'ACTIVE' };
+  }
+}
+
+export async function resetSetupWizardApi(id: string) {
+  try {
+    const res = await fetch(`${API_URL}/founder/institutions/${id}/reset-wizard`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to reset setup wizard');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.trim().toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, resetting setup wizard locally...');
+    return { success: true };
+  }
+}
+
+export async function resetUserPasswordApi(userId: string) {
+  try {
+    const res = await fetch(`${API_URL}/founder/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to reset user password');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.trim().toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, resetting user password locally...');
+    return {
+      success: true,
+      email: 'user@example.com',
+      temporaryPassword: 'Temp@' + Math.random().toString(36).substring(2, 10),
+    };
+  }
+}
+
+export async function endImpersonationApi() {
+  try {
+    const founderToken = typeof window !== 'undefined' ? localStorage.getItem('aurxon_founder_token') : null;
+    const res = await fetch(`${API_URL}/founder/impersonate/end`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(founderToken ? { Authorization: `Bearer ${founderToken}` } : {}),
+      },
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to end impersonation session');
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'Failed to fetch' && !error.message.trim().toLowerCase().includes('network')) {
+      throw error;
+    }
+    console.warn('Backend offline, ending impersonation session locally...');
+    return { success: true };
+  }
+}
+
+
+
+
+

@@ -1,0 +1,13 @@
+{
+  "totalFiles": 222,
+  "backendCount": 152,
+  "frontendCount": 70,
+  "cycles": [],
+  "unused": [
+    "backend\\src\\01_Core\\Auth\\feature-flag.decorator.ts",
+    "backend\\src\\01_Core\\Auth\\feature-flag.guard.ts",
+    "backend\\src\\main.ts",
+    "frontend\\src\\07_Staff\\Salary\\PayrollVoucherSlip.tsx",
+    "frontend\\src\\middleware.ts"
+  ]
+}

@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Sparkles, Building2, Calendar, MapPin, Sliders, CheckCircle, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
-import { getSetupStatusApi, submitSetupApi, saveSetupDraftApi, refreshContextApi } from '@/lib/api';
-import CountryPhoneInput from '@/01_Core/Dashboard/CountryPhoneInput';
-import { INDIAN_STATES_AND_UTS } from '@/lib/indianData';
+import { getSetupStatusApi, submitSetupApi, saveSetupDraftApi, refreshContextApi } from '@/services/api';
+import CountryPhoneInput from '@/modules/WORKSPACE_ENGINE/Dashboard/CountryPhoneInput';
+import { INDIAN_STATES_AND_UTS } from '@/utils/indianData';
 
 export default function SetupWizardPage() {
   const router = useRouter();

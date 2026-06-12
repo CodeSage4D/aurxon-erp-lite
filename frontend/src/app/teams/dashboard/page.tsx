@@ -14,7 +14,7 @@ import {
   founderGlobalSearchApi, impersonateOrganizationApi, getPlanDefinitionsApi, 
   createPlanDefinitionApi, getTeamsDashboardLayoutApi, getTeamsDashboardStatsApi, 
   getTeamsMemberProfileApi, technicalReviewRegistrationApi, provisionWorkspaceApi
-} from '@/lib/api';
+} from '@/services/api';
 
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,

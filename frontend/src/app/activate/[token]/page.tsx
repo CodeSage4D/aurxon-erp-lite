@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ShieldCheck, Eye, EyeOff, RefreshCw, KeyRound, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
-import { validateActivationTokenApi, activateOrganizationApi } from '@/lib/api';
+import { validateActivationTokenApi, activateOrganizationApi } from '@/services/api';
 
 export default function ActivatePage() {
   const params = useParams();

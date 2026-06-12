@@ -14,7 +14,7 @@ import {
   revokeActivationKeyApi,
   renewActivationKeyApi,
   regenerateActivationKeyApi
-} from '@/lib/api';
+} from '@/services/api';
 import { 
   Shield, Sparkles, Building2, KeyRound, Users, GraduationCap, 
   Stethoscope, Briefcase, Activity, Database, RefreshCw, LayoutDashboard,

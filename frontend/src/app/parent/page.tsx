@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import ParentDashboard from '@/12_ParentPortal/ParentDashboard';
+import ParentDashboard from '@/modules/ROLE_ENGINE/Parent/ParentDashboard';
 
 export default function ParentPortalPage() {
   const router = useRouter();

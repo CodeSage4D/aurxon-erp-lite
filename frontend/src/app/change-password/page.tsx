@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { changePasswordApi, switchContextApi } from '@/lib/api';
+import { changePasswordApi, switchContextApi } from '@/services/api';
 import { Shield, Sparkles, Key, Lock, ArrowRight } from 'lucide-react';
 
 export default function ChangePasswordPage() {

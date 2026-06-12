@@ -6,7 +6,7 @@ import {
   KeyRound, ArrowRight, CheckCircle2, AlertCircle, Shield,
   Loader2, Copy, Check, LogIn, Building2, Plus, Trash2
 } from 'lucide-react';
-import { verifyActivationKeyApi } from '@/lib/api';
+import { verifyActivationKeyApi } from '@/services/api';
 
 export default function ActivatePage() {
   const router = useRouter();

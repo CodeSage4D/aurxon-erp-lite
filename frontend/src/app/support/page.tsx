@@ -6,7 +6,7 @@ import {
   ShieldAlert, Send, ArrowLeft, CheckCircle2, AlertTriangle,
   Activity, ShieldCheck, Mail, HelpCircle, Terminal, Clock, LifeBuoy
 } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers/ThemeContext';
 
 export default function SupportPage() {
   const router = useRouter();

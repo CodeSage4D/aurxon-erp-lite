@@ -6,7 +6,7 @@ import {
   Building2, ShieldCheck, KeyRound, LifeBuoy, ArrowRight, 
   Terminal, Activity, Sparkles, LogIn, ExternalLink, AlertTriangle 
 } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers/ThemeContext';
 
 export default function RootPage() {
   const router = useRouter();

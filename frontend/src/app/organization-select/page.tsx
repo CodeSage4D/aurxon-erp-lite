@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { switchContextApi } from '@/lib/api';
+import { switchContextApi } from '@/services/api';
 import { Shield, Sparkles, Building, ArrowRight, LogOut, CheckCircle } from 'lucide-react';
 
 interface Membership {

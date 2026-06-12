@@ -6,7 +6,7 @@ import {
   Building2, ArrowRight, ArrowLeft, Check, CheckCircle2, AlertCircle, Sparkles, 
   GraduationCap, Stethoscope, Briefcase, KeyRound, User, Eye, EyeOff, Copy, Loader2
 } from 'lucide-react';
-import { registerOrganizationWithAdminApi, sendOtpApi, verifyOtpApi } from '@/lib/api';
+import { registerOrganizationWithAdminApi, sendOtpApi, verifyOtpApi } from '@/services/api';
 
 const INDUSTRY_PACKS = [
   { 

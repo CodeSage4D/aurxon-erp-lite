@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "@/context/ThemeContext";
-import { BrandProvider } from "@/context/BrandContext";
-import { TenantProvider } from "@/context/TenantContext";
-import { AuthProvider } from "@/context/AuthContext";
-import { NotificationProvider } from "@/context/NotificationContext";
+import { ThemeProvider } from "@/providers/ThemeContext";
+import { BrandProvider } from "@/providers/BrandContext";
+import { TenantProvider } from "@/providers/TenantContext";
+import { AuthProvider } from "@/providers/AuthContext";
+import { NotificationProvider } from "@/providers/NotificationContext";
 
 export const metadata: Metadata = {
   title: "Workspace Portal",

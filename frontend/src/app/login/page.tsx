@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginApi, switchContextApi } from '@/lib/api';
+import { loginApi, switchContextApi } from '@/services/api';
 import { Shield, Sparkles, LogIn, AlertTriangle, HelpCircle } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers/ThemeContext';
 
 export default function LoginPage() {
   const router = useRouter();

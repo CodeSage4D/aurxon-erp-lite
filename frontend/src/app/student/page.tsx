@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import StudentDashboard from '@/13_StudentPortal/StudentDashboard';
+import StudentDashboard from '@/modules/ROLE_ENGINE/Student/StudentDashboard';
 
 export default function StudentPortalPage() {
   const router = useRouter();

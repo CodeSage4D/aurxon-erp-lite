@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginApi } from '@/lib/api';
+import { loginApi } from '@/services/api';
 import { ShieldCheck, Sparkles, LogIn, Lock, Mail, Users, ArrowRight } from 'lucide-react';
 
 export default function TeamsLoginPage() {

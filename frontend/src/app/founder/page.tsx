@@ -21,11 +21,11 @@ import {
   technicalReviewRegistrationApi, provisionWorkspaceApi,
   verifyRegistrationManualApi, resendVerificationOtpApi,
   suspendInstitutionApi, resumeInstitutionApi, resetSetupWizardApi, resetUserPasswordApi
-} from '@/lib/api';
+} from '@/services/api';
 
-import { useTheme } from '@/context/ThemeContext';
-import { useNotifications, PlatformNotification } from '@/context/NotificationContext';
-import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/providers/ThemeContext';
+import { useNotifications, PlatformNotification } from '@/providers/NotificationContext';
+import { useAuth } from '@/providers/AuthContext';
 
 import { 
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,

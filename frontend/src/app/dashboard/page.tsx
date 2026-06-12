@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, Search, Sparkles, Bell, Sun, Moon, ChevronRight, Building2, ShieldCheck, Database, HardDrive, KeyRound, ArrowUpRight, Plus, HelpCircle, Activity } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers/ThemeContext';
 
 import {
   getDashboardStatsApi,
@@ -45,36 +45,36 @@ import {
   createExpenseApi,
   updateSettingsApi,
   createBranchApi
-} from '@/lib/api';
+} from '@/services/api';
 
 // Overlay Modals
-import EmployeeModal from '@/07_Staff/StaffProfile/hr/EmployeeModal';
-import HireFormModal from '@/07_Staff/StaffProfile/hr/HireFormModal';
-import PayslipModal from '@/07_Staff/StaffProfile/hr/PayslipModal';
-import PayslipGeneratorModal from '@/07_Staff/StaffProfile/hr/PayslipGeneratorModal';
+import EmployeeModal from '@/modules/COMMON_PLATFORM/HR/EmployeeModal';
+import HireFormModal from '@/modules/COMMON_PLATFORM/HR/HireFormModal';
+import PayslipModal from '@/modules/COMMON_PLATFORM/HR/PayslipModal';
+import PayslipGeneratorModal from '@/modules/COMMON_PLATFORM/HR/PayslipGeneratorModal';
 
 // Sub-components Tab Sheets
-import Sidebar from '@/01_Core/Dashboard/Sidebar';
-import CommandPalette from '@/01_Core/Dashboard/CommandPalette';
-import AiAssistant from '@/01_Core/Dashboard/AiAssistant';
-import OverviewTab from '@/01_Core/Dashboard/OverviewTab';
-import DynamicDashboard from '@/01_Core/Dashboard/DynamicDashboard';
-import AcademicTab from '@/03_Academics/Class/AcademicTab';
-import StudentsTab from '@/02_Admission/StudentProfile/StudentsTab';
-import ExamsTab from '@/06_Exams/ExamSetup/ExamsTab';
-import AttendanceTab from '@/04_Attendance/StudentAttendance/AttendanceTab';
-import FeesTab from '@/05_Fees/FeeStructure/FeesTab';
-import CommsTab from '@/08_Communication/Notices/CommsTab';
-import LibraryTab from '@/14_FutureTrendModules/Library/LibraryTab';
-import GateTab from '@/14_FutureTrendModules/VisitorManagement/GateTab';
-import ProductivityTab from '@/14_FutureTrendModules/Productivity/ProductivityTab';
-import CertificatesTab from '@/11_Documents/Certificates/CertificatesTab';
-import InventoryTab from '@/14_FutureTrendModules/Inventory/InventoryTab';
-import HrTab from '@/07_Staff/StaffProfile/HrTab';
-import ReportsDashboard from '@/09_Reports/ReportsDashboard';
-import AnalyticsDashboard from '@/10_Analytics/AnalyticsDashboard';
-import SettingsTab from '@/01_Core/Dashboard/SettingsTab';
-import OperationsDashboard from '@/01_Core/Dashboard/OperationsDashboard';
+import Sidebar from '@/modules/WORKSPACE_ENGINE/Dashboard/Sidebar';
+import CommandPalette from '@/modules/WORKSPACE_ENGINE/Dashboard/CommandPalette';
+import AiAssistant from '@/modules/WORKSPACE_ENGINE/Dashboard/AiAssistant';
+import OverviewTab from '@/modules/WORKSPACE_ENGINE/Dashboard/OverviewTab';
+import DynamicDashboard from '@/modules/WORKSPACE_ENGINE/Dashboard/DynamicDashboard';
+import AcademicTab from '@/modules/INDUSTRY_PACKS/SCHOOL/Academics/AcademicTab';
+import StudentsTab from '@/modules/INDUSTRY_PACKS/SCHOOL/Admission/StudentsTab';
+import ExamsTab from '@/modules/INDUSTRY_PACKS/SCHOOL/Exams/ExamsTab';
+import AttendanceTab from '@/modules/INDUSTRY_PACKS/SCHOOL/Attendance/AttendanceTab';
+import FeesTab from '@/modules/INDUSTRY_PACKS/SCHOOL/Fees/FeesTab';
+import CommsTab from '@/modules/SHARED/Notifications/CommsTab';
+import LibraryTab from '@/modules/INDUSTRY_PACKS/SCHOOL/Library/LibraryTab';
+import GateTab from '@/modules/SHARED/Documents/GateTab';
+import ProductivityTab from '@/modules/SHARED/Productivity/ProductivityTab';
+import CertificatesTab from '@/modules/SHARED/Documents/CertificatesTab';
+import InventoryTab from '@/modules/SHARED/Inventory/InventoryTab';
+import HrTab from '@/modules/COMMON_PLATFORM/Staff/HrTab';
+import ReportsDashboard from '@/modules/COMMON_PLATFORM/Reports/ReportsDashboard';
+import AnalyticsDashboard from '@/modules/COMMON_PLATFORM/Reports/AnalyticsDashboard';
+import SettingsTab from '@/modules/WORKSPACE_ENGINE/Dashboard/SettingsTab';
+import OperationsDashboard from '@/modules/WORKSPACE_ENGINE/Dashboard/OperationsDashboard';
 
 export default function DashboardPage() {
   const router = useRouter();

@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { founderLoginApi } from '@/lib/api';
+import { founderLoginApi } from '@/services/api';
 import {
   Shield, Sparkles, LogIn, AlertTriangle, Eye, EyeOff,
   Lock, Mail, Terminal, ArrowLeft, Check, Zap, Globe, Activity
 } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers/ThemeContext';
 
 export default function FounderLoginPage() {
   const router = useRouter();
