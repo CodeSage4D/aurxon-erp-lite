@@ -72,8 +72,10 @@ export default function RootPage() {
     const isLocalhost = host.includes('localhost');
     const isVercel = hostname.includes('vercel.app') || hostname.includes('amplifyapp.com');
 
-    if (isVercel) {
-      return path; // On Vercel, just return relative path
+    // On Vercel, or on localhost when we want to use cookie-based fallback (root localhost without subdomain)
+    const isLocalhostRoot = isLocalhost && (parts.length === 1 || (parts.length === 2 && parts[1].startsWith('localhost')));
+    if (isVercel || isLocalhostRoot) {
+      return path; // On Vercel or localhost root, just return relative path
     }
     
     let baseDomain = '';
@@ -88,9 +90,12 @@ export default function RootPage() {
 
   const handlePortalClick = (e: React.MouseEvent<HTMLAnchorElement>, sub: string, path: string) => {
     const host = window.location.hostname;
+    const parts = host.split('.');
+    const isLocalhost = host.includes('localhost');
     const isVercel = host.includes('vercel.app') || host.includes('amplifyapp.com');
+    const isLocalhostRoot = isLocalhost && (parts.length === 1 || (parts.length === 2 && parts[1].startsWith('localhost')));
     
-    if (isVercel) {
+    if (isVercel || isLocalhostRoot) {
       e.preventDefault();
       // Set tenant cookie
       document.cookie = `aurxon_tenant_slug=${sub}; path=/; max-age=86400; SameSite=Lax`;
@@ -119,9 +124,12 @@ export default function RootPage() {
     }
 
     const host = window.location.hostname;
+    const parts = host.split('.');
+    const isLocalhost = host.includes('localhost');
     const isVercel = host.includes('vercel.app') || host.includes('amplifyapp.com');
+    const isLocalhostRoot = isLocalhost && (parts.length === 1 || (parts.length === 2 && parts[0] === 'localhost'));
 
-    if (isVercel) {
+    if (isVercel || isLocalhostRoot) {
       // Set cookie and navigate locally
       document.cookie = `aurxon_tenant_slug=${slug}; path=/; max-age=86400; SameSite=Lax`;
       router.push('/login');

@@ -102,7 +102,8 @@ export function middleware(request: NextRequest) {
   } 
   // 5. Root domain or empty/www (Platform Directory)
   else if (!subdomain || subdomain === 'www' || subdomain === 'aurxon-erp-lite') {
-    if (isVercelHost) {
+    const shouldUseCookies = isVercelHost || host.includes('localhost');
+    if (shouldUseCookies) {
       if (url.pathname.startsWith('/register')) {
         const requestHeaders = new Headers(request.headers);
         requestHeaders.set('x-tenant-slug', 'register');
