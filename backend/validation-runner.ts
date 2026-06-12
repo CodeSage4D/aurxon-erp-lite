@@ -171,6 +171,32 @@ async function runValidations() {
 
   // --- Scenario 3 & 4: Org Lifecycle & Registration Approval Workflow ---
   try {
+    // Clean up any registrations/users/institutions/tenants from previous runs using this phone/org name
+    const existingRegs = await prisma.organizationRegistration.findMany({
+      where: { OR: [{ phone: '9876543210' }, { orgName: 'Lifecycle Test Org' }, { orgName: 'Rejected Org' }] }
+    });
+    for (const reg of existingRegs) {
+      if (reg.institutionId) {
+        const inst = await prisma.institution.findUnique({
+          where: { id: reg.institutionId },
+          select: { tenantId: true }
+        });
+        await prisma.organizationMembership.deleteMany({ where: { institutionId: reg.institutionId } }).catch(() => {});
+        await prisma.user.deleteMany({ where: { institutionId: reg.institutionId } }).catch(() => {});
+        await prisma.institution.delete({ where: { id: reg.institutionId } }).catch(() => {});
+        if (inst && inst.tenantId) {
+          await prisma.tenant.delete({ where: { id: inst.tenantId } }).catch(() => {});
+        }
+      }
+      await prisma.activationToken.deleteMany({ where: { registrationId: reg.id } }).catch(() => {});
+      await prisma.activationKey.deleteMany({ where: { registrationId: reg.id } }).catch(() => {});
+      await prisma.organizationRegistration.delete({ where: { id: reg.id } }).catch(() => {});
+    }
+
+    await prisma.otpVerification.deleteMany({
+      where: { OR: [{ phone: '9876543210' }, { email: { contains: 'lifecycle.com' } }] }
+    }).catch(() => {});
+
     // Pre-verify phone number via OTP for validation-runner
     await prisma.otpVerification.upsert({
       where: { phone: '9876543210' },
